@@ -7,12 +7,25 @@
 
 @layer base {
   body {
-    @apply bg-slate-50/50 text-slate-900;
+    @apply bg-slate-50/50 text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Better focus styles */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-indigo-500;
   }
 }
 
+/* Custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
@@ -25,10 +38,44 @@
   background: #cbd5e1;
 }
 
+/* Glass card effect */
 .glass-card {
   @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
 }
 
+/* Neo shadow */
 .neo-shadow {
   @apply shadow-[0_20px_50px_rgba(8,112,184,0.05)];
+}
+
+/* Sidebar transition for mobile */
+.sidebar-overlay {
+  @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300;
+}
+
+/* Table input styles */
+table input[type="number"],
+table input[type="text"] {
+  @apply transition-colors duration-200;
+}
+table input[type="number"]:focus,
+table input[type="text"]:focus {
+  @apply bg-indigo-50/50 rounded-lg px-1;
+}
+
+/* Animation for loading pulse */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Print styles */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
 }
