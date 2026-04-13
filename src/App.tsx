@@ -9,12 +9,13 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { 
-  TrendingUp, ShoppingBag, DollarSign, Calendar, Filter, 
-  ChevronDown, Download, LayoutDashboard, Package, CreditCard, 
+import {
+  TrendingUp, ShoppingBag, DollarSign, Calendar, Filter,
+  ChevronDown, Download, LayoutDashboard, Package, CreditCard,
   UserCheck, Users, ArrowUpRight, ArrowDownRight, Search, RefreshCw,
   Target, MessageSquare, Bell, Settings, Rocket, MoreHorizontal, Plus,
-  ChevronRight, LogOut, Activity, Eye, Zap, AlertCircle, Smartphone
+  ChevronRight, LogOut, Activity, Eye, Zap, AlertCircle, Smartphone,
+  Menu, X, FileSpreadsheet, BarChart3, Upload
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, getYear, getMonth, getQuarter } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -2209,9 +2210,10 @@ const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], avai
   );
 };
 
-const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
+const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }: { activeTab: string, setActiveTab: (t: string) => void, isOpen: boolean, onClose: () => void }) => {
   const menuItems = [
     { id: 'overview', icon: LayoutDashboard, label: 'Ringkasan Performa' },
+    { id: 'monitoring', icon: BarChart3, label: 'Monitoring Real-time' },
     { id: 'optimasi', icon: TrendingUp, label: 'Optimasi Harga' },
     { id: 'target', icon: Target, label: 'Strategi & Target' },
     { id: 'packages', icon: Package, label: 'Performa Produk' },
@@ -2222,130 +2224,180 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 
+  const handleTabClick = (id: string) => {
+    setActiveTab(id);
+    onClose();
+  };
+
   return (
-    <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col h-screen sticky top-0 overflow-y-auto">
-      <div className="p-8 border-b border-slate-800 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 flex items-center justify-center">
-            <img 
-              src="/logo_transparent.png" 
-              alt="Logo" 
-              className="w-full h-full object-contain" 
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                // Fallback if logo not found
-                e.currentTarget.style.display = 'none';
-                const fallback = document.createElement('div');
-                fallback.className = 'w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200';
-                fallback.innerHTML = '<svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-5c1.62-2.2 5-3 5-3"></path><path d="M12 15v5s3.03-.55 5-2c2.2-1.62 3-5 3-5"></path></svg>';
-                e.currentTarget.parentElement!.appendChild(fallback);
-              }}
-            />
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div className="sidebar-overlay lg:hidden" onClick={onClose} />
+      )}
+
+      <div className={cn(
+        "w-72 bg-slate-900 border-r border-slate-800 flex flex-col h-screen overflow-y-auto custom-scrollbar transition-transform duration-300 ease-in-out z-50",
+        "fixed lg:sticky top-0",
+        isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}>
+        <div className="p-8 border-b border-slate-800 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 flex items-center justify-center">
+                <img
+                  src="/logo_transparent.png"
+                  alt="Logo"
+                  className="w-full h-full object-contain"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = document.createElement('div');
+                    fallback.className = 'w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200';
+                    fallback.innerHTML = '<svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-5c1.62-2.2 5-3 5-3"></path><path d="M12 15v5s3.03-.55 5-2c2.2-1.62 3-5 3-5"></path></svg>';
+                    e.currentTarget.parentElement!.appendChild(fallback);
+                  }}
+                />
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-white tracking-tight leading-none">SiMarsel<span className="text-indigo-500">.</span></h1>
+                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1.5">PT. Cerebrum Edukanesia</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="lg:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-all">
+              <X className="w-5 h-5" />
+            </button>
           </div>
+        </div>
+
+        <div className="flex-1 px-4 space-y-8">
           <div>
-            <h1 className="text-xl font-black text-white tracking-tight leading-none">SiMarsel<span className="text-indigo-500">.</span></h1>
-            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1.5">PT. Cerebrum Edukanesia</p>
+            <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Menu Utama</p>
+            <div className="space-y-1">
+              {menuItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabClick(item.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-bold transition-all group",
+                    activeTab === item.id
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className={cn("w-5 h-5", activeTab === item.id ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
+                    {item.label}
+                  </div>
+                  {activeTab === item.id && (
+                    <motion.div layoutId="activeTab" className="w-1.5 h-1.5 bg-white rounded-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Sistem</p>
+            <div className="space-y-1">
+              {accountItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabClick(item.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-bold transition-all group",
+                    activeTab === item.id
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className={cn("w-5 h-5", activeTab === item.id ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
+                    {item.label}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 mt-auto">
+          <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Status Server</p>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-[11px] font-black text-white">Online & Terkoneksi</span>
+            </div>
           </div>
         </div>
       </div>
-
-      <div className="flex-1 px-4 space-y-8">
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Menu Utama</p>
-          <div className="space-y-1">
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={cn(
-                  "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-bold transition-all group",
-                  activeTab === item.id 
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20" 
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className={cn("w-5 h-5", activeTab === item.id ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
-                  {item.label}
-                </div>
-                {activeTab === item.id && (
-                  <motion.div layoutId="activeTab" className="w-1.5 h-1.5 bg-white rounded-full" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Sistem</p>
-          <div className="space-y-1">
-            {accountItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={cn(
-                  "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-bold transition-all group",
-                  activeTab === item.id 
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20" 
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className={cn("w-5 h-5", activeTab === item.id ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
-                  {item.label}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="p-6 mt-auto">
-        <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Status Server</p>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[11px] font-black text-white">Online & Terkoneksi</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    </>
   );
 };
 
-const TopBar = () => {
+const TopBar = ({ onMenuToggle, searchQuery, setSearchQuery, activeTab }: { onMenuToggle: () => void, searchQuery: string, setSearchQuery: (q: string) => void, activeTab: string }) => {
+  const tabLabels: Record<string, string> = {
+    overview: 'Ringkasan Performa',
+    monitoring: 'Monitoring Real-time',
+    optimasi: 'Optimasi Harga',
+    target: 'Strategi & Target',
+    packages: 'Performa Produk',
+    calendar: 'Kalender Paket',
+    settings: 'Pengaturan',
+  };
+
   return (
-    <div className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 flex items-center justify-between sticky top-0 z-30">
-      <div className="relative w-96">
+    <div className="h-16 lg:h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 lg:px-8 flex items-center justify-between sticky top-0 z-30 gap-4">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuToggle}
+          className="lg:hidden p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-slate-100"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="hidden sm:block">
+          <h2 className="text-sm font-black text-slate-900 tracking-tight">{tabLabels[activeTab] || 'Dashboard'}</h2>
+          <p className="text-[10px] text-slate-400 font-medium">SiMarsel Analytics Dashboard</p>
+        </div>
+      </div>
+      <div className="relative w-full max-w-xs lg:max-w-sm">
         <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-        <input 
-          type="text" 
-          placeholder="Search Anything" 
-          className="w-full bg-slate-50 border border-slate-100 rounded-xl py-2.5 pl-11 pr-4 text-sm font-medium focus:ring-4 focus:ring-indigo-100 outline-none transition-all"
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Cari transaksi, paket..."
+          className="w-full bg-slate-50 border border-slate-100 rounded-xl py-2.5 pl-11 pr-4 text-sm font-medium focus:ring-4 focus:ring-indigo-100 outline-none transition-all placeholder:text-slate-300"
         />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-slate-500 transition-colors">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
 };
 
-const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[], downloader: Downloader[]) => void }) => {
+const SettingsSection = ({ onDataUpdate, data, downloaderData, apps }: { onDataUpdate: (data: Transaction[], downloader: Downloader[]) => void, data: Transaction[], downloaderData: Downloader[], apps: AppData[] }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
+    setUploadSuccess(false);
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const bstr = event.target?.result;
         const workbook = XLSX.read(bstr, { type: 'binary' });
-        
+
         let transactions: any[] = [];
         let downloaders: any[] = [];
 
-        // Look for sheets
         workbook.SheetNames.forEach(name => {
           const sheet = workbook.Sheets[name];
           const jsonData = XLSX.utils.sheet_to_json(sheet);
@@ -2356,7 +2408,6 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
           }
         });
 
-        // Fallback if sheet names are different
         if (transactions.length === 0 && workbook.SheetNames.length > 0) {
           transactions = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         }
@@ -2364,12 +2415,9 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
           downloaders = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[1]]);
         }
 
-        // We need to pass raw data to the parent which has the processing logic
-        // But the parent expects processed data. Let's assume the parent will handle it.
-        // Actually, it's better to trigger a re-processing in the parent.
-        // For now, we'll just pass the raw data and let the parent handle it via a new prop.
         (onDataUpdate as any)(transactions, downloaders);
-        alert('Data berhasil diperbarui!');
+        setUploadSuccess(true);
+        setTimeout(() => setUploadSuccess(false), 3000);
       } catch (err) {
         console.error(err);
         alert('Gagal memproses file. Pastikan format Excel benar.');
@@ -2380,37 +2428,188 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
     reader.readAsBinaryString(file);
   };
 
+  const handleExportData = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Export transactions
+    if (data.length > 0) {
+      const exportData = data.map(d => ({
+        transaction_date: d.transaction_date,
+        payment_date: format(d.parsed_payment_date, 'yyyy-MM-dd'),
+        trx_id: d.trx_id,
+        source_app: d.source_app,
+        methode_name: d.methode_name,
+        revenue: d.revenue,
+        promo_code: d.promo_code,
+        content_name: d.content_name,
+        full_name: d.full_name,
+        email: d.email,
+        phone: d.phone,
+        payment_status: d.payment_status,
+      }));
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(wb, ws, 'TRANSAKSI');
+    }
+
+    // Export downloader data
+    if (downloaderData.length > 0) {
+      const dlData = downloaderData.map(d => ({
+        date: format(d.parsed_date, 'yyyy-MM-dd'),
+        source_app: d.source_app,
+        count: d.count,
+      }));
+      const ws2 = XLSX.utils.json_to_sheet(dlData);
+      XLSX.utils.book_append_sheet(wb, ws2, 'DOWNLOADER');
+    }
+
+    XLSX.writeFile(wb, `SiMarsel_Export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
+  const handleExportTargets = () => {
+    const wb = XLSX.utils.book_new();
+    const rows: any[] = [];
+
+    apps.forEach(app => {
+      Object.keys(app.targetConfig || {}).forEach(month => {
+        const config = app.targetConfig[month];
+        if (typeof config === 'object' && config !== null) {
+          rows.push({
+            app_name: app.name,
+            month,
+            target_downloader: config.targetDownloader || 0,
+            target_user_premium: config.targetUserPremium || 0,
+            target_sales: config.targetSales || 0,
+            target_conversion: config.targetConversion || 0,
+            avg_price: config.avgPrice || 0,
+          });
+        }
+      });
+    });
+
+    if (rows.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, 'TARGET');
+    }
+
+    XLSX.writeFile(wb, `SiMarsel_Targets_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   return (
     <div className="space-y-8">
+      {/* Upload Section */}
       <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
         <div className="flex items-center gap-3 mb-8">
           <div className="p-2.5 bg-indigo-50 rounded-xl">
-            <Settings className="w-5 h-5 text-indigo-600" />
+            <Upload className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">Pengaturan Data</h3>
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">Import Data</h3>
             <p className="text-xs text-slate-400 font-medium mt-1">Upload file Excel baru untuk memperbarui dashboard</p>
           </div>
         </div>
 
         <div className="max-w-xl">
-          <div className="p-12 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50/50 flex flex-col items-center justify-center text-center group hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer relative">
-            <input 
-              type="file" 
-              accept=".xlsx, .xls" 
+          <div className={cn(
+            "p-12 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center text-center group transition-all cursor-pointer relative",
+            uploadSuccess
+              ? "border-emerald-300 bg-emerald-50/30"
+              : "border-slate-200 bg-slate-50/50 hover:border-indigo-300 hover:bg-indigo-50/30"
+          )}>
+            <input
+              type="file"
+              accept=".xlsx, .xls"
               onChange={handleFileUpload}
               className="absolute inset-0 opacity-0 cursor-pointer"
               disabled={isUploading}
             />
             <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              {isUploading ? <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" /> : <Download className="w-8 h-8 text-slate-400 group-hover:text-indigo-600" />}
+              {isUploading ? (
+                <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+              ) : uploadSuccess ? (
+                <ArrowUpRight className="w-8 h-8 text-emerald-600" />
+              ) : (
+                <Upload className="w-8 h-8 text-slate-400 group-hover:text-indigo-600" />
+              )}
             </div>
             <h4 className="text-sm font-black text-slate-900 mb-1">
-              {isUploading ? 'Memproses File...' : 'Klik atau Drag file Excel di sini'}
+              {isUploading ? 'Memproses File...' : uploadSuccess ? 'Data Berhasil Diperbarui!' : 'Klik atau Drag file Excel di sini'}
             </h4>
             <p className="text-xs text-slate-400 font-medium">
               Format: .xlsx atau .xls dengan sheet TRANSAKSI dan DOWNLOADER
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Export Section */}
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-2.5 bg-emerald-50 rounded-xl">
+            <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">Export Data</h3>
+            <p className="text-xs text-slate-400 font-medium mt-1">Download data transaksi atau target dalam format Excel</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-xl">
+          <button
+            onClick={handleExportData}
+            disabled={data.length === 0}
+            className="p-6 border-2 border-slate-100 rounded-2xl hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group text-left disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <Download className="w-6 h-6 text-indigo-600" />
+            </div>
+            <h4 className="text-sm font-black text-slate-900 mb-1">Export Transaksi</h4>
+            <p className="text-[10px] text-slate-400 font-medium">{data.length > 0 ? `${formatNumber(data.length)} transaksi tersedia` : 'Belum ada data'}</p>
+          </button>
+
+          <button
+            onClick={handleExportTargets}
+            disabled={apps.every(a => Object.keys(a.targetConfig || {}).length === 0)}
+            className="p-6 border-2 border-slate-100 rounded-2xl hover:border-emerald-200 hover:bg-emerald-50/30 transition-all group text-left disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <Target className="w-6 h-6 text-emerald-600" />
+            </div>
+            <h4 className="text-sm font-black text-slate-900 mb-1">Export Target</h4>
+            <p className="text-[10px] text-slate-400 font-medium">
+              {apps.reduce((sum, a) => sum + Object.keys(a.targetConfig || {}).length, 0)} konfigurasi target
+            </p>
+          </button>
+        </div>
+      </div>
+
+      {/* Data Stats Summary */}
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-2.5 bg-violet-50 rounded-xl">
+            <Activity className="w-5 h-5 text-violet-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">Status Data</h3>
+            <p className="text-xs text-slate-400 font-medium mt-1">Ringkasan data yang tersedia di dashboard</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Transaksi</p>
+            <p className="text-lg font-black text-slate-900">{formatNumber(data.length)}</p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Downloader</p>
+            <p className="text-lg font-black text-slate-900">{formatNumber(downloaderData.length)}</p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Aplikasi</p>
+            <p className="text-lg font-black text-slate-900">{apps.length}</p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data Tersimpan</p>
+            <p className="text-lg font-black text-emerald-600">Lokal</p>
           </div>
         </div>
       </div>
@@ -2426,7 +2625,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [filters, setFilters] = useState({
     source_app: 'All',
     year: 'All',
@@ -2434,24 +2632,53 @@ export default function App() {
     methode_name: 'All'
   });
 
-  const [apps, setApps] = useState<any[]>([
-    {
+  // Mobile sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Global search
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Load apps from localStorage or use default
+  const [apps, setApps] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('simarsel_apps');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [{
       id: '1',
       name: 'App Utama',
-      targetConfig: {
-        targetDownloader: 0,
-        targetUserPremium: 0,
-        targetSales: 0,
-        targetConversion: 0,
-        avgPrice: 0,
-      },
-      dailyData: {}, // Keyed by YYYY-MM-DD
-      isTargetSet: false
-    }
-  ]);
-  const [selectedAppId, setSelectedAppId] = useState('1');
-  const [targetMonth, setTargetMonth] = useState(format(new Date(), 'yyyy-MM'));
+      targetConfig: {},
+      dailyData: {},
+      isTargetSet: {}
+    }];
+  });
+
+  const [selectedAppId, setSelectedAppId] = useState(() => {
+    try {
+      return localStorage.getItem('simarsel_selectedAppId') || '1';
+    } catch { return '1'; }
+  });
+
+  const [targetMonth, setTargetMonth] = useState(() => {
+    try {
+      return localStorage.getItem('simarsel_targetMonth') || format(new Date(), 'yyyy-MM');
+    } catch { return format(new Date(), 'yyyy-MM'); }
+  });
+
   const [calendarFocusDate, setCalendarFocusDate] = useState<Date | null>(null);
+
+  // Persist apps to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('simarsel_apps', JSON.stringify(apps)); } catch {}
+  }, [apps]);
+
+  useEffect(() => {
+    try { localStorage.setItem('simarsel_selectedAppId', selectedAppId); } catch {}
+  }, [selectedAppId]);
+
+  useEffect(() => {
+    try { localStorage.setItem('simarsel_targetMonth', targetMonth); } catch {}
+  }, [targetMonth]);
 
   // --- Data Loading ---
 
@@ -2655,14 +2882,22 @@ export default function App() {
   // --- Filtered Data & Analytics ---
 
   const filteredData = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return data.filter(item => {
       const matchApp = filters.source_app === 'All' || item.source_app === filters.source_app;
       const matchYear = filters.year === 'All' || item.year === Number(filters.year);
       const matchMonth = filters.month === 'All' || item.month === Number(filters.month);
       const matchMethod = filters.methode_name === 'All' || item.methode_name === filters.methode_name;
-      return matchApp && matchYear && matchMonth && matchMethod;
+      const matchSearch = !q || (
+        (item.content_name || '').toLowerCase().includes(q) ||
+        (item.full_name || '').toLowerCase().includes(q) ||
+        (item.trx_id || '').toLowerCase().includes(q) ||
+        (item.source_app || '').toLowerCase().includes(q) ||
+        (item.email || '').toLowerCase().includes(q)
+      );
+      return matchApp && matchYear && matchMonth && matchMethod && matchSearch;
     });
-  }, [data, filters]);
+  }, [data, filters, searchQuery]);
 
   const filteredDownloaderData = useMemo(() => {
     return downloaderData.filter(item => {
@@ -3170,12 +3405,12 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc] text-slate-900 font-sans selection:bg-indigo-100">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      
-      <div className="flex-1 flex flex-col min-w-0">
-        <TopBar />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <main className="p-8 max-w-[1600px] mx-auto w-full">
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar onMenuToggle={() => setSidebarOpen(!sidebarOpen)} searchQuery={searchQuery} setSearchQuery={setSearchQuery} activeTab={activeTab} />
+
+        <main className="p-4 lg:p-8 max-w-[1600px] mx-auto w-full">
         {/* Dynamic Content Based on Tabs */}
         <AnimatePresence mode="wait">
           {activeTab === 'overview' && (
@@ -3624,14 +3859,45 @@ export default function App() {
             </motion.div>
           )}
 
+          {activeTab === 'monitoring' && (
+            <motion.div
+              key="monitoring"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+            >
+              <MonitoringSection
+                data={filteredData}
+                downloaderData={filteredDownloaderData}
+                target={{
+                  revenue: stats.totalTargetRevenue,
+                  targetConversion: (() => {
+                    const relevantApps = filters.source_app === 'All' ? apps : apps.filter(app => app.name.toUpperCase() === filters.source_app.toUpperCase());
+                    const conversions = relevantApps.map(app => {
+                      const monthKey = format(new Date(), 'yyyy-MM');
+                      return app.targetConfig?.[monthKey]?.targetConversion || 0;
+                    }).filter(c => c > 0);
+                    return conversions.length > 0 ? conversions.reduce((a, b) => a + b, 0) / conversions.length : 5;
+                  })(),
+                  packages: apps.flatMap(app => {
+                    const monthKey = format(new Date(), 'yyyy-MM');
+                    const config = app.targetConfig?.[monthKey];
+                    if (!config) return [];
+                    return [{ active: true, price: config.avgPrice || 0 }];
+                  })
+                }}
+              />
+            </motion.div>
+          )}
+
           {activeTab === 'settings' && (
-            <motion.div 
+            <motion.div
               key="settings"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
-              <SettingsSection onDataUpdate={handleDataUpdate} />
+              <SettingsSection onDataUpdate={handleDataUpdate} data={data} downloaderData={downloaderData} apps={apps} />
             </motion.div>
           )}
 
@@ -3786,12 +4052,16 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="max-w-[1600px] mx-auto p-12 text-center border-t border-slate-100 mt-12">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100">
-            <TrendingUp className="w-5 h-5 text-slate-400" />
+      <footer className="max-w-[1600px] mx-auto px-4 lg:px-12 py-8 lg:py-12 text-center border-t border-slate-100 mt-12 no-print">
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-white" />
+            </div>
+            <h3 className="text-sm font-black text-slate-900 tracking-tight">SiMarsel<span className="text-indigo-500">.</span></h3>
           </div>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em]"> Dashboard analytic marketing & sales </p>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">Sales Analytics Dashboard - PT. Cerebrum Edukanesia</p>
+          <p className="text-slate-300 text-[9px] font-medium mt-1">Data tersimpan secara lokal di browser Anda</p>
         </div>
       </footer>
     </div>
