@@ -20,6 +20,7 @@ import {
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, getYear, getMonth, getQuarter } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
+import { dbSet, dbGet } from './lib/db';
 import { INITIAL_DATA } from './data';
 
 // --- Types ---
@@ -2763,15 +2764,52 @@ export default function App() {
     setDownloaderData(processedDownloaders);
   }, [processData, processDownloaderData]);
 
+  // Save data to IndexedDB whenever it changes (and has content)
+  useEffect(() => {
+    if (data.length > 0) {
+      dbSet('transactions', data).catch(() => {});
+    }
+  }, [data]);
+
+  useEffect(() => {
+    if (downloaderData.length > 0) {
+      dbSet('downloaders', downloaderData).catch(() => {});
+    }
+  }, [downloaderData]);
+
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
 
-        // Try multiple possible paths for the database file FIRST
+        // 1. Try IndexedDB first (persisted from previous upload)
+        try {
+          const [savedTx, savedDl] = await Promise.all([
+            dbGet<Transaction[]>('transactions'),
+            dbGet<Downloader[]>('downloaders'),
+          ]);
+          if (savedTx && savedTx.length > 0) {
+            // Restore parsed dates (IndexedDB serializes Date as string)
+            const restored = savedTx.map(item => ({
+              ...item,
+              parsed_payment_date: new Date(item.parsed_payment_date),
+            }));
+            setData(restored);
+            if (savedDl && savedDl.length > 0) {
+              setDownloaderData(savedDl.map(d => ({ ...d, parsed_date: new Date(d.parsed_date) })));
+            }
+            setError(null);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('IndexedDB load failed, trying file:', e);
+        }
+
+        // 2. Try fetching xlsx file from public/
         const paths = ['/data_paid_clean.xlsx', 'data_paid_clean.xlsx', './data_paid_clean.xlsx'];
         let response: Response | null = null;
-        
+
         for (const path of paths) {
           try {
             const r = await fetch(path);
@@ -2784,7 +2822,7 @@ export default function App() {
             console.warn(`Failed to fetch from ${path}`);
           }
         }
-        
+
         if (response) {
           const arrayBuffer = await response.arrayBuffer();
           const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -2792,8 +2830,7 @@ export default function App() {
           const findSheet = (keywords: string[]) => {
             return sheetNames.find(s => keywords.some(k => s.toLowerCase().includes(k.toLowerCase())));
           };
-          
-          // Handle sheet "transaksi"
+
           const transactionSheetName = findSheet(['transaksi', 'trx', 'paid']);
           const transactionSheet = transactionSheetName ? workbook.Sheets[transactionSheetName] : workbook.Sheets[sheetNames[0]];
           const transactionJson = XLSX.utils.sheet_to_json(transactionSheet);
@@ -2801,20 +2838,19 @@ export default function App() {
             setData(processData(transactionJson));
           }
 
-          // Handle sheet "downloader"
           const downloaderSheetName = findSheet(['downloader', 'download']);
           const downloaderSheet = downloaderSheetName ? workbook.Sheets[downloaderSheetName] : null;
           if (downloaderSheet) {
             const downloaderJson = XLSX.utils.sheet_to_json(downloaderSheet);
             setDownloaderData(processDownloaderData(downloaderJson));
           }
-          
+
           setError(null);
           setLoading(false);
           return;
         }
 
-        // Fallback to INITIAL_DATA if fetch fails
+        // 3. Fallback to INITIAL_DATA
         if (INITIAL_DATA && INITIAL_DATA.length > 0) {
           const processed = processData(INITIAL_DATA);
           setData(processed);
@@ -2822,11 +2858,11 @@ export default function App() {
           setLoading(false);
           return;
         }
-        
+
         throw new Error('Database file not found');
       } catch (err) {
         console.warn('Initial data load skipped or failed:', err);
-        setError('Silakan unggah file "data_paid_clean.xlsx" untuk memulai.');
+        setError('Silakan unggah file Excel melalui halaman Settings untuk memulai.');
       } finally {
         setLoading(false);
       }
