@@ -73,11 +73,50 @@ interface DashboardStats {
   totalRealPremium: number;
 }
 
+interface SocialMediaContent {
+  platform: string;
+  postingTime: string;
+  contentType: string;
+  title: string;
+  caption: string;
+  cta: string;
+  topic: string;
+  reach: number;
+  engagement: number;
+  views: number;
+  link: string;
+  objective: string;
+}
+
+interface DailyData {
+  targetDownloader: number;
+  targetSales: number;
+  targetUserPremium: number;
+  actualDownloader: number;
+  actualSales: number;
+  actualUserPremium: number;
+  estimasiHarga: number;
+  channel: string;
+  promo: string;
+  premium: string;
+  benefit: string;
+  event: string;
+  activity: string;
+  extra: string;
+  bcan: string;
+  story: string;
+  chat: string;
+  live: string;
+  ads: string;
+  socialContent?: SocialMediaContent[];
+  dailyInsight?: string;
+}
+
 interface AppData {
   id: string;
   name: string;
   targetConfig: Record<string, any>;
-  dailyData: Record<string, any>;
+  dailyData: Record<string, DailyData>;
   isTargetSet: Record<string, boolean>;
 }
 
@@ -107,6 +146,61 @@ const formatCurrency = (value: number) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
+};
+
+const generateDailyInsight = (
+  revenue: number,
+  transactions: number,
+  downloaders: number,
+  strategies: any[],
+  socialContent: SocialMediaContent[]
+) => {
+  if (revenue === 0 && transactions === 0 && downloaders === 0 && strategies.length === 0 && socialContent.length === 0) {
+    return "Tidak ada aktivitas atau data transaksi yang tercatat untuk hari ini.";
+  }
+
+  let insight = "";
+
+  // Analysis of Social Media vs Sales/Traffic
+  if (socialContent.length > 0) {
+    const totalReach = socialContent.reduce((acc, curr) => acc + curr.reach, 0);
+    
+    if (totalReach > 10000 && revenue > 5000000) {
+      insight += `Konten sosial media hari ini sangat efektif dengan reach ${formatNumber(totalReach)}, berkontribusi signifikan terhadap revenue harian yang mencapai ${formatCurrency(revenue)}. `;
+    } else if (totalReach > 5000 && downloaders > 100) {
+      insight += `Aktivitas konten berhasil mendorong traffic baru dengan ${downloaders} downloader baru hari ini. `;
+    } else if (socialContent.some(c => c.engagement > 500)) {
+      insight += `Salah satu konten mendapatkan engagement tinggi, namun konversi ke sales masih perlu dioptimalkan. `;
+    } else {
+      insight += `Aktivitas konten sosial media membantu menjaga brand awareness hari ini. `;
+    }
+  }
+
+  // Analysis of Operational Strategies
+  if (strategies.length > 0) {
+    const hasPromo = strategies.some(s => s.strategy?.promo);
+    const hasPush = strategies.some(s => s.strategy?.chat || s.strategy?.bcan);
+    
+    if (hasPromo && transactions > 50) {
+      insight += `Promo yang dijalankan berhasil meningkatkan volume transaksi menjadi ${transactions} order. `;
+    }
+    if (hasPush && revenue > 0) {
+      insight += `Strategi push notification/chat efektif dalam menjaga momentum sales harian. `;
+    }
+  }
+
+  // General Performance
+  if (revenue > 10000000) {
+    insight += "Performa hari ini sangat luar biasa (High Revenue Day). ";
+  } else if (revenue > 0 && revenue < 1000000) {
+    insight += "Revenue harian stabil, namun ada potensi peningkatan melalui optimalisasi jam posting konten. ";
+  }
+
+  if (!insight) {
+    insight = "Aktivitas harian berjalan normal. Fokus pada konsistensi konten untuk meningkatkan awareness.";
+  }
+
+  return insight;
 };
 
 const formatNumber = (value: number) => {
@@ -177,7 +271,210 @@ const StatCard = ({ title, value, icon: Icon, trend, colorClass, subtitle }: {
   </motion.div>
 );
 
-const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Transaction[], availableOptions: any, apps: AppData[], focusDate?: Date | null }) => {
+const SocialMediaModal = ({ 
+  isOpen, 
+  onClose, 
+  date, 
+  content, 
+  onSave 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  date: string; 
+  content: SocialMediaContent[]; 
+  onSave: (newContent: SocialMediaContent[]) => void;
+}) => {
+  const [localContent, setLocalContent] = useState<SocialMediaContent[]>(content || []);
+
+  useEffect(() => {
+    setLocalContent(content || []);
+  }, [content, isOpen]);
+
+  if (!isOpen) return null;
+
+  const addContent = () => {
+    setLocalContent([...localContent, {
+      platform: 'Instagram',
+      postingTime: '10:00',
+      contentType: 'Feed',
+      title: '',
+      cta: '',
+      topic: '',
+      reach: 0,
+      engagement: 0,
+      views: 0,
+      link: '',
+      objective: 'Awareness'
+    }]);
+  };
+
+  const updateContent = (index: number, field: keyof SocialMediaContent, value: any) => {
+    const updated = [...localContent];
+    updated[index] = { ...updated[index], [field]: value };
+    setLocalContent(updated);
+  };
+
+  const removeContent = (index: number) => {
+    setLocalContent(localContent.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-50 rounded-xl">
+              <MessageSquare className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Input Konten Sosial Media</h3>
+              <p className="text-xs text-slate-400 font-medium mt-1">{format(new Date(date), 'dd MMMM yyyy')}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+            <Plus className="w-5 h-5 text-slate-400 rotate-45" />
+          </button>
+        </div>
+
+        <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+          {localContent.length === 0 ? (
+            <div className="text-center py-20 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200">
+              <MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+              <p className="text-sm font-bold text-slate-400">Belum ada konten sosial media untuk hari ini.</p>
+              <button 
+                onClick={addContent}
+                className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all"
+              >
+                Tambah Konten Pertama
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {localContent.map((item, idx) => (
+                <div key={idx} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 relative group">
+                  <button 
+                    onClick={() => removeContent(idx)}
+                    className="absolute top-4 right-4 p-1.5 bg-rose-50 text-rose-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-100"
+                  >
+                    <Plus className="w-3 h-3 rotate-45" />
+                  </button>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Platform</label>
+                      <select 
+                        value={item.platform}
+                        onChange={(e) => updateContent(idx, 'platform', e.target.value)}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                      >
+                        <option value="Instagram">Instagram</option>
+                        <option value="TikTok">TikTok</option>
+                        <option value="Facebook">Facebook</option>
+                        <option value="Twitter/X">Twitter/X</option>
+                        <option value="YouTube">YouTube</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jam Posting</label>
+                      <input 
+                        type="time"
+                        value={item.postingTime}
+                        onChange={(e) => updateContent(idx, 'postingTime', e.target.value)}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jenis Konten</label>
+                      <select 
+                        value={item.contentType}
+                        onChange={(e) => updateContent(idx, 'contentType', e.target.value)}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                      >
+                        <option value="Feed">Feed</option>
+                        <option value="Reels">Reels</option>
+                        <option value="Story">Story</option>
+                        <option value="Video">Video</option>
+                        <option value="Shorts">Shorts</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-3 space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Judul / Caption</label>
+                      <input 
+                        type="text"
+                        value={item.title}
+                        onChange={(e) => updateContent(idx, 'title', e.target.value)}
+                        placeholder="Masukkan judul atau caption konten..."
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reach</label>
+                      <input 
+                        type="number"
+                        value={item.reach}
+                        onChange={(e) => updateContent(idx, 'reach', Number(e.target.value))}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Engagement</label>
+                      <input 
+                        type="number"
+                        value={item.engagement}
+                        onChange={(e) => updateContent(idx, 'engagement', Number(e.target.value))}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Views</label>
+                      <input 
+                        type="number"
+                        value={item.views}
+                        onChange={(e) => updateContent(idx, 'views', Number(e.target.value))}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button 
+                onClick={addContent}
+                className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+              >
+                <Plus className="w-4 h-4" />
+                Tambah Konten Lainnya
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-4">
+          <button 
+            onClick={onClose}
+            className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+          >
+            Batal
+          </button>
+          <button 
+            onClick={() => {
+              onSave(localContent);
+              onClose();
+            }}
+            className="px-8 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+          >
+            Simpan Data
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDate }: { data: Transaction[], downloaderData: Downloader[], availableOptions: any, apps: AppData[], focusDate?: Date | null }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedApp, setSelectedApp] = useState('');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -188,7 +485,7 @@ const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Tr
       setSelectedDay(format(focusDate, 'yyyy-MM-dd'));
     }
   }, [focusDate]);
-  
+
   const filteredData = useMemo(() => {
     if (!selectedApp) return data;
     return data.filter(d => d.source_app.toUpperCase() === selectedApp.toUpperCase());
@@ -238,6 +535,21 @@ const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Tr
 
     return map;
   }, [filteredData]);
+
+  const selectedDayInsight = useMemo(() => {
+    if (!selectedDay) return "";
+    
+    const dayRevenue = activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.revenue, 0) || 0;
+    const dayTransactions = activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.transactions, 0) || 0;
+    const dayDownloaders = downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).reduce((acc, curr) => acc + curr.count, 0);
+    const dayStrategies = apps.map(app => ({
+      appName: app.name,
+      strategy: app.dailyData?.[selectedDay]
+    })).filter(s => s.strategy);
+    const daySocialContent = apps.flatMap(app => app.dailyData?.[selectedDay]?.socialContent || []);
+    
+    return generateDailyInsight(dayRevenue, dayTransactions, dayDownloaders, dayStrategies, daySocialContent);
+  }, [selectedDay, activePackagesByDay, downloaderData, apps]);
 
   const selectedMonthPackages = useMemo(() => {
     const monthStr = format(currentMonth, 'yyyy-MM');
@@ -408,17 +720,56 @@ const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Tr
                   Tutup
                 </button>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Revenue</p>
+                  <h3 className="text-xl font-black text-indigo-600">
+                    {formatCurrency(activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.revenue, 0) || 0)}
+                  </h3>
+                </div>
+                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Transaksi</p>
+                  <h3 className="text-xl font-black text-emerald-600">
+                    {formatNumber(activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.transactions, 0) || 0)}
+                  </h3>
+                </div>
+                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
+                  <h3 className="text-xl font-black text-violet-600">
+                    {formatNumber(downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).reduce((acc, curr) => acc + curr.count, 0))}
+                  </h3>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).map((d, i) => (
+                      <span key={i} className="text-[8px] font-bold text-violet-500 bg-violet-50 px-2 py-0.5 rounded border border-violet-100">
+                        {d.source_app}: {d.count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">AOV Harian</p>
+                  <h3 className="text-xl font-black text-amber-600">
+                    {(() => {
+                      const rev = activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.revenue, 0) || 0;
+                      const trx = activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.transactions, 0) || 0;
+                      return trx ? formatCurrency(rev / trx) : 'Rp0';
+                    })()}
+                  </h3>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                 <div className="max-h-[350px] overflow-y-auto custom-scrollbar pr-2 border border-slate-100 rounded-2xl">
+                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest p-4 border-b border-slate-50 sticky top-0 bg-white z-20 flex items-center gap-2">
+                    <ShoppingBag className="w-3 h-3 text-emerald-600" />
+                    Detail Transaksi
+                  </h5>
                   <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-0 bg-white z-10">
+                    <thead className="sticky top-10 bg-white z-10">
                       <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                         <th className="py-4 px-4 bg-white">Nama Paket</th>
                         <th className="py-4 px-4 bg-white">Revenue</th>
                         <th className="py-4 px-4 bg-white">Transactions</th>
-                        <th className="py-4 px-4 bg-white text-emerald-600">Low Price</th>
-                        <th className="py-4 px-4 bg-white text-indigo-600">Avg Price</th>
-                        <th className="py-4 px-4 bg-white text-rose-600">High Price</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -431,9 +782,6 @@ const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Tr
                           </td>
                           <td className="py-4 px-4 text-xs font-black text-indigo-600 align-top">{formatCurrency(pkg.revenue)}</td>
                           <td className="py-4 px-4 text-xs font-bold text-slate-500 align-top">{formatNumber(pkg.transactions)}</td>
-                          <td className="py-4 px-4 text-xs font-black text-emerald-600 bg-emerald-50/30 align-top">{formatCurrency(pkg.minPrice)}</td>
-                          <td className="py-4 px-4 text-xs font-black text-indigo-600 bg-indigo-50/30 align-top">{formatCurrency(pkg.avgPrice)}</td>
-                          <td className="py-4 px-4 text-xs font-black text-rose-600 bg-rose-50/30 align-top">{formatCurrency(pkg.maxPrice)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -445,12 +793,12 @@ const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Tr
                     <Zap className="w-3 h-3 text-indigo-600" />
                     Strategi & Aktivitas Operasional
                   </h5>
-                  <div className="space-y-4">
+                  <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                     {apps.filter(app => !selectedApp || app.name.toUpperCase() === selectedApp.toUpperCase()).map(app => {
                       const dayData = app.dailyData?.[selectedDay];
                       if (!dayData) return null;
                       
-                      const hasStrategy = dayData.premium || dayData.benefit || dayData.event || dayData.activity;
+                      const hasStrategy = dayData.premium || dayData.benefit || dayData.event || dayData.activity || dayData.bcan || dayData.story || dayData.chat;
                       if (!hasStrategy) return null;
 
                       return (
@@ -485,11 +833,65 @@ const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Tr
                         </div>
                       );
                     })}
-                    {apps.every(app => !app.dailyData?.[selectedDay] || (!app.dailyData[selectedDay].premium && !app.dailyData[selectedDay].benefit && !app.dailyData[selectedDay].event && !app.dailyData[selectedDay].activity)) && (
-                      <div className="text-center py-8">
-                        <p className="text-[10px] font-bold text-slate-400 italic">Tidak ada strategi operasional yang tercatat untuk hari ini.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Social Media & Insights */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <MessageSquare className="w-3 h-3 text-indigo-600" />
+                    Konten Sosial Media
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {apps.flatMap(app => app.dailyData?.[selectedDay as string]?.socialContent || []).map((content, i) => (
+                      <div key={i} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex justify-between mb-2">
+                          <span className="text-[8px] font-black text-indigo-600 uppercase">{content.platform}</span>
+                          <span className="text-[8px] font-bold text-slate-400">{content.postingTime} WIB</span>
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-700 mb-2">{content.title || 'Tanpa Judul'}</p>
+                        <p className="text-[10px] text-slate-500 mb-3 line-clamp-2">{content.caption}</p>
+                        <div className="grid grid-cols-3 gap-4 mb-4">
+                          <div>
+                            <p className="text-[7px] font-bold text-slate-400 uppercase">Reach</p>
+                            <p className="text-[10px] font-black text-slate-900">{formatNumber(content.reach)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[7px] font-bold text-slate-400 uppercase">Eng</p>
+                            <p className="text-[10px] font-black text-slate-900">{formatNumber(content.engagement)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[7px] font-bold text-slate-400 uppercase">Views</p>
+                            <p className="text-[10px] font-black text-slate-900">{formatNumber(content.views)}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Type: {content.contentType}</span>
+                          {content.cta && <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">CTA: {content.cta}</span>}
+                          <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Obj: {content.objective}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {apps.every(app => !app.dailyData?.[selectedDay as string]?.socialContent?.length) && (
+                      <div className="col-span-full py-8 text-center">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Belum ada data konten</p>
                       </div>
                     )}
+                  </div>
+                </div>
+                <div className="bg-indigo-600 p-6 rounded-2xl text-white">
+                  <h5 className="text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-3 h-3 text-white" />
+                    Auto-Generated Insights
+                  </h5>
+                  <p className="text-[11px] leading-relaxed opacity-90 italic">
+                    {selectedDayInsight}
+                  </p>
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <p className="text-[8px] font-bold text-indigo-200 uppercase tracking-widest">Sebab-Akibat Analysis</p>
+                    <p className="text-[10px] mt-1 text-white/80">Analisa ini dibuat secara otomatis berdasarkan korelasi data konten, strategi operasional, dan performa sales harian.</p>
                   </div>
                 </div>
               </div>
@@ -497,7 +899,8 @@ const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Tr
           )}
         </AnimatePresence>
 
-        <div className="pt-8 border-t border-slate-100">
+        {!selectedDay && (
+          <div className="pt-8 border-t border-slate-100">
           <h4 className="text-sm font-black text-slate-900 mb-6 flex items-center gap-2">
             <Package className="w-4 h-4 text-indigo-600" />
             Detail Performa Paket - {format(currentMonth, 'MMMM yyyy')}
@@ -540,8 +943,9 @@ const PackageCalendar = ({ data, availableOptions, apps, focusDate }: { data: Tr
             </table>
           </div>
         </div>
-      </div>
+      )}
     </div>
+  </div>
   );
 };
 
@@ -572,6 +976,7 @@ const TargetSection = ({
 }) => {
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
+  const [socialModalDate, setSocialModalDate] = useState<string | null>(null);
   const selectedApp = apps.find(a => a.id === selectedAppId) || apps[0];
 
   const filteredAppsForSummary = useMemo(() => {
@@ -1276,7 +1681,8 @@ const TargetSection = ({
                     <th className="py-4 px-4 border-r border-slate-200">BC</th>
                     <th className="py-4 px-4 border-r border-slate-200">Story</th>
                     <th className="py-4 px-4 border-r border-slate-200">Chat</th>
-                    <th className="py-4 px-4 border-slate-200">Lainnya</th>
+                    <th className="py-4 px-4 border-r border-slate-200">Lainnya</th>
+                    <th className="py-4 px-4 border-slate-200 bg-indigo-50/50">Social Media</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1507,7 +1913,7 @@ const TargetSection = ({
                             placeholder="..."
                           />
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4 border-r border-slate-100">
                           <input 
                             type="text" 
                             value={dayData.activity || ''} 
@@ -1515,6 +1921,20 @@ const TargetSection = ({
                             className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
                             placeholder="..."
                           />
+                        </td>
+                        <td className="py-3 px-4 bg-indigo-50/30">
+                          <button 
+                            onClick={() => setSocialModalDate(date)}
+                            className={cn(
+                              "w-full py-1.5 rounded-lg text-[9px] font-black uppercase transition-all flex items-center justify-center gap-1.5",
+                              dayData.socialContent?.length > 0 
+                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-100" 
+                                : "bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-50"
+                            )}
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            {dayData.socialContent?.length > 0 ? `${dayData.socialContent.length} Konten` : 'Input'}
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1524,6 +1944,16 @@ const TargetSection = ({
             </div>
           </div>
         </motion.div>
+      )}
+
+      {socialModalDate && (
+        <SocialMediaModal 
+          isOpen={!!socialModalDate}
+          onClose={() => setSocialModalDate(null)}
+          date={socialModalDate}
+          content={selectedApp.dailyData[socialModalDate]?.socialContent || []}
+          onSave={(newContent) => updateDailyValue(socialModalDate, 'socialContent', newContent)}
+        />
       )}
     </div>
   );
@@ -2209,6 +2639,121 @@ const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], avai
   );
 };
 
+const SocialMediaAnalysis = ({ apps }: { apps: AppData[] }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('All');
+
+  const allContent = useMemo(() => {
+    return apps.flatMap(app => 
+      Object.entries(app.dailyData || {}).flatMap(([date, dayData]) => 
+        (dayData.socialContent || []).map(content => ({
+          ...content,
+          date,
+          appName: app.name
+        }))
+      )
+    ).sort((a, b) => b.date.localeCompare(a.date));
+  }, [apps]);
+
+  const filteredContent = useMemo(() => {
+    return allContent.filter(item => {
+      const matchesSearch = item.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           item.caption?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPlatform = platformFilter === 'All' || item.platform === platformFilter;
+      return matchesSearch && matchesPlatform;
+    });
+  }, [allContent, searchTerm, platformFilter]);
+
+  const platforms = ['All', ...new Set(allContent.map(item => item.platform))];
+
+  return (
+    <div className="space-y-8">
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-rose-50 rounded-xl">
+              <Smartphone className="w-5 h-5 text-rose-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Repository Konten Sosial Media</h3>
+              <p className="text-xs text-slate-400 font-medium mt-1">Database seluruh konten yang telah diposting</p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+              <Search className="w-4 h-4 text-slate-400 ml-2" />
+              <input 
+                type="text"
+                placeholder="Cari konten..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent border-none text-xs font-bold text-slate-600 outline-none px-2 py-1 w-48"
+              />
+            </div>
+            <select 
+              value={platformFilter}
+              onChange={(e) => setPlatformFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-100 text-xs font-bold text-slate-600 outline-none px-4 py-2.5 rounded-2xl cursor-pointer"
+            >
+              {platforms.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredContent.map((item, i) => (
+            <div key={i} className="bg-slate-50/50 rounded-3xl border border-slate-100 p-6 hover:border-rose-200 transition-all group">
+              <div className="flex items-center justify-between mb-4">
+                <span className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-full uppercase tracking-wider">
+                  {item.platform}
+                </span>
+                <span className="text-[10px] font-bold text-slate-400">
+                  {format(new Date(item.date), 'dd MMM yyyy')}
+                </span>
+              </div>
+              
+              <h4 className="text-sm font-black text-slate-800 mb-2 line-clamp-2 leading-tight group-hover:text-rose-600 transition-colors">
+                {item.title || 'Tanpa Judul'}
+              </h4>
+              <p className="text-[11px] text-slate-500 line-clamp-3 mb-4 leading-relaxed">
+                {item.caption || 'Tidak ada caption.'}
+              </p>
+
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
+                  <p className="text-[7px] font-bold text-slate-400 uppercase mb-0.5">Reach</p>
+                  <p className="text-[10px] font-black text-slate-900">{formatNumber(item.reach)}</p>
+                </div>
+                <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
+                  <p className="text-[7px] font-bold text-slate-400 uppercase mb-0.5">Eng.</p>
+                  <p className="text-[10px] font-black text-slate-900">{formatNumber(item.engagement)}</p>
+                </div>
+                <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
+                  <p className="text-[7px] font-bold text-slate-400 uppercase mb-0.5">Views</p>
+                  <p className="text-[10px] font-black text-slate-900">{formatNumber(item.views)}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[8px] font-black text-slate-400 bg-white px-2 py-1 rounded-lg border border-slate-100 uppercase">{item.contentType}</span>
+                <span className="text-[8px] font-black text-slate-400 bg-white px-2 py-1 rounded-lg border border-slate-100 uppercase">{item.objective}</span>
+                <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 uppercase">{item.appName}</span>
+              </div>
+            </div>
+          ))}
+          {filteredContent.length === 0 && (
+            <div className="col-span-full py-20 text-center">
+              <Smartphone className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Tidak ada konten yang ditemukan</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
   const menuItems = [
     { id: 'overview', icon: LayoutDashboard, label: 'Ringkasan Performa' },
@@ -2216,6 +2761,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
     { id: 'target', icon: Target, label: 'Strategi & Target' },
     { id: 'packages', icon: Package, label: 'Performa Produk' },
     { id: 'calendar', icon: Calendar, label: 'Kalender Paket' },
+    { id: 'social', icon: MessageSquare, label: 'Analisa Sosial Media' },
   ];
 
   const accountItems = [
@@ -3581,6 +4127,17 @@ export default function App() {
             </motion.div>
           )}
 
+          {activeTab === 'social' && (
+            <motion.div 
+              key="social"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+            >
+              <SocialMediaAnalysis apps={apps} />
+            </motion.div>
+          )}
+
           {activeTab === 'calendar' && (
             <motion.div 
               key="calendar"
@@ -3588,7 +4145,13 @@ export default function App() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
-              <PackageCalendar data={data} availableOptions={availableOptions} apps={apps} focusDate={calendarFocusDate} />
+              <PackageCalendar 
+                data={data} 
+                downloaderData={downloaderData}
+                availableOptions={availableOptions} 
+                apps={apps} 
+                focusDate={calendarFocusDate} 
+              />
             </motion.div>
           )}
 
