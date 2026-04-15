@@ -203,6 +203,18 @@ const generateDailyInsight = (
   return insight;
 };
 
+const getShortAppName = (name: string) => {
+  const upper = name.toUpperCase();
+  if (upper === 'JADIASN') return 'ASN';
+  if (upper === 'JADIBUMN') return 'BUMN';
+  if (upper === 'JADIPOLRI') return 'Polri';
+  if (upper === 'JADIPPPK') return 'PPPK';
+  if (upper === 'JADITNI') return 'TNI';
+  if (upper === 'JADICPNS') return 'CPNS';
+  if (upper === 'CEREBRUM') return 'Cerebrum';
+  return name.replace(/^JADI/i, '');
+};
+
 const formatNumber = (value: number) => {
   return new Intl.NumberFormat('id-ID').format(value);
 };
@@ -230,6 +242,11 @@ interface TrendItem {
   downloader: number;
   conversion: number;
   rawDate?: Date;
+  appBreakdown?: Record<string, {
+    revenue: number;
+    transactions: number;
+    downloader: number;
+  }>;
 }
 
 const StatCard = ({ title, value, icon: Icon, trend, colorClass, subtitle }: { 
@@ -270,6 +287,219 @@ const StatCard = ({ title, value, icon: Icon, trend, colorClass, subtitle }: {
     <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-slate-50 rounded-full opacity-0 group-hover:opacity-100 transition-all -z-10" />
   </motion.div>
 );
+
+const DrillDownModal = ({ isOpen, onClose, data, metric, appColors }: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  data: any; 
+  metric: string;
+  appColors: Record<string, string>;
+}) => {
+  if (!isOpen || !data) return null;
+
+  const breakdown = Object.entries(data.appBreakdown || {}).map(([app, vals]: [string, any]) => ({
+    app,
+    value: vals[metric] || 0,
+    color: appColors[app]
+  })).sort((a, b) => b.value - a.value);
+
+  const total = breakdown.reduce((sum, item) => sum + item.value, 0);
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
+      >
+        <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">Detail Kontribusi: {data.name}</h3>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">{metric}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+            <Plus className="w-5 h-5 text-slate-400 rotate-45" />
+          </button>
+        </div>
+        <div className="p-8 space-y-6">
+          <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100">
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Total {metric}</p>
+            <h4 className="text-2xl font-black text-slate-900">
+              {metric === 'revenue' ? formatCurrency(total) : 
+               metric === 'conversion' ? `${total.toFixed(2)}%` : 
+               formatNumber(total)}
+            </h4>
+          </div>
+          <div className="space-y-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Breakdown per Aplikasi</p>
+            {breakdown.map((item: any) => (
+              <div key={item.app} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-xs font-bold text-slate-700">{getShortAppName(item.app)}</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">
+                    {metric === 'revenue' ? formatCurrency(item.value) : 
+                     metric === 'conversion' ? `${item.value.toFixed(2)}%` : 
+                     formatNumber(item.value)}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full rounded-full" 
+                    style={{ 
+                      backgroundColor: item.color, 
+                      width: `${(item.value / (total || 1)) * 100}%` 
+                    }} 
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const CustomTooltip = ({ active, payload, label, metric }: any) => {
+  if (active && payload && payload.length) {
+    const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
+    const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);
+
+    return (
+      <div className="bg-white p-4 rounded-2xl shadow-2xl border border-slate-100 min-w-[220px]">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-50 pb-2">{label}</p>
+        <div className="space-y-2.5">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[10px] font-black text-slate-900 uppercase">Total {metric}</span>
+            <span className="text-[10px] font-black text-indigo-600">
+              {metric === 'revenue' ? formatCurrency(total) : 
+               metric === 'conversion' ? `${total.toFixed(2)}%` : 
+               formatNumber(total)}
+            </span>
+          </div>
+          {sortedPayload.map((entry: any, index: number) => (
+            <div key={index} className="flex justify-between items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
+                <span className="text-[9px] font-bold text-slate-500 uppercase">{getShortAppName(entry.name)}</span>
+              </div>
+              <span className="text-[9px] font-black text-slate-700">
+                {metric === 'revenue' ? formatCurrency(entry.value) : 
+                 metric === 'conversion' ? `${entry.value.toFixed(2)}%` : 
+                 formatNumber(entry.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const FlexibleChart = ({ 
+  data, 
+  type, 
+  metric, 
+  appColors, 
+  onDrillDown,
+  hiddenApps
+}: { 
+  data: any[]; 
+  type: 'bar' | 'line' | 'area' | 'pie'; 
+  metric: string;
+  appColors: Record<string, string>;
+  onDrillDown: (data: any) => void;
+  hiddenApps: Set<string>;
+}) => {
+  const apps = Object.keys(appColors).filter(app => !hiddenApps.has(app));
+  
+  const renderChart = () => {
+    if (type === 'pie') {
+      const pieData = apps.map(app => {
+        const total = data.reduce((sum, item) => sum + (item.appBreakdown?.[app]?.[metric] || 0), 0);
+        return { name: app, value: total, fill: appColors[app] };
+      }).filter(d => d.value > 0);
+
+      return (
+        <PieChart>
+          <Pie
+            data={pieData}
+            cx="50%"
+            cy="50%"
+            innerRadius={80}
+            outerRadius={120}
+            paddingAngle={5}
+            dataKey="value"
+          >
+            {pieData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.fill} />
+            ))}
+          </Pie>
+          <Tooltip 
+            formatter={(val: number) => metric === 'revenue' ? formatCurrency(val) : formatNumber(val)}
+            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '12px' }}
+          />
+        </PieChart>
+      );
+    }
+
+    const ChartComponent = type === 'bar' ? BarChart : type === 'line' ? LineChart : AreaChart;
+    const DataComponent = type === 'bar' ? Bar : type === 'line' ? Line : Area;
+
+    return (
+      <ChartComponent data={data} onClick={(e: any) => e && e.activePayload && onDrillDown(e.activePayload[0].payload)}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+        <XAxis 
+          dataKey="name" 
+          axisLine={false} 
+          tickLine={false} 
+          tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
+        />
+        <YAxis 
+          axisLine={false} 
+          tickLine={false} 
+          tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }}
+          tickFormatter={(val) => {
+            if (metric === 'revenue') {
+              if (val >= 1000000) return `Rp${(val/1000000).toFixed(1)}jt`;
+              return `Rp${val}`;
+            }
+            if (metric === 'conversion') return `${val.toFixed(1)}%`;
+            return formatNumber(val);
+          }}
+        />
+        <Tooltip 
+          cursor={{ fill: '#f8fafc' }}
+          content={<CustomTooltip metric={metric} />}
+        />
+        {apps.map(app => (
+          <DataComponent
+            key={app}
+            type="monotone"
+            dataKey={`${metric}_${app}`}
+            name={app}
+            stackId="a"
+            fill={appColors[app]}
+            stroke={appColors[app]}
+            fillOpacity={type === 'area' ? 0.1 : 1}
+            strokeWidth={type === 'line' || type === 'area' ? 3 : 0}
+            radius={type === 'bar' ? [4, 4, 0, 0] : undefined}
+          />
+        ))}
+      </ChartComponent>
+    );
+  };
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      {renderChart()}
+    </ResponsiveContainer>
+  );
+};
 
 const SocialMediaModal = ({ 
   isOpen, 
@@ -504,28 +734,35 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
   }, [currentMonth]);
 
   const activePackagesByDay = useMemo(() => {
-    const map: Record<string, any[]> = {};
+    const map: Record<string, { packages: any[], appBreakdown: Record<string, { revenue: number, transactions: number }> }> = {};
     filteredData.forEach(item => {
       const dateStr = format(item.parsed_payment_date, 'yyyy-MM-dd');
-      if (!map[dateStr]) map[dateStr] = [];
-      const existing = map[dateStr].find(p => p.name === item.content_name);
-      if (existing) {
-        existing.revenue += item.revenue;
-        existing.transactions += 1;
-        existing.prices.push(item.revenue);
+      if (!map[dateStr]) map[dateStr] = { packages: [], appBreakdown: {} };
+      
+      const existingPkg = map[dateStr].packages.find(p => p.name === item.content_name);
+      if (existingPkg) {
+        existingPkg.revenue += item.revenue;
+        existingPkg.transactions += 1;
+        existingPkg.prices.push(item.revenue);
       } else {
-        map[dateStr].push({ 
+        map[dateStr].packages.push({ 
           name: item.content_name, 
           revenue: item.revenue, 
           transactions: 1,
           prices: [item.revenue]
         });
       }
+
+      const app = item.source_app || 'Unknown';
+      if (!map[dateStr].appBreakdown[app]) {
+        map[dateStr].appBreakdown[app] = { revenue: 0, transactions: 0 };
+      }
+      map[dateStr].appBreakdown[app].revenue += item.revenue;
+      map[dateStr].appBreakdown[app].transactions += 1;
     });
 
-    // Calculate stats
     Object.keys(map).forEach(date => {
-      map[date] = map[date].map(p => ({
+      map[date].packages = map[date].packages.map(p => ({
         ...p,
         minPrice: Math.min(...p.prices),
         maxPrice: Math.max(...p.prices),
@@ -539,8 +776,8 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
   const selectedDayInsight = useMemo(() => {
     if (!selectedDay) return "";
     
-    const dayRevenue = activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.revenue, 0) || 0;
-    const dayTransactions = activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.transactions, 0) || 0;
+    const dayRevenue = activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.revenue, 0) || 0;
+    const dayTransactions = activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.transactions, 0) || 0;
     const dayDownloaders = downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).reduce((acc, curr) => acc + curr.count, 0);
     const dayStrategies = apps.map(app => ({
       appName: app.name,
@@ -651,7 +888,7 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
           ))}
           {daysInMonth.map(day => {
             const dateStr = format(day, 'yyyy-MM-dd');
-            const packages = activePackagesByDay[dateStr] || [];
+            const packages = activePackagesByDay[dateStr]?.packages || [];
             const hasActivity = packages.length > 0;
             const isSelected = selectedDay === dateStr;
             
@@ -724,14 +961,28 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
                 <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Revenue</p>
                   <h3 className="text-xl font-black text-indigo-600">
-                    {formatCurrency(activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.revenue, 0) || 0)}
+                    {formatCurrency(activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.revenue, 0) || 0)}
                   </h3>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {Object.entries(activePackagesByDay[selectedDay]?.appBreakdown || {}).map(([app, vals]: [string, any]) => (
+                      <span key={app} className="text-[8px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                        {app}: {formatCurrency(vals.revenue)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Transaksi</p>
                   <h3 className="text-xl font-black text-emerald-600">
-                    {formatNumber(activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.transactions, 0) || 0)}
+                    {formatNumber(activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.transactions, 0) || 0)}
                   </h3>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {Object.entries(activePackagesByDay[selectedDay]?.appBreakdown || {}).map(([app, vals]: [string, any]) => (
+                      <span key={app} className="text-[8px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                        {app}: {formatNumber(vals.transactions)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
@@ -750,8 +1001,8 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">AOV Harian</p>
                   <h3 className="text-xl font-black text-amber-600">
                     {(() => {
-                      const rev = activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.revenue, 0) || 0;
-                      const trx = activePackagesByDay[selectedDay]?.reduce((acc, curr) => acc + curr.transactions, 0) || 0;
+                      const rev = activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.revenue, 0) || 0;
+                      const trx = activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.transactions, 0) || 0;
                       return trx ? formatCurrency(rev / trx) : 'Rp0';
                     })()}
                   </h3>
@@ -773,7 +1024,7 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
                       </tr>
                     </thead>
                     <tbody>
-                      {[...activePackagesByDay[selectedDay]].sort((a, b) => b.revenue - a.revenue).map((pkg, i) => (
+                      {[...activePackagesByDay[selectedDay].packages].sort((a, b) => b.revenue - a.revenue).map((pkg, i) => (
                         <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-all group">
                           <td className="py-4 px-4 align-top">
                             <div className="text-xs font-black text-slate-700 max-w-[250px] whitespace-normal break-words line-clamp-5 leading-relaxed" title={pkg.name}>
@@ -3005,6 +3256,13 @@ export default function App() {
   const [targetMonth, setTargetMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [calendarFocusDate, setCalendarFocusDate] = useState<Date | null>(null);
 
+  // --- Flexible Charting State ---
+  const [chartType, setChartType] = useState<'bar' | 'line' | 'area' | 'pie'>('bar');
+  const [chartMetric, setChartMetric] = useState<'revenue' | 'transactions' | 'downloader' | 'conversion'>('revenue');
+  const [chartGranularity, setChartGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [hiddenApps, setHiddenApps] = useState<Set<string>>(new Set());
+  const [drillDownData, setDrillDownData] = useState<any | null>(null);
+
   // --- Data Loading ---
 
   const processData = useCallback((rawData: any[]) => {
@@ -3262,6 +3520,14 @@ export default function App() {
     };
   }, [data, downloaderData]);
 
+  const appColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    availableOptions.source_apps.forEach((app, index) => {
+      colors[app] = COLORS[index % COLORS.length];
+    });
+    return colors;
+  }, [availableOptions.source_apps]);
+
   const stats: DashboardStats = useMemo(() => {
     const isMonthFiltered = filters.month !== 'All';
     const isYearFiltered = filters.year !== 'All';
@@ -3363,93 +3629,84 @@ export default function App() {
   // --- Chart Data Preparation ---
 
   const trendData = useMemo(() => {
-    const isMonthFiltered = filters.month !== 'All';
-
-    if (isMonthFiltered) {
-      // Daily recap for the specific month
-      const grouped: Record<string, TrendItem> = {};
-      
-      filteredData.forEach(item => {
-        const key = format(item.parsed_payment_date, 'dd MMM');
-        if (!grouped[key]) {
-          grouped[key] = { 
-            name: key, 
-            revenue: 0, 
-            transactions: 0, 
-            downloader: 0, 
-            conversion: 0, 
-            rawDate: item.parsed_payment_date 
-          };
-        }
-        grouped[key].revenue += item.revenue;
-        grouped[key].transactions += 1;
-      });
-
-      filteredDownloaderData.forEach(item => {
-        const key = format(item.parsed_date, 'dd MMM');
-        if (!grouped[key]) {
-          grouped[key] = { 
-            name: key, 
-            revenue: 0, 
-            transactions: 0, 
-            downloader: 0, 
-            conversion: 0, 
-            rawDate: item.parsed_date 
-          };
-        }
-        grouped[key].downloader += item.count;
-      });
-
-      return Object.values(grouped).map(item => ({
-        ...item,
-        conversion: item.downloader > 0 ? (item.transactions / item.downloader) * 100 : 0
-      })).sort((a: TrendItem, b: TrendItem) => (a.rawDate?.getTime() || 0) - (b.rawDate?.getTime() || 0));
-    }
-
-    // Monthly trend based on data range
-    if (data.length === 0 && downloaderData.length === 0) return [];
-
-    const allYears = data.map(d => d.year).concat(downloaderData.map(d => d.year));
-    const minYear = allYears.length > 0 ? allYears.reduce((a, b) => Math.min(a, b)) : 2024;
-    const maxYear = allYears.length > 0 ? allYears.reduce((a, b) => Math.max(a, b)) : 2026;
+    const grouped: Record<string, TrendItem> = {};
     
-    const allMonths: TrendItem[] = [];
-    for (let y = minYear; y <= maxYear; y++) {
-      for (let m = 0; m < 12; m++) {
-        const date = new Date(y, m, 1);
-        allMonths.push({
-          name: format(date, 'MMM yyyy'),
-          key: format(date, 'yyyy-MM'),
-          revenue: 0,
-          transactions: 0,
-          downloader: 0,
-          conversion: 0
-        });
+    const getGroupKey = (date: Date) => {
+      if (chartGranularity === 'daily') return format(date, 'yyyy-MM-dd');
+      if (chartGranularity === 'weekly') return `${format(date, 'yyyy')}-W${format(date, 'ww')}`;
+      return format(date, 'yyyy-MM');
+    };
+
+    const getDisplayName = (key: string) => {
+      try {
+        if (chartGranularity === 'daily') return format(parseISO(key), 'dd MMM');
+        if (chartGranularity === 'weekly') return key;
+        return format(parseISO(key + '-01'), 'MMM yy');
+      } catch (e) {
+        return key;
       }
-    }
+    };
 
     filteredData.forEach(item => {
-      const key = item.year_month;
-      const monthObj = allMonths.find(m => m.key === key);
-      if (monthObj) {
-        monthObj.revenue += item.revenue;
-        monthObj.transactions += 1;
+      const key = getGroupKey(item.parsed_payment_date);
+      if (!grouped[key]) {
+        grouped[key] = { 
+          name: getDisplayName(key), 
+          revenue: 0, 
+          transactions: 0, 
+          downloader: 0, 
+          conversion: 0, 
+          rawDate: item.parsed_payment_date,
+          appBreakdown: {}
+        };
       }
+      const app = item.source_app;
+      if (!grouped[key].appBreakdown![app]) {
+        grouped[key].appBreakdown![app] = { revenue: 0, transactions: 0, downloader: 0 };
+      }
+      grouped[key].revenue += item.revenue;
+      grouped[key].transactions += 1;
+      grouped[key].appBreakdown![app].revenue += item.revenue;
+      grouped[key].appBreakdown![app].transactions += 1;
     });
 
     filteredDownloaderData.forEach(item => {
-      const key = item.year_month;
-      const monthObj = allMonths.find(m => m.key === key);
-      if (monthObj) {
-        monthObj.downloader += item.count;
+      const key = getGroupKey(item.parsed_date);
+      if (!grouped[key]) {
+        grouped[key] = { 
+          name: getDisplayName(key), 
+          revenue: 0, 
+          transactions: 0, 
+          downloader: 0, 
+          conversion: 0, 
+          rawDate: item.parsed_date,
+          appBreakdown: {}
+        };
       }
+      const app = item.source_app;
+      if (!grouped[key].appBreakdown![app]) {
+        grouped[key].appBreakdown![app] = { revenue: 0, transactions: 0, downloader: 0 };
+      }
+      grouped[key].downloader += item.count;
+      grouped[key].appBreakdown![app].downloader += item.count;
     });
 
-    return allMonths.map(item => ({
-      ...item,
-      conversion: item.downloader > 0 ? (item.transactions / item.downloader) * 100 : 0
-    }));
-  }, [data, downloaderData, filteredData, filteredDownloaderData, filters.month]);
+    return Object.values(grouped).map(item => {
+      const conversion = item.downloader > 0 ? (item.transactions / item.downloader) * 100 : 0;
+      const dynamicProps: any = {};
+      if (item.appBreakdown) {
+        Object.entries(item.appBreakdown).forEach(([app, vals]) => {
+          if (!hiddenApps.has(app)) {
+            dynamicProps[`revenue_${app}`] = vals.revenue;
+            dynamicProps[`transactions_${app}`] = vals.transactions;
+            dynamicProps[`downloader_${app}`] = vals.downloader;
+            dynamicProps[`conversion_${app}`] = vals.downloader > 0 ? (vals.transactions / vals.downloader) * 100 : 0;
+          }
+        });
+      }
+      return { ...item, conversion, ...dynamicProps };
+    }).sort((a: any, b: any) => a.rawDate.getTime() - b.rawDate.getTime());
+  }, [filteredData, filteredDownloaderData, chartGranularity, hiddenApps]);
 
   const packagePerformanceData = useMemo(() => {
     const grouped = filteredData.reduce((acc: any, item) => {
@@ -3792,123 +4049,99 @@ export default function App() {
                   <p className="text-[9px] text-slate-400 font-medium mt-1">Total pengguna berbayar</p>
                 </div>
               </div>
-              {/* Revenue Trend */}
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-                <div className="flex justify-between items-center mb-8">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight">Tren Pendapatan</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-1">Statistik performa pendapatan</p>
-                  </div>
-                  <div className="p-2.5 bg-indigo-50 rounded-xl">
-                    <TrendingUp className="w-5 h-5 text-indigo-600" />
-                  </div>
-                </div>
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trendData.filter(d => d.revenue > 0 || filters.year === 'All')} margin={{ bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={70}
-                        interval={filters.year === 'All' ? 2 : 0}
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }}
-                        tickFormatter={(val) => {
-                          if (val >= 1000000) return `Rp${(val/1000000).toFixed(1)}jt`;
-                          if (val >= 1000) return `Rp${(val/1000).toFixed(0)}rb`;
-                          return `Rp${val}`;
-                        }}
-                      />
-                      <Tooltip 
-                        cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '12px' }}
-                        formatter={(val: number) => [formatCurrency(val), 'Pendapatan']}
-                      />
-                      <Bar dataKey="revenue" fill="#6366f1" radius={[8, 8, 0, 0]} barSize={30} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
 
-              {/* Transaction Volume */}
+              {/* Analisa Tren Section */}
               <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
                   <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight">Volume Transaksi</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-1">Total transaksi per periode</p>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Analisa Tren & Performa</h3>
+                    <p className="text-sm text-slate-400 font-medium mt-1">Visualisasi data multi-app dengan kontrol fleksibel</p>
                   </div>
-                  <div className="p-2.5 bg-emerald-50 rounded-xl">
-                    <ShoppingBag className="w-5 h-5 text-emerald-600" />
-                  </div>
-                </div>
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trendData} margin={{ bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={70}
-                        interval={filters.year === 'All' ? 2 : 0}
-                      />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }} />
-                      <Tooltip 
-                        cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '12px' }}
-                        formatter={(val: number) => [formatNumber(val), 'Transaksi']}
-                      />
-                      <Bar dataKey="transactions" fill="#10b981" radius={[8, 8, 0, 0]} barSize={filters.month !== 'All' ? 15 : 30} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+                  
+                  <div className="flex flex-wrap items-center gap-4">
+                    {/* Metric Selector */}
+                    <div className="flex bg-slate-100/80 p-1 rounded-2xl border border-slate-200/50">
+                      {(['revenue', 'transactions', 'downloader', 'conversion'] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setChartMetric(m)}
+                          className={cn(
+                            "px-4 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest",
+                            chartMetric === m ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                          )}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
 
-              {/* Downloader Trend */}
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-                <div className="flex justify-between items-center mb-8">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight">Tren Downloader</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-1">Total downloader per periode</p>
-                  </div>
-                  <div className="p-2.5 bg-blue-50 rounded-xl">
-                    <Download className="w-5 h-5 text-blue-600" />
+                    {/* Chart Type Selector */}
+                    <div className="flex bg-slate-100/80 p-1 rounded-2xl border border-slate-200/50">
+                      {(['bar', 'line', 'area', 'pie'] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setChartType(t)}
+                          className={cn(
+                            "px-4 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest",
+                            chartType === t ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                          )}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Granularity Selector */}
+                    <div className="flex bg-slate-100/80 p-1 rounded-2xl border border-slate-200/50">
+                      {(['daily', 'weekly', 'monthly'] as const).map((g) => (
+                        <button
+                          key={g}
+                          onClick={() => setChartGranularity(g)}
+                          className={cn(
+                            "px-4 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest",
+                            chartGranularity === g ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                          )}
+                        >
+                          {g}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trendData} margin={{ bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={70}
-                        interval={filters.year === 'All' ? 2 : 0}
-                      />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }} />
-                      <Tooltip 
-                        cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '12px' }}
-                        formatter={(val: number) => [formatNumber(val), 'Downloader']}
-                      />
-                      <Bar dataKey="downloader" fill="#3b82f6" radius={[8, 8, 0, 0]} barSize={filters.month !== 'All' ? 15 : 30} />
-                    </BarChart>
-                  </ResponsiveContainer>
+
+                <div className="h-[500px] mb-8">
+                  <FlexibleChart 
+                    data={trendData} 
+                    type={chartType} 
+                    metric={chartMetric} 
+                    appColors={appColors}
+                    onDrillDown={setDrillDownData}
+                    hiddenApps={hiddenApps}
+                  />
+                </div>
+
+                {/* Interactive Legend */}
+                <div className="flex flex-wrap items-center justify-center gap-6 pt-8 border-t border-slate-50">
+                  {Object.entries(appColors).map(([app, color]) => (
+                    <button
+                      key={app}
+                      onClick={() => {
+                        const newHidden = new Set(hiddenApps);
+                        if (newHidden.has(app)) newHidden.delete(app);
+                        else newHidden.add(app);
+                        setHiddenApps(newHidden);
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all",
+                        hiddenApps.has(app) 
+                          ? "bg-slate-50 border-slate-100 grayscale opacity-50" 
+                          : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm"
+                      )}
+                    >
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                      <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest">{app}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -3988,42 +4221,6 @@ export default function App() {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                </div>
-              </div>
-
-              {/* Conversion Trend */}
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-                <div className="flex justify-between items-center mb-8">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight">Tingkat Konversi</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-1">Persentase transaksi dibanding downloader</p>
-                  </div>
-                  <div className="p-2.5 bg-rose-50 rounded-xl">
-                    <TrendingUp className="w-5 h-5 text-rose-600" />
-                  </div>
-                </div>
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={70}
-                        interval={filters.year === 'All' ? 2 : 0}
-                      />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }} tickFormatter={(val) => `${val.toFixed(1)}%`} />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '12px' }}
-                        formatter={(val: number) => [`${val.toFixed(2)}%`, 'Konversi']}
-                      />
-                      <Area type="monotone" dataKey="conversion" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.1} strokeWidth={3} />
-                    </AreaChart>
-                  </ResponsiveContainer>
                 </div>
               </div>
             </motion.div>
@@ -4339,6 +4536,14 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+
+      <DrillDownModal 
+        isOpen={!!drillDownData} 
+        onClose={() => setDrillDownData(null)} 
+        data={drillDownData} 
+        metric={chartMetric}
+        appColors={appColors}
+      />
 
       {/* Footer */}
       <footer className="max-w-[1600px] mx-auto p-12 text-center border-t border-slate-100 mt-12">
