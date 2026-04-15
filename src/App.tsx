@@ -10,11 +10,11 @@ import {
   PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { 
-  TrendingUp, ShoppingBag, DollarSign, Calendar, Filter, 
-  ChevronDown, Download, LayoutDashboard, Package, CreditCard, 
+  TrendingUp, ShoppingBag, DollarSign, Calendar, Filter,
+  ChevronDown, Download, LayoutDashboard, Package, CreditCard,
   UserCheck, Users, ArrowUpRight, ArrowDownRight, Search, RefreshCw,
-  Target, MessageSquare, Bell, Settings, Rocket, MoreHorizontal, Plus,
-  ChevronRight, LogOut, Activity, Eye, Zap, AlertCircle, Smartphone
+  Target, MessageSquare, Settings, Plus,
+  ChevronRight, Activity, Zap, AlertCircle, Smartphone
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, getYear, getMonth, getQuarter, getDaysInMonth } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -100,6 +100,7 @@ interface DailyData {
   promo: string;
   premium: string;
   benefit: string;
+  benefit2?: string;
   event: string;
   activity: string;
   extra: string;
@@ -108,8 +109,12 @@ interface DailyData {
   chat: string;
   live: string;
   ads: string;
+  manualTargetSales?: number;
+  manualTargetDownloader?: number;
+  manualTargetPremium?: number;
   socialContent?: SocialMediaContent[];
   dailyInsight?: string;
+  [key: string]: unknown;
 }
 
 interface TargetConfig {
@@ -129,6 +134,35 @@ interface AppData {
   targetConfig: Record<string, TargetConfig>;
   dailyData: Record<string, DailyData>;
   isTargetSet: Record<string, boolean>;
+}
+
+interface Filters {
+  source_app: string;
+  year: string;
+  month: string;
+  methode_name: string;
+}
+
+interface AvailableOptions {
+  source_apps: string[];
+  years: number[];
+  methods: string[];
+}
+
+interface PackageInfo {
+  name: string;
+  revenue: number;
+  transactions: number;
+  prices: number[];
+  minPrice?: number;
+  maxPrice?: number;
+  avgPrice?: number;
+}
+
+interface AppBreakdownEntry {
+  revenue: number;
+  transactions: number;
+  downloader?: number;
 }
 
 // --- Constants ---
@@ -299,18 +333,18 @@ const StatCard = ({ title, value, icon: Icon, trend, colorClass, subtitle }: {
   </motion.div>
 );
 
-const DrillDownModal = ({ isOpen, onClose, data, metric, appColors }: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  data: any; 
+const DrillDownModal = ({ isOpen, onClose, data, metric, appColors }: {
+  isOpen: boolean;
+  onClose: () => void;
+  data: TrendItem | null;
   metric: string;
   appColors: Record<string, string>;
 }) => {
   if (!isOpen || !data) return null;
 
-  const breakdown = Object.entries(data.appBreakdown || {}).map(([app, vals]: [string, any]) => ({
+  const breakdown = Object.entries(data.appBreakdown || {}).map(([app, vals]) => ({
     app,
-    value: vals[metric] || 0,
+    value: (vals as Record<string, number>)[metric] || 0,
     color: appColors[app]
   })).sort((a, b) => b.value - a.value);
 
@@ -343,7 +377,7 @@ const DrillDownModal = ({ isOpen, onClose, data, metric, appColors }: {
           </div>
           <div className="space-y-4">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Breakdown per Aplikasi</p>
-            {breakdown.map((item: any) => (
+            {breakdown.map((item) => (
               <div key={item.app} className="space-y-2">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
@@ -374,10 +408,10 @@ const DrillDownModal = ({ isOpen, onClose, data, metric, appColors }: {
   );
 };
 
-const CustomTooltip = ({ active, payload, label, metric }: any) => {
+const CustomTooltip = ({ active, payload, label, metric }: { active?: boolean; payload?: Array<{ value: number; color?: string; fill?: string; name: string }>; label?: string; metric: string }) => {
   if (active && payload && payload.length) {
     const sortedPayload = [...payload].sort((a, b) => b.value - a.value);
-    const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);
+    const total = payload.reduce((sum, entry) => sum + entry.value, 0);
 
     return (
       <div className="bg-white p-4 rounded-2xl shadow-2xl border border-slate-100 min-w-[220px]">
@@ -391,7 +425,7 @@ const CustomTooltip = ({ active, payload, label, metric }: any) => {
                formatNumber(total)}
             </span>
           </div>
-          {sortedPayload.map((entry: any, index: number) => (
+          {sortedPayload.map((entry, index) => (
             <div key={index} className="flex justify-between items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
@@ -418,12 +452,12 @@ const FlexibleChart = ({
   appColors, 
   onDrillDown,
   hiddenApps
-}: { 
-  data: any[]; 
-  type: 'bar' | 'line' | 'area' | 'pie'; 
+}: {
+  data: TrendItem[];
+  type: 'bar' | 'line' | 'area' | 'pie';
   metric: string;
   appColors: Record<string, string>;
-  onDrillDown: (data: any) => void;
+  onDrillDown: (data: TrendItem) => void;
   hiddenApps: Set<string>;
 }) => {
   const apps = Object.keys(appColors).filter(app => !hiddenApps.has(app));
@@ -462,7 +496,7 @@ const FlexibleChart = ({
     const DataComponent = type === 'bar' ? Bar : type === 'line' ? Line : Area;
 
     return (
-      <ChartComponent data={data} onClick={(e: any) => e && e.activePayload && onDrillDown(e.activePayload[0].payload)}>
+      <ChartComponent data={data} onClick={(e: Record<string, unknown>) => e && (e as { activePayload?: Array<{ payload: TrendItem }> }).activePayload && onDrillDown((e as { activePayload: Array<{ payload: TrendItem }> }).activePayload[0].payload)}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
         <XAxis 
           dataKey="name" 
@@ -716,7 +750,7 @@ const SocialMediaModal = ({
   );
 };
 
-const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDate }: { data: Transaction[], downloaderData: Downloader[], availableOptions: any, apps: AppData[], focusDate?: Date | null }) => {
+const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDate }: { data: Transaction[], downloaderData: Downloader[], availableOptions: AvailableOptions, apps: AppData[], focusDate?: Date | null }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedApp, setSelectedApp] = useState('');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -746,7 +780,7 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
   }, [currentMonth]);
 
   const activePackagesByDay = useMemo(() => {
-    const map: Record<string, { packages: any[], appBreakdown: Record<string, { revenue: number, transactions: number }> }> = {};
+    const map: Record<string, { packages: PackageInfo[], appBreakdown: Record<string, AppBreakdownEntry> }> = {};
     filteredData.forEach(item => {
       const dateStr = format(item.parsed_payment_date, 'yyyy-MM-dd');
       if (!map[dateStr]) map[dateStr] = { packages: [], appBreakdown: {} };
@@ -802,13 +836,13 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
 
   const selectedMonthPackages = useMemo(() => {
     const monthStr = format(currentMonth, 'yyyy-MM');
-    const grouped: Record<string, any> = {};
+    const grouped: Record<string, { name: string; revenue: number; transactions: number; buyers: Set<string>; prices: number[] }> = {};
     filteredData.forEach(item => {
       if (item.year_month === monthStr) {
         if (!grouped[item.content_name]) {
-          grouped[item.content_name] = { 
-            name: item.content_name, 
-            revenue: 0, 
+          grouped[item.content_name] = {
+            name: item.content_name,
+            revenue: 0,
             transactions: 0,
             buyers: new Set(),
             prices: []
@@ -820,13 +854,13 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
         grouped[item.content_name].prices.push(item.revenue);
       }
     });
-    return Object.values(grouped).map((p: any) => ({
+    return Object.values(grouped).map((p) => ({
       ...p,
       uniqueBuyers: p.buyers.size,
-      minPrice: p.prices.length > 0 ? p.prices.reduce((a: number, b: number) => Math.min(a, b), p.prices[0]) : 0,
-      maxPrice: p.prices.length > 0 ? p.prices.reduce((a: number, b: number) => Math.max(a, b), p.prices[0]) : 0,
+      minPrice: p.prices.length > 0 ? p.prices.reduce((a, b) => Math.min(a, b), p.prices[0]) : 0,
+      maxPrice: p.prices.length > 0 ? p.prices.reduce((a, b) => Math.max(a, b), p.prices[0]) : 0,
       avgPrice: p.revenue / p.transactions
-    })).sort((a: any, b: any) => b.revenue - a.revenue);
+    })).sort((a, b) => b.revenue - a.revenue);
   }, [filteredData, currentMonth]);
 
   const years = useMemo(() => {
@@ -976,7 +1010,7 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
                     {formatCurrency(activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.revenue, 0) || 0)}
                   </h3>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {Object.entries(activePackagesByDay[selectedDay]?.appBreakdown || {}).map(([app, vals]: [string, any]) => (
+                    {(Object.entries(activePackagesByDay[selectedDay]?.appBreakdown || {}) as [string, AppBreakdownEntry][]).map(([app, vals]) => (
                       <span key={app} className="text-[8px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
                         {app}: {formatCurrency(vals.revenue)}
                       </span>
@@ -989,7 +1023,7 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
                     {formatNumber(activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.transactions, 0) || 0)}
                   </h3>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {Object.entries(activePackagesByDay[selectedDay]?.appBreakdown || {}).map(([app, vals]: [string, any]) => (
+                    {(Object.entries(activePackagesByDay[selectedDay]?.appBreakdown || {}) as [string, AppBreakdownEntry][]).map(([app, vals]) => (
                       <span key={app} className="text-[8px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
                         {app}: {formatNumber(vals.transactions)}
                       </span>
@@ -1181,7 +1215,7 @@ const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDa
                 </tr>
               </thead>
               <tbody>
-                {selectedMonthPackages.map((pkg: any, i) => (
+                {selectedMonthPackages.map((pkg, i) => (
                   <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-all group">
                     <td className="py-4 px-4 align-top">
                       <div className="text-xs font-black text-slate-700 max-w-[250px] whitespace-normal break-words line-clamp-5 leading-relaxed" title={pkg.name}>
@@ -1224,12 +1258,12 @@ const TargetSection = ({
   setTargetMonth,
   setActiveTab,
   setCalendarFocusDate
-}: { 
-  apps: any[], 
-  setApps: (a: any[]) => void, 
-  selectedAppId: string, 
+}: {
+  apps: AppData[],
+  setApps: (a: AppData[]) => void,
+  selectedAppId: string,
   setSelectedAppId: (id: string) => void,
-  filters: any,
+  filters: Filters,
   data: Transaction[],
   downloaderData: Downloader[],
   targetMonth: string,
@@ -1298,7 +1332,7 @@ const TargetSection = ({
     const dailySales = Math.ceil(form.targetSales / daysInMonthCount);
     const dailyUserPremium = Math.ceil(form.targetUserPremium / daysInMonthCount);
     
-    const newDailyData: any = { ...(selectedApp.dailyData || {}) };
+    const newDailyData: Record<string, DailyData> = { ...(selectedApp.dailyData || {}) };
     dates.forEach(date => {
       newDailyData[date] = {
         targetDownloader: dailyDownloader,
@@ -1310,13 +1344,16 @@ const TargetSection = ({
         estimasiHarga: form.avgPrice,
         channel: '',
         promo: '',
+        premium: '',
         benefit: '',
         event: '',
+        activity: '',
         extra: '',
         bcan: '',
         story: '',
         chat: '',
-        activity: ''
+        live: '',
+        ads: ''
       };
     });
 
@@ -1335,11 +1372,11 @@ const TargetSection = ({
   };
 
   const updateDailyValue = (date: string, field: string, value: string | number | null | SocialMediaContent[]) => {
-    const newDailyData: Record<string, Record<string, unknown>> = { ...selectedApp.dailyData };
+    const newDailyData = { ...selectedApp.dailyData } as Record<string, DailyData>;
     if (!newDailyData[date]) {
-      newDailyData[date] = {};
+      newDailyData[date] = {} as DailyData;
     }
-    newDailyData[date][field] = value;
+    (newDailyData[date] as Record<string, unknown>)[field] = value;
     setApps(apps.map(a => a.id === selectedAppId ? { ...a, dailyData: newDailyData } : a));
   };
 
@@ -1950,8 +1987,8 @@ const TargetSection = ({
                 </thead>
                 <tbody>
                   {dates.map((date, idx) => {
-                    const dayData = selectedApp.dailyData[date] || {};
-                    const conv = dayData.actualDownloader > 0 ? (dayData.actualUserPremium / dayData.actualDownloader) * 100 : 0;
+                    const dayData = selectedApp.dailyData[date] || ({} as Partial<DailyData>);
+                    const conv = (dayData.actualDownloader || 0) > 0 ? ((dayData.actualUserPremium || 0) / (dayData.actualDownloader || 1)) * 100 : 0;
                     
                     // Chained Dynamic Target Logic
                     const totalTargetSales = selectedApp.targetConfig[targetMonth]?.targetSales || 0;
@@ -1979,7 +2016,7 @@ const TargetSection = ({
 
                     // If this is the day immediately after the last filled day, apply the accumulated deficit
                     if (idx === lastFilledIdx + 1) {
-                      const actualsBefore = dates.slice(0, lastFilledIdx + 1).map(d => selectedApp.dailyData[d] || {});
+                      const actualsBefore = dates.slice(0, lastFilledIdx + 1).map(d => selectedApp.dailyData[d] || ({} as Partial<DailyData>));
                       const totalActualSalesBefore = actualsBefore.reduce((sum, d) => sum + (d.actualSales || 0), 0);
                       const totalActualDownloaderBefore = actualsBefore.reduce((sum, d) => sum + (d.actualDownloader || 0), 0);
                       const totalActualPremiumBefore = actualsBefore.reduce((sum, d) => sum + (d.actualUserPremium || 0), 0);
@@ -2003,12 +2040,12 @@ const TargetSection = ({
                     const displayTargetDownloader = dayData.manualTargetDownloader || flexibleTargetDownloader;
                     const displayTargetPremium = dayData.manualTargetPremium || flexibleTargetPremium;
 
-                    const achievement = displayTargetSales > 0 ? (dayData.actualSales / displayTargetSales) * 100 : 0;
+                    const achievement = displayTargetSales > 0 ? ((dayData.actualSales || 0) / displayTargetSales) * 100 : 0;
                     let statusColor = "text-slate-400";
                     let statusText = "Menunggu";
                     let statusBg = "bg-slate-50";
 
-                    if (dayData.actualSales > 0) {
+                    if ((dayData.actualSales || 0) > 0) {
                       if (achievement >= 100) {
                         statusColor = "text-emerald-600";
                         statusText = "Melebihi";
@@ -2025,7 +2062,7 @@ const TargetSection = ({
                     }
 
                     const salesDiff = (dayData.actualSales || 0) - displayTargetSales;
-                    const keteranganText = dayData.actualSales > 0 
+                    const keteranganText = (dayData.actualSales || 0) > 0
                       ? `${salesDiff >= 0 ? '+' : ''}${formatCurrency(salesDiff)}`
                       : '-';
 
@@ -2223,9 +2260,9 @@ const TargetSection = ({
 };
 
 const FilterSection = ({ filters, setFilters, availableOptions }: {
-  filters: any;
-  setFilters: (f: any) => void;
-  availableOptions: { source_apps: string[]; years: number[]; methods: string[] };
+  filters: Filters;
+  setFilters: (f: Filters) => void;
+  availableOptions: AvailableOptions;
 }) => {
   return (
     <div className="bg-white p-6 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 mb-8">
@@ -2321,7 +2358,7 @@ const FilterSection = ({ filters, setFilters, availableOptions }: {
   );
 };
 
-const MonitoringSection = ({ data, downloaderData, target }: { data: Transaction[], downloaderData: Downloader[], target: any }) => {
+const MonitoringSection = ({ data, downloaderData, target }: { data: Transaction[], downloaderData: Downloader[], target: TargetConfig }) => {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
   const today = new Date();
@@ -2356,7 +2393,7 @@ const MonitoringSection = ({ data, downloaderData, target }: { data: Transaction
 
     const isRevenueRealistic = projectedRevenue >= target.revenue * 0.9;
 
-    const activePackages = target.packages.filter((p: any) => p.active && p.price > 0).sort((a: any, b: any) => a.price - b.price);
+    const activePackages = (target.packages || []).filter(p => p.active && p.price > 0).sort((a, b) => a.price - b.price);
     const mainPackage = activePackages.length > 0 ? activePackages[activePackages.length - 1] : null;
     const conversionRate = (target.targetConversion || 1) / 100;
     
@@ -2618,7 +2655,7 @@ const MonitoringSection = ({ data, downloaderData, target }: { data: Transaction
   );
 };
 
-const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], availableOptions: any }) => {
+const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], availableOptions: AvailableOptions }) => {
   const [platform, setPlatform] = useState('');
   const [duration, setDuration] = useState('');
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -2647,7 +2684,7 @@ const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], avai
     const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
     
     // Find most bought price (Mode)
-    const priceCounts = prices.reduce((acc: any, p) => {
+    const priceCounts: Record<number, number> = prices.reduce((acc: Record<number, number>, p) => {
       acc[p] = (acc[p] || 0) + 1;
       return acc;
     }, {});
@@ -2708,7 +2745,7 @@ const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], avai
   }, [stats, filteredHistory]);
 
   const historyTableData = useMemo(() => {
-    const grouped = filteredHistory.reduce((acc: any, curr) => {
+    const grouped: Record<string, { name: string; revenue: number; transactions: number; prices: number[] }> = filteredHistory.reduce((acc: Record<string, { name: string; revenue: number; transactions: number; prices: number[] }>, curr) => {
       const key = curr.content_name;
       if (!acc[key]) acc[key] = { name: key, revenue: 0, transactions: 0, prices: [] };
       acc[key].revenue += curr.revenue;
@@ -2717,12 +2754,12 @@ const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], avai
       return acc;
     }, {});
 
-    return Object.values(grouped).map((p: any) => ({
+    return Object.values(grouped).map((p) => ({
       ...p,
-      minPrice: p.prices.length > 0 ? p.prices.reduce((a: number, b: number) => Math.min(a, b), p.prices[0]) : 0,
-      maxPrice: p.prices.length > 0 ? p.prices.reduce((a: number, b: number) => Math.max(a, b), p.prices[0]) : 0,
+      minPrice: p.prices.length > 0 ? p.prices.reduce((a, b) => Math.min(a, b), p.prices[0]) : 0,
+      maxPrice: p.prices.length > 0 ? p.prices.reduce((a, b) => Math.max(a, b), p.prices[0]) : 0,
       avgPrice: p.revenue / p.transactions
-    })).sort((a: any, b: any) => b.revenue - a.revenue);
+    })).sort((a, b) => b.revenue - a.revenue);
   }, [filteredHistory]);
 
   return (
@@ -3144,7 +3181,7 @@ const TopBar = () => {
   );
 };
 
-const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[], downloader: Downloader[]) => void }) => {
+const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Record<string, unknown>[], downloader: Record<string, unknown>[]) => void }) => {
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3158,13 +3195,13 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
         const bstr = event.target?.result;
         const workbook = XLSX.read(bstr, { type: 'binary' });
         
-        let transactions: any[] = [];
-        let downloaders: any[] = [];
+        let transactions: Record<string, unknown>[] = [];
+        let downloaders: Record<string, unknown>[] = [];
 
         // Look for sheets
         workbook.SheetNames.forEach(name => {
           const sheet = workbook.Sheets[name];
-          const jsonData = XLSX.utils.sheet_to_json(sheet);
+          const jsonData = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[];
           if (name.toUpperCase().includes('TRANSAKSI')) {
             transactions = jsonData;
           } else if (name.toUpperCase().includes('DOWNLOADER')) {
@@ -3174,17 +3211,17 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
 
         // Fallback if sheet names are different
         if (transactions.length === 0 && workbook.SheetNames.length > 0) {
-          transactions = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+          transactions = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as Record<string, unknown>[];
         }
         if (downloaders.length === 0 && workbook.SheetNames.length > 1) {
-          downloaders = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[1]]);
+          downloaders = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[1]]) as Record<string, unknown>[];
         }
 
         // We need to pass raw data to the parent which has the processing logic
         // But the parent expects processed data. Let's assume the parent will handle it.
         // Actually, it's better to trigger a re-processing in the parent.
         // For now, we'll just pass the raw data and let the parent handle it via a new prop.
-        onDataUpdate(transactions as unknown as Transaction[], downloaders as unknown as Downloader[]);
+        onDataUpdate(transactions, downloaders);
         alert('Data berhasil diperbarui!');
       } catch (err) {
         console.error(err);
@@ -3243,7 +3280,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<Filters>({
     source_app: 'All',
     year: 'All',
     month: 'All',
@@ -3268,11 +3305,11 @@ export default function App() {
   const [chartMetric, setChartMetric] = useState<'revenue' | 'transactions' | 'downloader' | 'conversion'>('revenue');
   const [chartGranularity, setChartGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [hiddenApps, setHiddenApps] = useState<Set<string>>(new Set());
-  const [drillDownData, setDrillDownData] = useState<any | null>(null);
+  const [drillDownData, setDrillDownData] = useState<TrendItem | null>(null);
 
   // --- Data Loading ---
 
-  const processData = useCallback((rawData: any[]) => {
+  const processData = useCallback((rawData: Record<string, unknown>[]) => {
     return rawData.map(item => {
       let paymentDate: Date;
       const rawDate = item.payment_date || item.transaction_date || item.Tanggal || item.tanggal || item.Date || item.date;
@@ -3282,7 +3319,7 @@ export default function App() {
       } else if (rawDate instanceof Date) {
         paymentDate = rawDate;
       } else if (rawDate) {
-        paymentDate = new Date(rawDate);
+        paymentDate = new Date(rawDate as string | number);
       } else {
         console.warn('Missing date for transaction, using current date as fallback:', item.trx_id || 'unknown');
         paymentDate = new Date();
@@ -3303,11 +3340,11 @@ export default function App() {
         quarter: getQuarter(paymentDate),
         year_month: format(paymentDate, 'yyyy-MM'),
         revenue: Number(item.revenue || item.Revenue || item.total_price || 0)
-      };
+      } as Transaction;
     });
   }, []);
 
-  const processDownloaderData = useCallback((rawData: any[]) => {
+  const processDownloaderData = useCallback((rawData: Record<string, unknown>[]) => {
     const processed: Downloader[] = [];
     
     rawData.forEach(row => {
@@ -3322,7 +3359,7 @@ export default function App() {
       } else if (rawDate instanceof Date) {
         date = rawDate;
       } else {
-        date = new Date(rawDate);
+        date = new Date(rawDate as string | number);
       }
 
       const year = getYear(date);
@@ -3332,9 +3369,9 @@ export default function App() {
       // Iterate over all keys except the date key and internal XLSX keys
       Object.keys(row).forEach(key => {
         if (['Tanggal', 'tanggal', 'date', 'Date', '__rowNum__'].includes(key)) return;
-        
+
         processed.push({
-          date: rawDate,
+          date: rawDate as string | number | Date,
           source_app: String(key || '').toUpperCase(),
           count: Number(row[key]) || 0,
           parsed_date: date,
@@ -3348,7 +3385,7 @@ export default function App() {
     return processed;
   }, []);
 
-  const handleDataUpdate = useCallback((rawTransactions: any[], rawDownloaders: any[]) => {
+  const handleDataUpdate = useCallback((rawTransactions: Record<string, unknown>[], rawDownloaders: Record<string, unknown>[]) => {
     const processedTransactions = processData(rawTransactions);
     const processedDownloaders = processDownloaderData(rawDownloaders);
     setData(processedTransactions);
@@ -3479,10 +3516,11 @@ export default function App() {
   }, [downloaderData, filters]);
 
   const recapData = useMemo(() => {
-    const yearly: any = {};
-    const monthly: any = {};
-    const weekly: any = {};
-    const daily: any = {};
+    type RecapAccum = Record<string, { name: string; revenue: number; transactions: number; buyers: Set<string> }>;
+    const yearly: RecapAccum = {};
+    const monthly: RecapAccum = {};
+    const weekly: RecapAccum = {};
+    const daily: RecapAccum = {};
 
     filteredData.forEach(item => {
       const d = item.parsed_payment_date;
@@ -3491,7 +3529,7 @@ export default function App() {
       const wKey = `${format(d, 'yyyy')}-W${format(d, 'ww')}`;
       const dKey = format(d, 'yyyy-MM-dd');
 
-      const update = (acc: any, key: string) => {
+      const update = (acc: RecapAccum, key: string) => {
         if (!acc[key]) acc[key] = { name: key, revenue: 0, transactions: 0, buyers: new Set() };
         acc[key].revenue += item.revenue;
         acc[key].transactions += 1;
@@ -3504,11 +3542,11 @@ export default function App() {
       update(daily, dKey);
     });
 
-    const finalize = (acc: any) => Object.values(acc).map((item: any) => ({
+    const finalize = (acc: RecapAccum) => Object.values(acc).map((item) => ({
       ...item,
       uniqueBuyers: item.buyers.size,
       aov: item.transactions > 0 ? item.revenue / item.transactions : 0
-    })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+    })).sort((a, b) => a.name.localeCompare(b.name));
 
     return {
       yearly: finalize(yearly),
@@ -3704,7 +3742,7 @@ export default function App() {
 
     return Object.values(grouped).map(item => {
       const conversion = item.downloader > 0 ? (item.transactions / item.downloader) * 100 : 0;
-      const dynamicProps: any = {};
+      const dynamicProps: Record<string, number> = {};
       if (item.appBreakdown) {
         Object.entries(item.appBreakdown).forEach(([app, vals]) => {
           if (!hiddenApps.has(app)) {
@@ -3716,17 +3754,18 @@ export default function App() {
         });
       }
       return { ...item, conversion, ...dynamicProps };
-    }).sort((a: any, b: any) => a.rawDate.getTime() - b.rawDate.getTime());
+    }).sort((a, b) => (a.rawDate?.getTime() || 0) - (b.rawDate?.getTime() || 0));
   }, [filteredData, filteredDownloaderData, chartGranularity, hiddenApps]);
 
   const packagePerformanceData = useMemo(() => {
-    const grouped = filteredData.reduce((acc: any, item) => {
+    type PkgAccum = { name: string; revenue: number; transactions: number; buyers: Set<string>; prices: number[]; minDate: Date; maxDate: Date };
+    const grouped: Record<string, PkgAccum> = filteredData.reduce((acc: Record<string, PkgAccum>, item) => {
       const key = item.content_name;
       const date = item.parsed_payment_date;
-      if (!acc[key]) acc[key] = { 
-        name: key, 
-        revenue: 0, 
-        transactions: 0, 
+      if (!acc[key]) acc[key] = {
+        name: key,
+        revenue: 0,
+        transactions: 0,
         buyers: new Set(),
         prices: [],
         minDate: date,
@@ -3737,28 +3776,26 @@ export default function App() {
       const buyerId = item.email || item.phone || item.full_name || item.trx_id;
       if (buyerId) acc[key].buyers.add(buyerId);
       acc[key].prices.push(item.revenue);
-      
+
       if (date < acc[key].minDate) acc[key].minDate = date;
       if (date > acc[key].maxDate) acc[key].maxDate = date;
-      
+
       return acc;
     }, {});
 
-    const totalRevenue = filteredData.reduce((sum, item) => sum + item.revenue, 0);
-
-    return Object.values(grouped).map((item: any) => {
+    return Object.values(grouped).map((item) => {
       const uniqueUsers = item.buyers.size;
       // AOV (Average Order Value) = Total Revenue / Total Transactions
       const aov = item.transactions > 0 ? item.revenue / item.transactions : 0;
       // ARPPU (Average Revenue Per Paying User) = Total Revenue / Unique Paying Users
       const arppu = uniqueUsers > 0 ? item.revenue / uniqueUsers : 0;
       
-      const minPrice = item.prices.length > 0 ? item.prices.reduce((a: number, b: number) => Math.min(a, b), item.prices[0]) : 0;
-      const maxPrice = item.prices.length > 0 ? item.prices.reduce((a: number, b: number) => Math.max(a, b), item.prices[0]) : 0;
-      const avgPrice = item.prices.length > 0 ? item.prices.reduce((a: number, b: number) => a + b, 0) / item.prices.length : 0;
-      
-      const lowTrx = item.prices.filter((p: number) => p === minPrice).length;
-      const highTrx = item.prices.filter((p: number) => p === maxPrice).length;
+      const minPrice = item.prices.length > 0 ? item.prices.reduce((a, b) => Math.min(a, b), item.prices[0]) : 0;
+      const maxPrice = item.prices.length > 0 ? item.prices.reduce((a, b) => Math.max(a, b), item.prices[0]) : 0;
+      const avgPrice = item.prices.length > 0 ? item.prices.reduce((a, b) => a + b, 0) / item.prices.length : 0;
+
+      const lowTrx = item.prices.filter(p => p === minPrice).length;
+      const highTrx = item.prices.filter(p => p === maxPrice).length;
       const avgTrx = item.transactions;
 
       const durationDays = Math.max(1, Math.ceil((item.maxDate.getTime() - item.minDate.getTime()) / (1000 * 60 * 60 * 24)));
@@ -3785,19 +3822,18 @@ export default function App() {
         durationDays,
         durationLabel
       };
-    }).sort((a: any, b: any) => b.revenue - a.revenue);
+    }).sort((a, b) => b.revenue - a.revenue);
   }, [filteredData]);
 
   const methodData = useMemo(() => {
-    const grouped = filteredData.reduce((acc: any, item) => {
+    const grouped: Record<string, { name: string; revenue: number; transactions: number }> = filteredData.reduce((acc: Record<string, { name: string; revenue: number; transactions: number }>, item) => {
       const key = item.methode_name;
       if (!acc[key]) acc[key] = { name: key, revenue: 0, transactions: 0 };
       acc[key].revenue += item.revenue;
       acc[key].transactions += 1;
       return acc;
     }, {});
-    // Sort by transactions as requested
-    return Object.values(grouped).sort((a: any, b: any) => b.transactions - a.transactions);
+    return Object.values(grouped).sort((a, b) => b.transactions - a.transactions);
   }, [filteredData]);
 
   const [pricingMode, setPricingMode] = useState<'yearly' | 'monthly'>('yearly');
@@ -3812,14 +3848,15 @@ export default function App() {
     });
 
     // Step 1: Group by Month and App to get sub-period metrics
-    const subPeriodGroups = comparisonFilteredData.reduce((acc: any, item) => {
+    type SubPeriodAccum = { year_month: string; year: number; app: string; revenue: number; transactions: number; buyers: Set<string> };
+    const subPeriodGroups: Record<string, SubPeriodAccum> = comparisonFilteredData.reduce((acc: Record<string, SubPeriodAccum>, item) => {
       const subKey = `${item.year_month}_${item.source_app}`;
-      if (!acc[subKey]) acc[subKey] = { 
+      if (!acc[subKey]) acc[subKey] = {
         year_month: item.year_month,
         year: item.year,
         app: item.source_app,
-        revenue: 0, 
-        transactions: 0, 
+        revenue: 0,
+        transactions: 0,
         buyers: new Set()
       };
       acc[subKey].revenue += item.revenue;
@@ -3828,24 +3865,25 @@ export default function App() {
       return acc;
     }, {});
 
-    const subPeriodMetrics = Object.values(subPeriodGroups).map((item: any) => ({
+    const subPeriodMetrics = Object.values(subPeriodGroups).map((item) => ({
       ...item,
       aov: item.revenue / (item.transactions || 1),
       arppu: item.revenue / (item.buyers.size || 1)
     }));
 
     // Step 2: Group for the table display (Yearly or Monthly)
-    const grouped = comparisonFilteredData.reduce((acc: any, item) => {
+    type PricingAccum = { label: string | number; app: string; revenue: number; transactions: number; buyers: Set<string>; prices: number[] };
+    const grouped: Record<string, PricingAccum> = comparisonFilteredData.reduce((acc: Record<string, PricingAccum>, item) => {
       const timeKey = pricingMode === 'yearly' ? item.year : item.year_month;
-      const key = pricingBreakdownByApp ? `${timeKey}_${item.source_app}` : timeKey;
-      
-      if (!acc[key]) acc[key] = { 
-        label: timeKey, 
+      const key = pricingBreakdownByApp ? `${timeKey}_${item.source_app}` : String(timeKey);
+
+      if (!acc[key]) acc[key] = {
+        label: timeKey,
         app: item.source_app,
-        revenue: 0, 
-        transactions: 0, 
+        revenue: 0,
+        transactions: 0,
         buyers: new Set(),
-        prices: [] 
+        prices: []
       };
       acc[key].revenue += item.revenue;
       acc[key].transactions += 1;
@@ -3854,28 +3892,28 @@ export default function App() {
       return acc;
     }, {});
 
-    return Object.values(grouped).map((item: any) => {
+    return Object.values(grouped).map((item) => {
       const uniqueUsers = item.buyers.size;
       const aov = item.revenue / (item.transactions || 1);
       const arppu = uniqueUsers > 0 ? item.revenue / uniqueUsers : 0;
-      
-      // Calculate Average AOV/ARPPU from sub-periods (rata-rata dari metrik sub-periode)
-      const relevantSubPeriods = subPeriodMetrics.filter((sub: any) => {
+
+      // Calculate Average AOV/ARPPU from sub-periods
+      const relevantSubPeriods = subPeriodMetrics.filter((sub) => {
         const timeMatch = pricingMode === 'yearly' ? sub.year === item.label : sub.year_month === item.label;
         const appMatch = !pricingBreakdownByApp || sub.app === item.app;
         return timeMatch && appMatch;
       });
 
-      const avgAov = relevantSubPeriods.length > 0 
-        ? relevantSubPeriods.reduce((sum, sub) => sum + sub.aov, 0) / relevantSubPeriods.length 
+      const avgAov = relevantSubPeriods.length > 0
+        ? relevantSubPeriods.reduce((sum, sub) => sum + sub.aov, 0) / relevantSubPeriods.length
         : aov;
-      const avgArppu = relevantSubPeriods.length > 0 
-        ? relevantSubPeriods.reduce((sum, sub) => sum + sub.arppu, 0) / relevantSubPeriods.length 
+      const avgArppu = relevantSubPeriods.length > 0
+        ? relevantSubPeriods.reduce((sum, sub) => sum + sub.arppu, 0) / relevantSubPeriods.length
         : arppu;
 
-      const sortedPrices = item.prices.slice().sort((a: number, b: number) => a - b);
-      const minPrice = item.prices.length > 0 ? item.prices.reduce((a: number, b: number) => Math.min(a, b)) : 0;
-      const maxPrice = item.prices.length > 0 ? item.prices.reduce((a: number, b: number) => Math.max(a, b)) : 0;
+      const sortedPrices = item.prices.slice().sort((a, b) => a - b);
+      const minPrice = item.prices.length > 0 ? item.prices.reduce((a, b) => Math.min(a, b)) : 0;
+      const maxPrice = item.prices.length > 0 ? item.prices.reduce((a, b) => Math.max(a, b)) : 0;
       const avgPrice = item.revenue / (item.transactions || 1);
 
       const benchmarkPrice = sortedPrices[Math.floor(sortedPrices.length * 0.5)] || 0;
@@ -3898,7 +3936,7 @@ export default function App() {
         midRec,
         highRec
       };
-    }).sort((a: any, b: any) => b.label.toString().localeCompare(a.label.toString()));
+    }).sort((a, b) => b.label.toString().localeCompare(a.label.toString()));
   }, [data, pricingMode, pricingBreakdownByApp, filters.source_app, filters.methode_name]);
 
   // --- Pagination State ---
@@ -4172,12 +4210,15 @@ export default function App() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={Object.values(filteredData.reduce((acc: any, curr) => {
-                            const method = curr.methode_name || 'Unknown';
-                            if (!acc[method]) acc[method] = { name: method, value: 0 };
-                            acc[method].value += curr.revenue;
-                            return acc;
-                          }, {})).sort((a: any, b: any) => b.value - a.value)}
+                          data={(() => {
+                            const grouped: Record<string, { name: string; value: number }> = {};
+                            filteredData.forEach(curr => {
+                              const method = curr.methode_name || 'Unknown';
+                              if (!grouped[method]) grouped[method] = { name: method, value: 0 };
+                              grouped[method].value += curr.revenue;
+                            });
+                            return Object.values(grouped).sort((a, b) => b.value - a.value);
+                          })()}
                           cx="50%"
                           cy="50%"
                           innerRadius={80}
@@ -4210,12 +4251,15 @@ export default function App() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={Object.values(filteredData.reduce((acc: any, curr) => {
-                            const method = curr.methode_name || 'Unknown';
-                            if (!acc[method]) acc[method] = { name: method, value: 0 };
-                            acc[method].value += 1;
-                            return acc;
-                          }, {})).sort((a: any, b: any) => b.value - a.value)}
+                          data={(() => {
+                            const grouped: Record<string, { name: string; value: number }> = {};
+                            filteredData.forEach(curr => {
+                              const method = curr.methode_name || 'Unknown';
+                              if (!grouped[method]) grouped[method] = { name: method, value: 0 };
+                              grouped[method].value += 1;
+                            });
+                            return Object.values(grouped).sort((a, b) => b.value - a.value);
+                          })()}
                           cx="50%"
                           cy="50%"
                           innerRadius={80}
