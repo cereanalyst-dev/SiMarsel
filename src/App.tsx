@@ -3360,8 +3360,8 @@ export default function App() {
       try {
         setLoading(true);
 
-        // Fetch strictly from public/data_paid_clean.xlsx
-        const response = await fetch('/data_paid_clean.xlsx');
+        // Fetch default data file from public directory
+        const response = await fetch('/data_paid_clean (2).xlsx');
         
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
@@ -3404,7 +3404,7 @@ export default function App() {
         throw new Error('Database file not found');
       } catch (err) {
         console.warn('Initial data load skipped or failed:', err);
-        setError('Silakan unggah file "data_paid_clean.xlsx" untuk memulai.');
+        setError('Silakan unggah file Excel untuk memulai.');
       } finally {
         setLoading(false);
       }
@@ -3941,7 +3941,7 @@ export default function App() {
           <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">SiMarsel Analytics</h2>
           <p className="text-slate-500 mb-10 leading-relaxed font-medium">
             Sistem sedang menunggu data untuk inisialisasi dashboard. <br/>
-            Pastikan file <code className="bg-indigo-50 px-2 py-1 rounded text-indigo-600 font-bold text-sm mx-1">data_paid_clean.xlsx</code> tersedia di direktori utama atau unggah secara manual di bawah ini.
+            Pastikan file <code className="bg-indigo-50 px-2 py-1 rounded text-indigo-600 font-bold text-sm mx-1">data_paid_clean (2).xlsx</code> tersedia di direktori utama atau unggah secara manual di bawah ini.
           </p>
           <div className="bg-slate-50 p-8 rounded-[2rem] border border-dashed border-slate-200">
             <label className="block w-full cursor-pointer">
