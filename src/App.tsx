@@ -16,7 +16,7 @@ import {
   Target, MessageSquare, Bell, Settings, Rocket, MoreHorizontal, Plus,
   ChevronRight, LogOut, Activity, Eye, Zap, AlertCircle, Smartphone
 } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, getYear, getMonth, getQuarter } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, getYear, getMonth, getQuarter, getDaysInMonth } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { INITIAL_DATA } from './data';
@@ -25,7 +25,7 @@ import { INITIAL_DATA } from './data';
 
 interface Transaction {
   transaction_date: string;
-  payment_date: any; // Can be Excel serial or ISO string
+  payment_date: string | number | Date;
   trx_id: string;
   source_app: string;
   methode_name: string;
@@ -45,7 +45,7 @@ interface Transaction {
 }
 
 interface Downloader {
-  date: any;
+  date: string | number | Date;
   source_app: string;
   count: number;
   // Derived
@@ -112,10 +112,21 @@ interface DailyData {
   dailyInsight?: string;
 }
 
+interface TargetConfig {
+  targetDownloader: number;
+  targetUserPremium: number;
+  targetSales: number;
+  targetConversion: number;
+  avgPrice: number;
+  revenue?: number;
+  packages?: Array<{ active: boolean; price: number; name: string }>;
+  [key: string]: unknown;
+}
+
 interface AppData {
   id: string;
   name: string;
-  targetConfig: Record<string, any>;
+  targetConfig: Record<string, TargetConfig>;
   dailyData: Record<string, DailyData>;
   isTargetSet: Record<string, boolean>;
 }
@@ -152,7 +163,7 @@ const generateDailyInsight = (
   revenue: number,
   transactions: number,
   downloaders: number,
-  strategies: any[],
+  strategies: Array<{ appName: string; strategy: DailyData | undefined }>,
   socialContent: SocialMediaContent[]
 ) => {
   if (revenue === 0 && transactions === 0 && downloaders === 0 && strategies.length === 0 && socialContent.length === 0) {
@@ -249,12 +260,12 @@ interface TrendItem {
   }>;
 }
 
-const StatCard = ({ title, value, icon: Icon, trend, colorClass, subtitle }: { 
-  title: string; 
-  value: string; 
-  icon: any; 
-  trend?: number; 
-  colorClass: string; 
+const StatCard = ({ title, value, icon: Icon, trend, colorClass, subtitle }: {
+  title: string;
+  value: string;
+  icon: React.ElementType;
+  trend?: number;
+  colorClass: string;
   subtitle?: string;
 }) => (
   <motion.div 
@@ -528,6 +539,7 @@ const SocialMediaModal = ({
       postingTime: '10:00',
       contentType: 'Feed',
       title: '',
+      caption: '',
       cta: '',
       topic: '',
       reach: 0,
@@ -538,7 +550,7 @@ const SocialMediaModal = ({
     }]);
   };
 
-  const updateContent = (index: number, field: keyof SocialMediaContent, value: any) => {
+  const updateContent = (index: number, field: keyof SocialMediaContent, value: string | number) => {
     const updated = [...localContent];
     updated[index] = { ...updated[index], [field]: value };
     setLocalContent(updated);
@@ -1322,8 +1334,8 @@ const TargetSection = ({
     } : a));
   };
 
-  const updateDailyValue = (date: string, field: string, value: any) => {
-    const newDailyData = { ...selectedApp.dailyData };
+  const updateDailyValue = (date: string, field: string, value: string | number | null | SocialMediaContent[]) => {
+    const newDailyData: Record<string, Record<string, unknown>> = { ...selectedApp.dailyData };
     if (!newDailyData[date]) {
       newDailyData[date] = {};
     }
@@ -2370,9 +2382,10 @@ const MonitoringSection = ({ data, downloaderData, target }: { data: Transaction
   }, [currentMonthData, currentMonthDownloader, target, currentDay, daysInMonth]);
 
   const dailyTrend = useMemo(() => {
+    if (!currentDay || currentDay <= 0) return [];
     const days = Array.from({ length: currentDay }, (_, i) => i + 1);
-    const targetDailyRev = target.revenue / 30;
-    
+    const targetDailyRev = target.revenue / daysInMonth;
+
     return days.map(day => {
       const dayData = currentMonthData.filter(d => d.parsed_payment_date.getDate() === day);
       const revenue = dayData.reduce((acc, curr) => acc + curr.revenue, 0);
@@ -2382,7 +2395,7 @@ const MonitoringSection = ({ data, downloaderData, target }: { data: Transaction
         Target: targetDailyRev
       };
     });
-  }, [currentMonthData, target, currentDay]);
+  }, [currentMonthData, target, currentDay, daysInMonth]);
 
   if (target.revenue === 0) {
     return (
@@ -3171,7 +3184,7 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
         // But the parent expects processed data. Let's assume the parent will handle it.
         // Actually, it's better to trigger a re-processing in the parent.
         // For now, we'll just pass the raw data and let the parent handle it via a new prop.
-        (onDataUpdate as any)(transactions, downloaders);
+        onDataUpdate(transactions as unknown as Transaction[], downloaders as unknown as Downloader[]);
         alert('Data berhasil diperbarui!');
       } catch (err) {
         console.error(err);
@@ -3237,19 +3250,13 @@ export default function App() {
     methode_name: 'All'
   });
 
-  const [apps, setApps] = useState<any[]>([
+  const [apps, setApps] = useState<AppData[]>([
     {
       id: '1',
       name: 'App Utama',
-      targetConfig: {
-        targetDownloader: 0,
-        targetUserPremium: 0,
-        targetSales: 0,
-        targetConversion: 0,
-        avgPrice: 0,
-      },
-      dailyData: {}, // Keyed by YYYY-MM-DD
-      isTargetSet: false
+      targetConfig: {},
+      dailyData: {},
+      isTargetSet: {}
     }
   ]);
   const [selectedAppId, setSelectedAppId] = useState('1');
@@ -3277,11 +3284,13 @@ export default function App() {
       } else if (rawDate) {
         paymentDate = new Date(rawDate);
       } else {
-        paymentDate = new Date(); // Fallback
+        console.warn('Missing date for transaction, using current date as fallback:', item.trx_id || 'unknown');
+        paymentDate = new Date();
       }
 
       // Ensure valid date
       if (isNaN(paymentDate.getTime())) {
+        console.warn('Invalid date for transaction, using current date as fallback:', rawDate, item.trx_id || 'unknown');
         paymentDate = new Date();
       }
 
@@ -3579,7 +3588,9 @@ export default function App() {
             return hasData ? i : acc;
           }, -1);
 
-          const baseDailySales = target.targetSales / 30; // Approximation if month length not easily available here
+          const [mYear, mMonth] = monthKey.split('-').map(Number);
+          const daysInTargetMonth = getDaysInMonth(new Date(mYear, mMonth - 1));
+          const baseDailySales = target.targetSales / daysInTargetMonth;
           const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
           totalHutangSales += Math.max(0, expectedSalesSoFar - appRealSales);
         }
