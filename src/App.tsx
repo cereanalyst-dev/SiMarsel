@@ -3075,7 +3075,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
     { id: 'optimasi', icon: TrendingUp, label: 'Optimasi Harga' },
     { id: 'target', icon: Target, label: 'Strategi & Target' },
     { id: 'packages', icon: Package, label: 'Performa Produk' },
-    { id: 'calendar', icon: Calendar, label: 'Kalender Paket' },
+    { id: 'calendar', icon: Calendar, label: 'Kalender Marsel' },
     { id: 'social', icon: MessageSquare, label: 'Analisa Sosial Media' },
   ];
 
