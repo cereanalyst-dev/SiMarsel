@@ -71,6 +71,7 @@ interface DashboardStats {
   totalRealDownloader: number;
   totalRealSales: number;
   totalRealPremium: number;
+  repeatOrder: number;
 }
 
 interface SocialMediaContent {
@@ -1331,53 +1332,60 @@ const TargetSection = ({
     const dailyDownloader = Math.ceil(form.targetDownloader / daysInMonthCount);
     const dailySales = Math.ceil(form.targetSales / daysInMonthCount);
     const dailyUserPremium = Math.ceil(form.targetUserPremium / daysInMonthCount);
-    
-    const newDailyData: Record<string, DailyData> = { ...(selectedApp.dailyData || {}) };
-    dates.forEach(date => {
-      newDailyData[date] = {
-        targetDownloader: dailyDownloader,
-        targetSales: dailySales,
-        targetUserPremium: dailyUserPremium,
-        actualDownloader: 0,
-        actualSales: 0,
-        actualUserPremium: 0,
-        estimasiHarga: form.avgPrice,
-        channel: '',
-        promo: '',
-        premium: '',
-        benefit: '',
-        event: '',
-        activity: '',
-        extra: '',
-        bcan: '',
-        story: '',
-        chat: '',
-        live: '',
-        ads: ''
+
+    setApps(prevApps => prevApps.map(a => {
+      if (a.id !== selectedAppId) return a;
+
+      const newDailyData: Record<string, DailyData> = { ...(a.dailyData || {}) };
+      dates.forEach(date => {
+        newDailyData[date] = {
+          targetDownloader: dailyDownloader,
+          targetSales: dailySales,
+          targetUserPremium: dailyUserPremium,
+          actualDownloader: 0,
+          actualSales: 0,
+          actualUserPremium: 0,
+          estimasiHarga: form.avgPrice,
+          channel: '',
+          promo: '',
+          premium: '',
+          benefit: '',
+          event: '',
+          activity: '',
+          extra: '',
+          bcan: '',
+          story: '',
+          chat: '',
+          live: '',
+          ads: ''
+        };
+      });
+
+      const newTargetConfig = { ...(a.targetConfig || {}) };
+      newTargetConfig[targetMonth] = form;
+
+      const newIsTargetSet = { ...(a.isTargetSet || {}) };
+      newIsTargetSet[targetMonth] = true;
+
+      return {
+        ...a,
+        targetConfig: newTargetConfig,
+        dailyData: newDailyData,
+        isTargetSet: newIsTargetSet
       };
-    });
-
-    const newTargetConfig = { ...(selectedApp.targetConfig || {}) };
-    newTargetConfig[targetMonth] = form;
-
-    const newIsTargetSet = { ...(selectedApp.isTargetSet || {}) };
-    newIsTargetSet[targetMonth] = true;
-
-    setApps(apps.map(a => a.id === selectedAppId ? { 
-      ...a, 
-      targetConfig: newTargetConfig, 
-      dailyData: newDailyData,
-      isTargetSet: newIsTargetSet
-    } : a));
+    }));
   };
 
   const updateDailyValue = (date: string, field: string, value: string | number | null | SocialMediaContent[]) => {
-    const newDailyData = { ...selectedApp.dailyData } as Record<string, DailyData>;
-    if (!newDailyData[date]) {
-      newDailyData[date] = {} as DailyData;
-    }
-    (newDailyData[date] as Record<string, unknown>)[field] = value;
-    setApps(apps.map(a => a.id === selectedAppId ? { ...a, dailyData: newDailyData } : a));
+    setApps(prevApps => prevApps.map(a => {
+      if (a.id !== selectedAppId) return a;
+      const newDailyData = { ...a.dailyData } as Record<string, DailyData>;
+      if (!newDailyData[date]) {
+        newDailyData[date] = {} as DailyData;
+      }
+      newDailyData[date] = { ...newDailyData[date], [field]: value };
+      return { ...a, dailyData: newDailyData };
+    }));
   };
 
   const isTargetSetForMonth = selectedApp.isTargetSet?.[targetMonth];
@@ -1434,9 +1442,9 @@ const TargetSection = ({
 
   const addApp = () => {
     const newId = Math.random().toString(36).substr(2, 9);
-    setApps([...apps, {
+    setApps(prevApps => [...prevApps, {
       id: newId,
-      name: `App ${apps.length + 1}`,
+      name: `App ${prevApps.length + 1}`,
       targetConfig: {},
       dailyData: {},
       isTargetSet: {}
@@ -1445,10 +1453,12 @@ const TargetSection = ({
   };
 
   const removeApp = (id: string) => {
-    if (apps.length <= 1) return;
-    const newApps = apps.filter(a => a.id !== id);
-    setApps(newApps);
-    if (selectedAppId === id) setSelectedAppId(newApps[0].id);
+    setApps(prevApps => {
+      if (prevApps.length <= 1) return prevApps;
+      const newApps = prevApps.filter(a => a.id !== id);
+      if (selectedAppId === id) setSelectedAppId(newApps[0].id);
+      return newApps;
+    });
   };
 
   const globalSummary = useMemo(() => {
@@ -1738,7 +1748,8 @@ const TargetSection = ({
                   type="text"
                   value={app.name}
                   onChange={(e) => {
-                    setApps(apps.map(a => a.id === app.id ? { ...a, name: e.target.value } : a));
+                    const newName = e.target.value;
+                    setApps(prevApps => prevApps.map(a => a.id === app.id ? { ...a, name: newName } : a));
                   }}
                   className="text-lg font-black text-slate-900 mb-2 bg-transparent border-none outline-none focus:ring-2 focus:ring-indigo-100 rounded px-1 w-full"
                   onClick={(e) => e.stopPropagation()}
@@ -1939,11 +1950,14 @@ const TargetSection = ({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <button 
+                <button
                   onClick={() => {
-                    const newIsTargetSet = { ...(selectedApp.isTargetSet || {}) };
-                    newIsTargetSet[targetMonth] = false;
-                    setApps(apps.map(a => a.id === selectedAppId ? { ...a, isTargetSet: newIsTargetSet } : a));
+                    setApps(prevApps => prevApps.map(a => {
+                      if (a.id !== selectedAppId) return a;
+                      const newIsTargetSet = { ...(a.isTargetSet || {}) };
+                      newIsTargetSet[targetMonth] = false;
+                      return { ...a, isTargetSet: newIsTargetSet };
+                    }));
                   }}
                   className="px-4 py-2 bg-white border border-slate-200 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-all"
                 >
@@ -3585,6 +3599,16 @@ export default function App() {
     const uniqueBuyers = new Set(filteredData.map(item => item.email || item.phone || item.full_name || item.trx_id).filter(Boolean)).size;
     const totalRealDownloader = filteredDownloaderData.reduce((sum, d) => sum + d.count, 0);
 
+    // Calculate repeat order: users with more than 1 purchase
+    const buyerPurchaseCount = new Map<string, number>();
+    filteredData.forEach(item => {
+      const buyerId = item.email || item.phone || item.full_name;
+      if (buyerId) {
+        buyerPurchaseCount.set(buyerId, (buyerPurchaseCount.get(buyerId) || 0) + 1);
+      }
+    });
+    const repeatOrder = Array.from(buyerPurchaseCount.values()).filter(count => count > 1).length;
+
     // Filter apps based on source_app filter
     const relevantApps = filters.source_app === 'All' 
       ? apps 
@@ -3671,7 +3695,8 @@ export default function App() {
       hutangSales: totalHutangSales,
       totalRealDownloader,
       totalRealSales,
-      totalRealPremium: totalRealPremiumFromApps
+      totalRealPremium: totalRealPremiumFromApps,
+      repeatOrder
     };
   }, [filteredData, filteredDownloaderData, apps, filters]);
 
@@ -4092,10 +4117,10 @@ export default function App() {
                     <div className="p-2 bg-rose-50 rounded-xl">
                       <UserCheck className="w-4 h-4 text-rose-600" />
                     </div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Premium Users</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Repeat Order</p>
                   </div>
-                  <h3 className="text-xl font-black text-slate-900">{formatNumber(stats.totalRealPremium)}</h3>
-                  <p className="text-[9px] text-slate-400 font-medium mt-1">Total pengguna berbayar</p>
+                  <h3 className="text-xl font-black text-slate-900">{formatNumber(stats.repeatOrder)}</h3>
+                  <p className="text-[9px] text-slate-400 font-medium mt-1">User dengan lebih dari 1 pembelian</p>
                 </div>
               </div>
 
