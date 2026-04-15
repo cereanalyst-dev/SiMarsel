@@ -3301,18 +3301,41 @@ export default function App() {
     methode_name: 'All'
   });
 
-  const [apps, setApps] = useState<AppData[]>([
-    {
+  const [apps, setApps] = useState<AppData[]>(() => {
+    try {
+      const saved = localStorage.getItem('simarsel_apps');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [{
       id: '1',
       name: 'App Utama',
       targetConfig: {},
       dailyData: {},
       isTargetSet: {}
-    }
-  ]);
-  const [selectedAppId, setSelectedAppId] = useState('1');
-  const [targetMonth, setTargetMonth] = useState(format(new Date(), 'yyyy-MM'));
+    }];
+  });
+  const [selectedAppId, setSelectedAppId] = useState(() => {
+    try {
+      return localStorage.getItem('simarsel_selectedAppId') || '1';
+    } catch { return '1'; }
+  });
+  const [targetMonth, setTargetMonth] = useState(() => {
+    try {
+      return localStorage.getItem('simarsel_targetMonth') || format(new Date(), 'yyyy-MM');
+    } catch { return format(new Date(), 'yyyy-MM'); }
+  });
   const [calendarFocusDate, setCalendarFocusDate] = useState<Date | null>(null);
+
+  // Auto-save apps, selectedAppId, and targetMonth to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('simarsel_apps', JSON.stringify(apps)); } catch {}
+  }, [apps]);
+  useEffect(() => {
+    try { localStorage.setItem('simarsel_selectedAppId', selectedAppId); } catch {}
+  }, [selectedAppId]);
+  useEffect(() => {
+    try { localStorage.setItem('simarsel_targetMonth', targetMonth); } catch {}
+  }, [targetMonth]);
 
   // --- Flexible Charting State ---
   const [chartType, setChartType] = useState<'bar' | 'line' | 'area' | 'pie'>('bar');
