@@ -15,13 +15,13 @@ export function formatNumber(value: number): string {
 
 export function getShortAppName(name: string): string {
   const upper = name.toUpperCase();
+  if (upper === 'CEREBRUM') return 'Cerebrum';
   if (upper === 'JADIASN') return 'ASN';
   if (upper === 'JADIBUMN') return 'BUMN';
-  if (upper === 'JADIPOLRI') return 'Polri';
-  if (upper === 'JADIPPPK') return 'PPPK';
-  if (upper === 'JADITNI') return 'TNI';
-  if (upper === 'JADICPNS') return 'CPNS';
-  if (upper === 'CEREBRUM') return 'Cerebrum';
+  if (upper === 'JADIPOLISI') return 'Polisi';
+  if (upper === 'JADIPRAJURIT') return 'Prajurit';
+  if (upper === 'JADIBEASISWA') return 'Beasiswa';
+  if (upper === 'JADISEKDIN') return 'Sekdin';
   return name.replace(/^JADI/i, '');
 }
 

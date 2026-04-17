@@ -17,19 +17,28 @@ export interface ImportSummary {
   validationErrors: string[];
 }
 
+// Excel cells may arrive as number | string | Date; treat anything non-empty
+// as a string for text fields so phone numbers / emails that Excel stored as
+// numbers don't fail validation.
+const looseString = z
+  .union([z.string(), z.number(), z.boolean()])
+  .nullable()
+  .optional()
+  .transform((v) => (v == null || v === '' ? null : String(v)));
+
 const TransactionRow = z.object({
   trx_id: z.union([z.string(), z.number()]).transform(String),
   payment_date: z.string().min(1),
   transaction_date: z.string().nullable().optional(),
   source_app: z.string().min(1),
-  methode_name: z.string().nullable().optional(),
+  methode_name: looseString,
   revenue: z.coerce.number().default(0),
-  promo_code: z.string().nullable().optional(),
-  content_name: z.string().nullable().optional(),
-  full_name: z.string().nullable().optional(),
-  email: z.string().nullable().optional(),
-  phone: z.string().nullable().optional(),
-  payment_status: z.string().nullable().optional(),
+  promo_code: looseString,
+  content_name: looseString,
+  full_name: looseString,
+  email: looseString,
+  phone: looseString,
+  payment_status: looseString,
 });
 
 function findSheetName(sheetNames: string[], keywords: string[]): string | undefined {
