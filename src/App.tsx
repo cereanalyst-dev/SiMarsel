@@ -262,6 +262,19 @@ const excelDateToJSDate = (serial: number) => {
   return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
 };
 
+// --- Shared hooks ---
+
+const useCloseOnEscape = (isOpen: boolean, onClose: () => void) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+};
+
 // --- Components ---
 
 interface TrendItem {
@@ -318,13 +331,14 @@ const StatCard = ({ title, value, icon: Icon, trend, colorClass, subtitle }: {
   </motion.div>
 );
 
-const DrillDownModal = ({ isOpen, onClose, data, metric, appColors }: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  data: any; 
+const DrillDownModal = ({ isOpen, onClose, data, metric, appColors }: {
+  isOpen: boolean;
+  onClose: () => void;
+  data: any;
   metric: string;
   appColors: Record<string, string>;
 }) => {
+  useCloseOnEscape(isOpen, onClose);
   if (!isOpen || !data) return null;
 
   const breakdown = Object.entries(data.appBreakdown || {}).map(([app, vals]: [string, any]) => ({
@@ -336,8 +350,14 @@ const DrillDownModal = ({ isOpen, onClose, data, metric, appColors }: {
   const total = breakdown.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <motion.div 
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
@@ -550,6 +570,7 @@ const SocialMediaModal = ({
     setLocalContent(content || []);
   }, [content, isOpen]);
 
+  useCloseOnEscape(isOpen, onClose);
   if (!isOpen) return null;
 
   const addContent = () => {
@@ -579,8 +600,14 @@ const SocialMediaModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <motion.div 
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
@@ -1411,7 +1438,9 @@ const TargetSection = ({
   }, [selectedApp, targetMonth, dates]);
 
   const addApp = () => {
-    const newId = Math.random().toString(36).substr(2, 9);
+    const newId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2, 11);
     setApps([...apps, {
       id: newId,
       name: `App ${apps.length + 1}`,
@@ -2866,6 +2895,7 @@ const TopBar = () => {
 const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[], downloader: Downloader[], append: boolean) => void }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
+  const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2900,10 +2930,13 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
         }
 
         onDataUpdate(transactions, downloaders, uploadMode === 'append');
-        alert(uploadMode === 'append' ? 'Data berhasil ditambahkan!' : 'Data berhasil diganti!');
+        setStatus({
+          kind: 'success',
+          message: uploadMode === 'append' ? 'Data berhasil ditambahkan.' : 'Data berhasil diganti.',
+        });
       } catch (err) {
         console.error(err);
-        alert('Gagal memproses file. Pastikan format Excel benar.');
+        setStatus({ kind: 'error', message: 'Gagal memproses file. Pastikan format Excel benar.' });
       } finally {
         setIsUploading(false);
       }
@@ -2989,6 +3022,20 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
             </p>
           </div>
         </div>
+
+        {status && (
+          <div
+            role="status"
+            className={cn(
+              "mt-6 max-w-xl px-5 py-4 rounded-2xl text-xs font-bold border",
+              status.kind === 'success'
+                ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                : "bg-rose-50 border-rose-100 text-rose-700"
+            )}
+          >
+            {status.message}
+          </div>
+        )}
       </div>
     </div>
   );
