@@ -6,21 +6,21 @@ export const CHART_COLORS = [
 
 // Map full app names to short labels used on compact charts / legends.
 export const APP_SHORT_NAMES: Record<string, string> = {
+  CEREBRUM: 'Cerebrum',
   JADIASN: 'ASN',
   JADIBUMN: 'BUMN',
-  JADIPOLRI: 'POLRI',
-  JADIPPPK: 'PPPK',
-  JADITNI: 'TNI',
-  JADICPNS: 'CPNS',
-  CEREBRUM: 'CEREBRUM',
+  JADIPOLISI: 'Polisi',
+  JADIPRAJURIT: 'Prajurit',
+  JADIBEASISWA: 'Beasiswa',
+  JADISEKDIN: 'Sekdin',
 };
 
 export const DEFAULT_APP_NAMES = [
+  'CEREBRUM',
   'JADIASN',
   'JADIBUMN',
-  'JADIPOLRI',
-  'JADIPPPK',
-  'JADITNI',
-  'JADICPNS',
-  'CEREBRUM',
+  'JADIPOLISI',
+  'JADIPRAJURIT',
+  'JADIBEASISWA',
+  'JADISEKDIN',
 ] as const;

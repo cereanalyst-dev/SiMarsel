@@ -1,4 +1,4 @@
--- Source applications (JADIASN, JADIBUMN, etc.)
+-- Source applications (matches the app columns in the real downloader sheet)
 create table public.apps (
   id uuid primary key default uuid_generate_v4(),
   name text not null unique,
@@ -10,13 +10,14 @@ create table public.apps (
 
 create index idx_apps_name on public.apps(name);
 
--- Seed default app list (idempotent)
+-- Seed default app list (idempotent). Names match the uppercase column
+-- headers in the production downloader sheet.
 insert into public.apps (name, display_name) values
+  ('CEREBRUM', 'Cerebrum'),
   ('JADIASN', 'ASN'),
   ('JADIBUMN', 'BUMN'),
-  ('JADIPOLRI', 'POLRI'),
-  ('JADIPPPK', 'PPPK'),
-  ('JADITNI', 'TNI'),
-  ('JADICPNS', 'CPNS'),
-  ('CEREBRUM', 'CEREBRUM')
+  ('JADIPOLISI', 'Polisi'),
+  ('JADIPRAJURIT', 'Prajurit'),
+  ('JADIBEASISWA', 'Beasiswa'),
+  ('JADISEKDIN', 'Sekdin')
 on conflict (name) do nothing;
