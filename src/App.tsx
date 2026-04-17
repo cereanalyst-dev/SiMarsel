@@ -4,7 +4,9 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import * as XLSX from 'xlsx';
+type XLSXModule = typeof import('xlsx');
+let xlsxModulePromise: Promise<XLSXModule> | null = null;
+const loadXLSX = () => (xlsxModulePromise ??= import('xlsx'));
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, AreaChart, Area
@@ -2871,11 +2873,12 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
 
     setIsUploading(true);
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
-        const bstr = event.target?.result;
-        const workbook = XLSX.read(bstr, { type: 'binary' });
-        
+        const buffer = event.target?.result;
+        const XLSX = await loadXLSX();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+
         let transactions: any[] = [];
         let downloaders: any[] = [];
 
@@ -2905,7 +2908,7 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
         setIsUploading(false);
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -3133,6 +3136,7 @@ export default function App() {
         
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
+          const XLSX = await loadXLSX();
           const workbook = XLSX.read(arrayBuffer, { type: 'array' });
           const sheetNames = workbook.SheetNames;
           const findSheet = (keywords: string[]) => {
@@ -3186,11 +3190,12 @@ export default function App() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const data = evt.target?.result;
         if (!data) throw new Error('Failed to read file');
-        
+
+        const XLSX = await loadXLSX();
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetNames = workbook.SheetNames;
         const findSheet = (keywords: string[]) => {
