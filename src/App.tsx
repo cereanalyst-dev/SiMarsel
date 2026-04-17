@@ -1328,10 +1328,7 @@ const TargetSection = ({
 
   const updateDailyValue = (date: string, field: string, value: any) => {
     const newDailyData = { ...selectedApp.dailyData };
-    if (!newDailyData[date]) {
-      newDailyData[date] = {};
-    }
-    newDailyData[date][field] = value;
+    newDailyData[date] = { ...(newDailyData[date] || {}), [field]: value };
     setApps(apps.map(a => a.id === selectedAppId ? { ...a, dailyData: newDailyData } : a));
   };
 
@@ -1932,7 +1929,7 @@ const TargetSection = ({
                     <th className="py-4 px-4 border-r border-slate-200">Repeat Order</th>
                     <th className="py-4 px-4 border-r border-slate-200">Benefit</th>
                     <th className="py-4 px-4 border-r border-slate-200">Event</th>
-                    <th className="py-4 px-4 border-r border-slate-200">Benefit</th>
+                    <th className="py-4 px-4 border-r border-slate-200">Extra</th>
                     <th className="py-4 px-4 border-r border-slate-200">BC</th>
                     <th className="py-4 px-4 border-r border-slate-200">Story</th>
                     <th className="py-4 px-4 border-r border-slate-200">Chat</th>
@@ -1948,7 +1945,7 @@ const TargetSection = ({
                     // Chained Dynamic Target Logic
                     const totalTargetSales = selectedApp.targetConfig[targetMonth]?.targetSales || 0;
                     const totalTargetDownloader = selectedApp.targetConfig[targetMonth]?.targetDownloader || 0;
-                    const totalTargetRepeatOrder = selectedApp.targetConfig[targetMonth]?.targetRepeatOrder || 0;
+                    const totalTargetRepeatOrder = selectedApp.targetConfig[targetMonth]?.targetUserPremium || 0;
                     
                     const baseDailySales = totalTargetSales / dates.length;
                     const baseDailyDownloader = totalTargetDownloader / dates.length;
@@ -3285,15 +3282,9 @@ export default function App() {
     {
       id: '1',
       name: 'App Utama',
-      targetConfig: {
-        targetDownloader: 0,
-        targetUserPremium: 0,
-        targetSales: 0,
-        targetConversion: 0,
-        avgPrice: 0,
-      },
+      targetConfig: {} as Record<string, any>,
       dailyData: {}, // Keyed by YYYY-MM-DD
-      isTargetSet: false
+      isTargetSet: {} as Record<string, boolean>
     }
   ]);
   const [selectedAppId, setSelectedAppId] = useState('1');
@@ -3310,26 +3301,24 @@ export default function App() {
   // --- Data Loading ---
 
   const processData = useCallback((rawData: any[]) => {
-    return rawData.map(item => {
-      let paymentDate: Date;
+    let skipped = 0;
+    const result: Transaction[] = [];
+    rawData.forEach(item => {
       const rawDate = item.payment_date || item.transaction_date || item.Tanggal || item.tanggal || item.Date || item.date;
-      
+      if (!rawDate) { skipped++; return; }
+
+      let paymentDate: Date;
       if (typeof rawDate === 'number') {
         paymentDate = excelDateToJSDate(rawDate);
       } else if (rawDate instanceof Date) {
         paymentDate = rawDate;
-      } else if (rawDate) {
-        paymentDate = new Date(rawDate);
       } else {
-        paymentDate = new Date(); // Fallback
+        paymentDate = new Date(rawDate);
       }
 
-      // Ensure valid date
-      if (isNaN(paymentDate.getTime())) {
-        paymentDate = new Date();
-      }
+      if (isNaN(paymentDate.getTime())) { skipped++; return; }
 
-      return {
+      result.push({
         ...item,
         source_app: String(item.source_app || '').toUpperCase(),
         parsed_payment_date: paymentDate,
@@ -3339,8 +3328,10 @@ export default function App() {
         year_month: format(paymentDate, 'yyyy-MM'),
         hour: paymentDate.getHours(),
         revenue: Number(item.revenue || item.Revenue || item.total_price || 0)
-      };
+      });
     });
+    if (skipped > 0) console.warn(`processData: skipped ${skipped} rows with invalid/missing date`);
+    return result;
   }, []);
 
   const processDownloaderData = useCallback((rawData: any[]) => {
@@ -3645,7 +3636,10 @@ export default function App() {
             return hasData ? i : acc;
           }, -1);
 
-          const baseDailySales = target.targetSales / 30;
+          const daysInMonthForKey = monthKey
+            ? new Date(Number(monthKey.split('-')[0]), Number(monthKey.split('-')[1]), 0).getDate()
+            : 30;
+          const baseDailySales = target.targetSales / daysInMonthForKey;
           const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
           totalHutangSales += Math.max(0, expectedSalesSoFar - appRealSales);
         }
