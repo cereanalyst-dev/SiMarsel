@@ -4,22 +4,24 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import { 
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { 
+import {
   TrendingUp, ShoppingBag, DollarSign, Calendar, Filter,
   ChevronDown, Download, LayoutDashboard, Package, CreditCard,
   UserCheck, Users, ArrowUpRight, ArrowDownRight, Search, RefreshCw,
-  Target, MessageSquare, Settings, Plus,
-  ChevronRight, Activity, Zap, AlertCircle, Smartphone
+  Target, MessageSquare, Settings, Plus, LogOut,
+  ChevronRight, Activity, Zap, AlertCircle, Smartphone, Shield
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, getYear, getMonth, getQuarter, getDaysInMonth } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
+import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
-import { INITIAL_DATA } from '../data';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { importExcelFile } from '@/services/excelImport';
 
 // --- Types ---
 
@@ -3167,22 +3169,32 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
 };
 
 const TopBar = () => {
+  const { profile, signOut } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const initials = (profile?.full_name || profile?.email || '?')
+    .split(/\s+/)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   return (
     <div className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 flex items-center justify-between sticky top-0 z-30">
       <div className="relative w-96">
         <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-        <input 
-          type="text" 
-          placeholder="Search Anything" 
+        <input
+          type="text"
+          placeholder="Search Anything"
           className="w-full bg-slate-50 border border-slate-100 rounded-xl py-2.5 pl-11 pr-4 text-sm font-medium focus:ring-4 focus:ring-indigo-100 outline-none transition-all"
         />
       </div>
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 flex items-center justify-center">
-          <img 
-            src="/logo_transparent.png" 
-            alt="Logo" 
-            className="w-full h-full object-contain" 
+          <img
+            src="/logo_transparent.png"
+            alt="Logo"
+            className="w-full h-full object-contain"
             referrerPolicy="no-referrer"
           />
         </div>
@@ -3190,61 +3202,86 @@ const TopBar = () => {
           <p className="text-sm font-black text-slate-900 leading-none">SiMarsel</p>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Dashboard</p>
         </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">
+              {initials}
+            </div>
+            <div className="hidden md:block text-left leading-tight">
+              <div className="text-xs font-semibold text-slate-900 truncate max-w-[120px]">
+                {profile?.full_name || profile?.email || 'Guest'}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                {profile?.role ?? '—'}
+              </div>
+            </div>
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          </button>
+          {menuOpen && (
+            <div
+              className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-100 py-2 z-40"
+              onMouseLeave={() => setMenuOpen(false)}
+            >
+              <div className="px-4 py-2 border-b border-slate-100">
+                <div className="text-xs font-semibold text-slate-900 truncate">
+                  {profile?.email}
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-0.5">
+                  {profile?.role ?? '—'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await signOut();
+                  } catch (err) {
+                    toast.error((err as Error).message);
+                  }
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Record<string, unknown>[], downloader: Record<string, unknown>[]) => void }) => {
+const SettingsSection = ({ onImportComplete }: { onImportComplete: () => void }) => {
+  const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const bstr = event.target?.result;
-        const workbook = XLSX.read(bstr, { type: 'binary' });
-        
-        let transactions: Record<string, unknown>[] = [];
-        let downloaders: Record<string, unknown>[] = [];
-
-        // Look for sheets
-        workbook.SheetNames.forEach(name => {
-          const sheet = workbook.Sheets[name];
-          const jsonData = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[];
-          if (name.toUpperCase().includes('TRANSAKSI')) {
-            transactions = jsonData;
-          } else if (name.toUpperCase().includes('DOWNLOADER')) {
-            downloaders = jsonData;
-          }
-        });
-
-        // Fallback if sheet names are different
-        if (transactions.length === 0 && workbook.SheetNames.length > 0) {
-          transactions = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as Record<string, unknown>[];
-        }
-        if (downloaders.length === 0 && workbook.SheetNames.length > 1) {
-          downloaders = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[1]]) as Record<string, unknown>[];
-        }
-
-        // We need to pass raw data to the parent which has the processing logic
-        // But the parent expects processed data. Let's assume the parent will handle it.
-        // Actually, it's better to trigger a re-processing in the parent.
-        // For now, we'll just pass the raw data and let the parent handle it via a new prop.
-        onDataUpdate(transactions, downloaders);
-        alert('Data berhasil diperbarui!');
-      } catch (err) {
-        console.error(err);
-        alert('Gagal memproses file. Pastikan format Excel benar.');
-      } finally {
-        setIsUploading(false);
+    try {
+      const summary = await importExcelFile(file, user?.id ?? null);
+      toast.success(
+        `Imported ${summary.transactionCount} transactions, ${summary.downloaderCount} downloader rows`
+      );
+      if (summary.validationErrors.length) {
+        console.warn('[import] validation errors', summary.validationErrors);
       }
-    };
-    reader.readAsBinaryString(file);
+      onImportComplete();
+    } catch (err) {
+      console.error(err);
+      toast.error((err as Error).message || 'Import failed');
+    } finally {
+      setIsUploading(false);
+      // Allow re-uploading the same file.
+      e.target.value = '';
+    }
   };
 
   return (
@@ -3320,6 +3357,8 @@ export default function Dashboard() {
   const [chartGranularity, setChartGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [hiddenApps, setHiddenApps] = useState<Set<string>>(new Set());
   const [drillDownData, setDrillDownData] = useState<TrendItem | null>(null);
+
+  const { user } = useAuth();
 
   // --- Data Loading ---
 
@@ -3399,113 +3438,78 @@ export default function Dashboard() {
     return processed;
   }, []);
 
-  const handleDataUpdate = useCallback((rawTransactions: Record<string, unknown>[], rawDownloaders: Record<string, unknown>[]) => {
-    const processedTransactions = processData(rawTransactions);
-    const processedDownloaders = processDownloaderData(rawDownloaders);
-    setData(processedTransactions);
-    setDownloaderData(processedDownloaders);
-  }, [processData, processDownloaderData]);
+  // Load transactions + downloaders from Supabase. Both tables already have
+  // generated year/month/year_month columns, so we only need to add
+  // parsed_payment_date / parsed_date / quarter for the existing UI helpers.
+  const loadFromSupabase = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [trxRes, dlRes] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('*')
+          .order('payment_date', { ascending: false })
+          .limit(50_000),
+        supabase.from('downloaders').select('*').order('date', { ascending: false }),
+      ]);
+
+      if (trxRes.error) throw trxRes.error;
+      if (dlRes.error) throw dlRes.error;
+
+      const txs = (trxRes.data ?? []).map((row) => {
+        const d = parseISO(row.payment_date);
+        return {
+          ...row,
+          source_app: (row.source_app || '').toUpperCase(),
+          parsed_payment_date: d,
+          quarter: getQuarter(d),
+        } as unknown as Transaction;
+      });
+
+      const dls = (dlRes.data ?? []).map((row) => {
+        const d = parseISO(row.date);
+        return {
+          date: row.date,
+          source_app: (row.source_app || '').toUpperCase(),
+          count: row.count,
+          parsed_date: d,
+          year: row.year,
+          month: row.month,
+          year_month: row.year_month,
+        } as unknown as Downloader;
+      });
+
+      setData(txs);
+      setDownloaderData(dls);
+      setError(txs.length === 0 ? 'Belum ada data. Unggah file Excel untuk memulai.' : null);
+    } catch (err) {
+      console.error('[dashboard] load failed', err);
+      setError((err as Error).message || 'Gagal memuat data dari server.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        setLoading(true);
+    loadFromSupabase();
+  }, [loadFromSupabase]);
 
-        // Fetch default data file from public directory
-        const response = await fetch('/data_paid_clean (2).xlsx');
-        
-        if (response.ok) {
-          const arrayBuffer = await response.arrayBuffer();
-          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-          const sheetNames = workbook.SheetNames;
-          const findSheet = (keywords: string[]) => {
-            return sheetNames.find(s => keywords.some(k => s.toLowerCase().includes(k.toLowerCase())));
-          };
-          
-          // Handle sheet "transaksi"
-          const transactionSheetName = findSheet(['transaksi', 'trx', 'paid']);
-          const transactionSheet = transactionSheetName ? workbook.Sheets[transactionSheetName] : workbook.Sheets[sheetNames[0]];
-          const transactionJson = XLSX.utils.sheet_to_json(transactionSheet);
-          if (transactionJson && transactionJson.length > 0) {
-            setData(processData(transactionJson));
-          }
-
-          // Handle sheet "downloader"
-          const downloaderSheetName = findSheet(['downloader', 'download']);
-          const downloaderSheet = downloaderSheetName ? workbook.Sheets[downloaderSheetName] : null;
-          if (downloaderSheet) {
-            const downloaderJson = XLSX.utils.sheet_to_json(downloaderSheet);
-            setDownloaderData(processDownloaderData(downloaderJson));
-          }
-          
-          setError(null);
-          setLoading(false);
-          return;
-        }
-
-        // Fallback to INITIAL_DATA if fetch fails
-        if (INITIAL_DATA && INITIAL_DATA.length > 0) {
-          const processed = processData(INITIAL_DATA);
-          setData(processed);
-          setError(null);
-          setLoading(false);
-          return;
-        }
-        
-        throw new Error('Database file not found');
-      } catch (err) {
-        console.warn('Initial data load skipped or failed:', err);
-        setError('Silakan unggah file Excel untuk memulai.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadInitialData();
-  }, [processData]);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = evt.target?.result;
-        if (!data) throw new Error('Failed to read file');
-        
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetNames = workbook.SheetNames;
-        const findSheet = (keywords: string[]) => {
-          return sheetNames.find(s => keywords.some(k => s.toLowerCase().includes(k.toLowerCase())));
-        };
-        
-        // Handle sheet "transaksi"
-        const transactionSheetName = findSheet(['transaksi', 'trx', 'paid']);
-        const transactionSheet = transactionSheetName ? workbook.Sheets[transactionSheetName] : workbook.Sheets[sheetNames[0]];
-        const transactionJson = XLSX.utils.sheet_to_json(transactionSheet);
-        if (transactionJson && transactionJson.length > 0) {
-          setData(processData(transactionJson));
-        }
-
-        // Handle sheet "downloader"
-        const downloaderSheetName = findSheet(['downloader', 'download']);
-        const downloaderSheet = downloaderSheetName ? workbook.Sheets[downloaderSheetName] : null;
-        if (downloaderSheet) {
-          const downloaderJson = XLSX.utils.sheet_to_json(downloaderSheet);
-          setDownloaderData(processDownloaderData(downloaderJson));
-        }
-
-        setError(null);
-      } catch (err) {
-        console.error('Error parsing uploaded file:', err);
-        setError('Gagal membaca file. Pastikan format file Excel benar.');
-      }
-    };
-    reader.onerror = () => {
-      setError('Gagal mengunggah file.');
-    };
-    reader.readAsArrayBuffer(file);
+    const input = e.target;
+    try {
+      const summary = await importExcelFile(file, user?.id ?? null);
+      toast.success(
+        `Imported ${summary.transactionCount} transactions, ${summary.downloaderCount} downloader rows`
+      );
+      await loadFromSupabase();
+    } catch (err) {
+      console.error('[dashboard] upload failed', err);
+      toast.error((err as Error).message || 'Import failed');
+    } finally {
+      input.value = '';
+    }
   };
 
   // --- Filtered Data & Analytics ---
@@ -4463,7 +4467,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
-              <SettingsSection onDataUpdate={handleDataUpdate} />
+              <SettingsSection onImportComplete={loadFromSupabase} />
             </motion.div>
           )}
 
