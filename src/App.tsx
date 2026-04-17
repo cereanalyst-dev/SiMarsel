@@ -223,6 +223,30 @@ const formatNumber = (value: number) => {
   return new Intl.NumberFormat('id-ID').format(value);
 };
 
+// Persist lightweight UI/operational state across reloads.
+// Large, computed datasets (transactions/downloaders) are not persisted — they come from Excel.
+const STORAGE_PREFIX = 'simarsel:v1:';
+
+const loadPersisted = <T,>(key: string, fallback: T): T => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_PREFIX + key);
+    if (raw == null) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const savePersisted = (key: string, value: unknown) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+  } catch {
+    // Quota / serialization errors intentionally swallowed; user can still work for this session.
+  }
+};
+
 const excelDateToJSDate = (serial: number) => {
   const utc_days = Math.floor(serial - 25569);
   const utc_value = utc_days * 86400;
@@ -2974,25 +2998,25 @@ export default function App() {
   const [downloaderData, setDownloaderData] = useState<Downloader[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [filters, setFilters] = useState({
+  const [activeTab, setActiveTab] = useState<string>(() => loadPersisted('activeTab', 'overview'));
+  const [filters, setFilters] = useState(() => loadPersisted('filters', {
     source_app: 'All',
     year: 'All',
     month: 'All',
     methode_name: 'All'
-  });
+  }));
 
-  const [apps, setApps] = useState<any[]>([
+  const [apps, setApps] = useState<any[]>(() => loadPersisted('apps', [
     {
       id: '1',
       name: 'App Utama',
       targetConfig: {} as Record<string, any>,
-      dailyData: {}, // Keyed by YYYY-MM-DD
+      dailyData: {},
       isTargetSet: {} as Record<string, boolean>
     }
-  ]);
-  const [selectedAppId, setSelectedAppId] = useState('1');
-  const [targetMonth, setTargetMonth] = useState(format(new Date(), 'yyyy-MM'));
+  ]));
+  const [selectedAppId, setSelectedAppId] = useState<string>(() => loadPersisted('selectedAppId', '1'));
+  const [targetMonth, setTargetMonth] = useState<string>(() => loadPersisted('targetMonth', format(new Date(), 'yyyy-MM')));
   const [calendarFocusDate, setCalendarFocusDate] = useState<Date | null>(null);
 
   // --- Flexible Charting State ---
@@ -3001,6 +3025,13 @@ export default function App() {
   const [chartGranularity, setChartGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [hiddenApps, setHiddenApps] = useState<Set<string>>(new Set());
   const [drillDownData, setDrillDownData] = useState<any | null>(null);
+
+  // --- Persistence ---
+  useEffect(() => { savePersisted('apps', apps); }, [apps]);
+  useEffect(() => { savePersisted('filters', filters); }, [filters]);
+  useEffect(() => { savePersisted('activeTab', activeTab); }, [activeTab]);
+  useEffect(() => { savePersisted('selectedAppId', selectedAppId); }, [selectedAppId]);
+  useEffect(() => { savePersisted('targetMonth', targetMonth); }, [targetMonth]);
 
   // --- Data Loading ---
 
