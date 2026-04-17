@@ -22,6 +22,7 @@ import { cn } from '../lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { importExcelFile } from '@/services/excelImport';
+import { loadAppsFromSupabase, useAppsSync } from '@/hooks/useAppsSync';
 
 // --- Types ---
 
@@ -3338,16 +3339,9 @@ export default function Dashboard() {
     methode_name: 'All'
   });
 
-  const [apps, setApps] = useState<AppData[]>([
-    {
-      id: '1',
-      name: 'App Utama',
-      targetConfig: {},
-      dailyData: {},
-      isTargetSet: {}
-    }
-  ]);
-  const [selectedAppId, setSelectedAppId] = useState('1');
+  const [apps, setApps] = useState<AppData[]>([]);
+  const [appsHydrated, setAppsHydrated] = useState(false);
+  const [selectedAppId, setSelectedAppId] = useState('');
   const [targetMonth, setTargetMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [calendarFocusDate, setCalendarFocusDate] = useState<Date | null>(null);
 
@@ -3493,6 +3487,32 @@ export default function Dashboard() {
   useEffect(() => {
     loadFromSupabase();
   }, [loadFromSupabase]);
+
+  // Hydrate apps + targets + daily data + social content from Supabase once.
+  useEffect(() => {
+    let cancelled = false;
+    loadAppsFromSupabase()
+      .then((loaded) => {
+        if (cancelled) return;
+        if (loaded.length === 0) {
+          setAppsHydrated(true);
+          return;
+        }
+        setApps(loaded as unknown as AppData[]);
+        setSelectedAppId((prev) => prev || loaded[0].id);
+        setAppsHydrated(true);
+      })
+      .catch((err) => {
+        console.error('[dashboard] app hydration failed', err);
+        setAppsHydrated(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Auto-persist apps mutations back to Supabase (debounced).
+  useAppsSync({ apps, enabled: appsHydrated, userId: user?.id ?? null });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
