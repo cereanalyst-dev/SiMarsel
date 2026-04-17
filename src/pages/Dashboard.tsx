@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { importExcelFile } from '@/services/excelImport';
 import { loadAppsFromSupabase, useAppsSync } from '@/hooks/useAppsSync';
+import AuditLogTab from '@/components/tabs/AuditLogTab';
 
 // --- Types ---
 
@@ -3073,6 +3074,7 @@ const SocialMediaAnalysis = ({ apps }: { apps: AppData[] }) => {
 };
 
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
+  const { isAdmin } = useAuth();
   const menuItems = [
     { id: 'overview', icon: LayoutDashboard, label: 'Ringkasan Performa' },
     { id: 'optimasi', icon: TrendingUp, label: 'Optimasi Harga' },
@@ -3084,6 +3086,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
 
   const accountItems = [
     { id: 'settings', icon: Settings, label: 'Settings' },
+    ...(isAdmin ? [{ id: 'audit', icon: Shield, label: 'Audit Log' }] : []),
   ];
 
   return (
@@ -4481,13 +4484,24 @@ export default function Dashboard() {
           )}
 
           {activeTab === 'settings' && (
-            <motion.div 
+            <motion.div
               key="settings"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
               <SettingsSection onImportComplete={loadFromSupabase} />
+            </motion.div>
+          )}
+
+          {activeTab === 'audit' && (
+            <motion.div
+              key="audit"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+            >
+              <AuditLogTab />
             </motion.div>
           )}
 
