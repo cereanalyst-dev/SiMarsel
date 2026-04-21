@@ -16,7 +16,7 @@ import {
   Target, MessageSquare, Bell, Settings, Rocket, MoreHorizontal, Plus,
   ChevronRight, LogOut, Activity, Eye, Zap, AlertCircle, Smartphone
 } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, getYear, getMonth, getQuarter } from 'date-fns';
+import { format, parseISO, parse, startOfMonth, endOfMonth, isWithinInterval, getYear, getMonth, getQuarter } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { INITIAL_DATA } from './data';
@@ -85,6 +85,10 @@ interface SocialMediaContent {
   reach: number;
   engagement: number;
   views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  hook: string;
   link: string;
   objective: string;
 }
@@ -2894,7 +2898,15 @@ const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], avai
   );
 };
 
-const SocialMediaAnalysis = ({ apps }: { apps: AppData[] }) => {
+const SocialMediaAnalysis = ({ 
+  apps, 
+  setActiveTab, 
+  setCalendarFocusDate 
+}: { 
+  apps: AppData[], 
+  setActiveTab: (tab: string) => void,
+  setCalendarFocusDate: (date: Date) => void
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState('All');
 
@@ -2909,6 +2921,12 @@ const SocialMediaAnalysis = ({ apps }: { apps: AppData[] }) => {
       )
     ).sort((a, b) => b.date.localeCompare(a.date));
   }, [apps]);
+
+  const handleDateClick = (dateStr: string) => {
+    const date = parse(dateStr, 'yyyy-MM-dd', new Date());
+    setCalendarFocusDate(date);
+    setActiveTab('calendar');
+  };
 
   const filteredContent = useMemo(() => {
     return allContent.filter(item => {
@@ -2956,49 +2974,77 @@ const SocialMediaAnalysis = ({ apps }: { apps: AppData[] }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredContent.map((item, i) => (
-            <div key={i} className="bg-slate-50/50 rounded-3xl border border-slate-100 p-6 hover:border-rose-200 transition-all group">
-              <div className="flex items-center justify-between mb-4">
-                <span className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-full uppercase tracking-wider">
-                  {item.platform}
-                </span>
-                <span className="text-[10px] font-bold text-slate-400">
-                  {format(new Date(item.date), 'dd MMM yyyy')}
-                </span>
-              </div>
-              
-              <h4 className="text-sm font-black text-slate-800 mb-2 line-clamp-2 leading-tight group-hover:text-rose-600 transition-colors">
-                {item.title || 'Tanpa Judul'}
-              </h4>
-              <p className="text-[11px] text-slate-500 line-clamp-3 mb-4 leading-relaxed">
-                {item.caption || 'Tidak ada caption.'}
-              </p>
-
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
-                  <p className="text-[7px] font-bold text-slate-400 uppercase mb-0.5">Reach</p>
-                  <p className="text-[10px] font-black text-slate-900">{formatNumber(item.reach)}</p>
-                </div>
-                <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
-                  <p className="text-[7px] font-bold text-slate-400 uppercase mb-0.5">Eng.</p>
-                  <p className="text-[10px] font-black text-slate-900">{formatNumber(item.engagement)}</p>
-                </div>
-                <div className="bg-white p-2 rounded-xl border border-slate-100 text-center">
-                  <p className="text-[7px] font-bold text-slate-400 uppercase mb-0.5">Views</p>
-                  <p className="text-[10px] font-black text-slate-900">{formatNumber(item.views)}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                <span className="text-[8px] font-black text-slate-400 bg-white px-2 py-1 rounded-lg border border-slate-100 uppercase">{item.contentType}</span>
-                <span className="text-[8px] font-black text-slate-400 bg-white px-2 py-1 rounded-lg border border-slate-100 uppercase">{item.objective}</span>
-                <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 uppercase">{item.appName}</span>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto -mx-4 px-4 custom-scrollbar">
+          <table className="w-full text-left min-w-[1200px] border-collapse">
+            <thead>
+              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100">
+                <th className="py-4 px-4 rounded-tl-2xl">Platform</th>
+                <th className="py-4 px-4">Tanggal</th>
+                <th className="py-4 px-4">Jenis Post</th>
+                <th className="py-4 px-4 text-center">Likes</th>
+                <th className="py-4 px-4 text-center">Comments</th>
+                <th className="py-4 px-4 text-center">Shares</th>
+                <th className="py-4 px-4 text-center">ER (%)</th>
+                <th className="py-4 px-4">Hook</th>
+                <th className="py-4 px-4">CTA</th>
+                <th className="py-4 px-4 rounded-tr-2xl text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredContent.map((item, i) => {
+                const er = item.reach > 0 ? (item.engagement / item.reach) * 100 : 0;
+                return (
+                  <tr key={i} className="hover:bg-rose-50/20 transition-colors group">
+                    <td className="py-5 px-4">
+                      <span className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-full uppercase tracking-wider">
+                        {item.platform}
+                      </span>
+                    </td>
+                    <td className="py-5 px-4 text-[11px] font-black text-slate-700">
+                      {item.date ? format(new Date(item.date), 'dd MMM yyyy') : '-'}
+                    </td>
+                    <td className="py-5 px-4">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">{item.contentType}</span>
+                    </td>
+                    <td className="py-5 px-4 text-[11px] font-bold text-slate-700 text-center">
+                      {formatNumber(item.likes || 0)}
+                    </td>
+                    <td className="py-5 px-4 text-[11px] font-bold text-slate-700 text-center">
+                      {formatNumber(item.comments || 0)}
+                    </td>
+                    <td className="py-5 px-4 text-[11px] font-bold text-slate-700 text-center">
+                      {formatNumber(item.shares || 0)}
+                    </td>
+                    <td className="py-5 px-4 text-center">
+                      <span className={cn(
+                        "text-[10px] font-black px-2 py-1 rounded-lg",
+                        er > 5 ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-500"
+                      )}>
+                        {er.toFixed(2)}%
+                      </span>
+                    </td>
+                    <td className="py-5 px-4 text-[11px] text-slate-600 max-w-xs truncate">
+                      {item.hook || '-'}
+                    </td>
+                    <td className="py-5 px-4 text-[11px] font-bold text-indigo-600">
+                      {item.cta || '-'}
+                    </td>
+                    <td className="py-5 px-4 text-center">
+                      <button 
+                        onClick={() => handleDateClick(item.date)}
+                        className="p-2 hover:bg-white rounded-lg transition-colors text-slate-400 hover:text-indigo-600 group/btn"
+                        title="Lihat di Kalender Paket"
+                      >
+                        <Calendar className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
           {filteredContent.length === 0 && (
-            <div className="col-span-full py-20 text-center">
+            <div className="py-20 text-center">
               <Smartphone className="w-12 h-12 text-slate-200 mx-auto mb-4" />
               <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Tidak ada konten yang ditemukan</p>
             </div>
@@ -3029,7 +3075,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 flex items-center justify-center">
             <img 
-              src="/favicon.jpg" 
+              src="/maungmarsel.jpeg" 
               alt="Logo" 
               className="w-full h-full object-contain rounded-xl" 
               referrerPolicy="no-referrer"
@@ -3120,7 +3166,7 @@ const TopBar = () => {
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 flex items-center justify-center">
           <img 
-            src="/favicon.jpg" 
+            src="/maungmarsel.jpeg" 
             alt="Logo" 
             className="w-full h-full object-contain rounded-lg" 
             referrerPolicy="no-referrer"
@@ -3304,6 +3350,7 @@ export default function App() {
   const [chartType, setChartType] = useState<'bar' | 'line' | 'area' | 'pie'>('bar');
   const [chartMetric, setChartMetric] = useState<'revenue' | 'transactions' | 'downloader' | 'conversion'>('revenue');
   const [chartGranularity, setChartGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [paymentChartMode, setPaymentChartMode] = useState<'revenue' | 'transactions'>('revenue');
   const [hiddenApps, setHiddenApps] = useState<Set<string>>(new Set());
   const [drillDownData, setDrillDownData] = useState<any | null>(null);
 
@@ -3597,10 +3644,10 @@ export default function App() {
       return acc;
     }, {} as Record<string, number>);
 
-    // Count how many unique users in the filtered result have > 2 purchases in the whole dataset
+    // Count how many unique users in the filtered result have >= 2 purchases in the whole dataset
     const repeatOrderUsersInFilteredData = new Set(
       filteredData
-        .filter(item => item.email && emailCountsInAllData[item.email] > 2)
+        .filter(item => item.email && emailCountsInAllData[item.email] >= 2)
         .map(item => item.email)
     ).size;
 
@@ -3622,7 +3669,7 @@ export default function App() {
         if (target) {
           totalTargetRevenue += target.targetSales || 0;
           totalTargetDownloader += target.targetDownloader || 0;
-          totalTargetRepeatOrder += target.targetUserPremium || 0;
+          totalTargetRepeatOrder += target.targetRepeatOrder || 0;
         }
 
         // Calculate real and hutang from dailyData
@@ -3631,7 +3678,7 @@ export default function App() {
         
         let appRealSales = 0;
         monthDates.forEach(date => {
-          totalRealRepeatOrderFromApps += Number(dailyData[date].actualUserPremium) || 0;
+          totalRealRepeatOrderFromApps += Number(dailyData[date].actualRepeatOrder) || 0;
           appRealSales += Number(dailyData[date].actualSales) || 0;
         });
 
@@ -3655,13 +3702,13 @@ export default function App() {
             const target = app.targetConfig[m];
             totalTargetRevenue += target.targetSales || 0;
             totalTargetDownloader += target.targetDownloader || 0;
-            totalTargetRepeatOrder += target.targetUserPremium || 0;
+            totalTargetRepeatOrder += target.targetRepeatOrder || 0;
           }
         });
 
         Object.keys(app.dailyData || {}).forEach(date => {
           if (!isYearFiltered || date.startsWith(filters.year)) {
-            totalRealRepeatOrderFromApps += Number(app.dailyData[date].actualUserPremium) || 0;
+            totalRealRepeatOrderFromApps += Number(app.dailyData[date].actualRepeatOrder) || 0;
           }
         });
       }
@@ -4002,7 +4049,7 @@ export default function App() {
         >
           <div className="w-32 h-32 mx-auto mb-10 flex items-center justify-center">
             <img 
-              src="/logo_transparent.png" 
+              src="/maungmarsel.jpeg" 
               alt="SiMarsel Logo" 
               className="w-full h-full object-contain drop-shadow-2xl rounded-3xl" 
               referrerPolicy="no-referrer"
@@ -4234,13 +4281,30 @@ export default function App() {
               {/* Payment Method & Hourly Distribution Pie Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-                  <div className="flex justify-between items-center mb-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
-                      <h3 className="text-lg font-black text-slate-900 tracking-tight">Metode Pembayaran (Revenue)</h3>
-                      <p className="text-xs text-slate-400 font-medium mt-1">Distribusi pendapatan per metode</p>
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight">Metode Pembayaran</h3>
+                      <p className="text-xs text-slate-400 font-medium mt-1">Distribusi berdasarkan {paymentChartMode === 'revenue' ? 'pendapatan' : 'jumlah transaksi'}</p>
                     </div>
-                    <div className="p-2.5 bg-emerald-50 rounded-xl">
-                      <CreditCard className="w-5 h-5 text-emerald-600" />
+                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                      <button 
+                        onClick={() => setPaymentChartMode('revenue')}
+                        className={cn(
+                          "px-4 py-1.5 text-[10px] font-black rounded-lg transition-all",
+                          paymentChartMode === 'revenue' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400"
+                        )}
+                      >
+                        REVENUE
+                      </button>
+                      <button 
+                        onClick={() => setPaymentChartMode('transactions')}
+                        className={cn(
+                          "px-4 py-1.5 text-[10px] font-black rounded-lg transition-all",
+                          paymentChartMode === 'transactions' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400"
+                        )}
+                      >
+                        TRANSAKSI
+                      </button>
                     </div>
                   </div>
                   <div className="h-[350px]">
@@ -4250,7 +4314,7 @@ export default function App() {
                           data={Object.values(filteredData.reduce((acc: any, curr) => {
                             const method = curr.methode_name || 'Unknown';
                             if (!acc[method]) acc[method] = { name: method, value: 0 };
-                            acc[method].value += curr.revenue;
+                            acc[method].value += paymentChartMode === 'revenue' ? curr.revenue : 1;
                             return acc;
                           }, {})).sort((a: any, b: any) => b.value - a.value)}
                           cx="50%"
@@ -4264,7 +4328,7 @@ export default function App() {
                             <Cell key={`cell-${index}`} fill={color} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Tooltip formatter={(value: number) => paymentChartMode === 'revenue' ? formatCurrency(value) : formatNumber(value)} />
                         <Legend verticalAlign="bottom" height={36}/>
                       </PieChart>
                     </ResponsiveContainer>
@@ -4423,7 +4487,11 @@ export default function App() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
-              <SocialMediaAnalysis apps={apps} />
+              <SocialMediaAnalysis 
+                apps={apps} 
+                setActiveTab={setActiveTab}
+                setCalendarFocusDate={setCalendarFocusDate}
+              />
             </motion.div>
           )}
 
