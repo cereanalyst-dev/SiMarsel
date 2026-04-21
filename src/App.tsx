@@ -9,14 +9,14 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { 
-  TrendingUp, ShoppingBag, DollarSign, Calendar, Filter, 
-  ChevronDown, Download, LayoutDashboard, Package, CreditCard, 
+import {
+  TrendingUp, ShoppingBag, DollarSign, Calendar, Filter,
+  ChevronDown, Download, LayoutDashboard, Package,
   UserCheck, Users, ArrowUpRight, ArrowDownRight, Search, RefreshCw,
-  Target, MessageSquare, Bell, Settings, Rocket, MoreHorizontal, Plus,
-  ChevronRight, LogOut, Activity, Eye, Zap, AlertCircle, Smartphone
+  Target, MessageSquare, Settings, Plus,
+  ChevronRight, Activity, Zap, Smartphone
 } from 'lucide-react';
-import { format, parseISO, parse, startOfMonth, endOfMonth, isWithinInterval, getYear, getMonth, getQuarter } from 'date-fns';
+import { format, parseISO, parse, startOfMonth, endOfMonth, getYear, getMonth, getQuarter } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { INITIAL_DATA } from './data';
@@ -459,7 +459,10 @@ const FlexibleChart = ({
     const DataComponent = type === 'bar' ? Bar : type === 'line' ? Line : Area;
 
     return (
-      <ChartComponent data={data} onClick={(e: any) => e && e.activePayload && onDrillDown(e.activePayload[0].payload)}>
+      <ChartComponent data={data} onClick={(e: any) => {
+        const payload = e?.activePayload?.[0]?.payload;
+        if (payload) onDrillDown(payload);
+      }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
         <XAxis 
           dataKey="name" 
@@ -536,11 +539,16 @@ const SocialMediaModal = ({
       postingTime: '10:00',
       contentType: 'Feed',
       title: '',
+      caption: '',
       cta: '',
       topic: '',
       reach: 0,
       engagement: 0,
       views: 0,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      hook: '',
       link: '',
       objective: 'Awareness'
     }]);
@@ -1259,22 +1267,19 @@ const TargetSection = ({
     return availableMonths.filter(m => m.startsWith(selectedYear));
   }, [availableMonths, selectedYear]);
 
-  const [form, setForm] = useState(selectedApp.targetConfig?.[targetMonth] || {
+  const emptyTargetForm = {
     targetDownloader: 0,
-    targetUserPremium: 0,
+    targetRepeatOrder: 0,
     targetSales: 0,
     targetConversion: 0,
     avgPrice: 0,
-  });
+  };
+
+  const [form, setForm] = useState(selectedApp.targetConfig?.[targetMonth] || emptyTargetForm);
 
   useEffect(() => {
-    setForm(selectedApp.targetConfig?.[targetMonth] || {
-      targetDownloader: 0,
-      targetUserPremium: 0,
-      targetSales: 0,
-      targetConversion: 0,
-      avgPrice: 0,
-    });
+    setForm(selectedApp.targetConfig?.[targetMonth] || emptyTargetForm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAppId, targetMonth, selectedApp.targetConfig]);
 
   const daysInMonthCount = useMemo(() => {
@@ -1292,27 +1297,32 @@ const TargetSection = ({
   const handleGenerateSheet = () => {
     const dailyDownloader = Math.ceil(form.targetDownloader / daysInMonthCount);
     const dailySales = Math.ceil(form.targetSales / daysInMonthCount);
-    const dailyUserPremium = Math.ceil(form.targetUserPremium / daysInMonthCount);
-    
-    const newDailyData: any = { ...(selectedApp.dailyData || {}) };
+    const dailyRepeatOrder = Math.ceil(form.targetRepeatOrder / daysInMonthCount);
+
+    const existingDaily = selectedApp.dailyData || {};
+    const newDailyData: Record<string, any> = { ...existingDaily };
     dates.forEach(date => {
+      const prev = existingDaily[date] || {};
       newDailyData[date] = {
         targetDownloader: dailyDownloader,
         targetSales: dailySales,
-        targetUserPremium: dailyUserPremium,
-        actualDownloader: 0,
-        actualSales: 0,
-        actualUserPremium: 0,
+        targetRepeatOrder: dailyRepeatOrder,
+        // preserve any already-entered actuals so regenerate won't wipe user work
+        actualDownloader: prev.actualDownloader ?? null,
+        actualSales: prev.actualSales ?? null,
+        actualRepeatOrder: prev.actualRepeatOrder ?? null,
         estimasiHarga: form.avgPrice,
-        channel: '',
-        promo: '',
-        benefit: '',
-        event: '',
-        extra: '',
-        bcan: '',
-        story: '',
-        chat: '',
-        activity: ''
+        channel: prev.channel || '',
+        promo: prev.promo || '',
+        strategy: prev.strategy || '',
+        benefit: prev.benefit || '',
+        event: prev.event || '',
+        extra: prev.extra || '',
+        bcan: prev.bcan || '',
+        story: prev.story || '',
+        chat: prev.chat || '',
+        activity: prev.activity || '',
+        socialContent: prev.socialContent || [],
       };
     });
 
@@ -1345,44 +1355,45 @@ const TargetSection = ({
     const dailyValues = dates.map(date => selectedApp.dailyData?.[date] || {});
     const totalRealDownloader = dailyValues.reduce((sum, d) => sum + (Number(d.actualDownloader) || 0), 0);
     const totalRealSales = dailyValues.reduce((sum, d) => sum + (Number(d.actualSales) || 0), 0);
-    const totalRealPremium = dailyValues.reduce((sum, d) => sum + (Number(d.actualUserPremium) || 0), 0);
-    
-    const targetConfig = selectedApp.targetConfig?.[targetMonth] || { 
-      targetDownloader: 0, 
+    const totalRealRepeatOrder = dailyValues.reduce((sum, d) => sum + (Number(d.actualRepeatOrder) || 0), 0);
+
+    const targetConfig = selectedApp.targetConfig?.[targetMonth] || {
+      targetDownloader: 0,
       targetSales: 0,
-      targetUserPremium: 0,
+      targetRepeatOrder: 0,
       targetConversion: 0,
       avgPrice: 0
     };
-    
-    const progressDownloader = targetConfig.targetDownloader > 0 
-      ? (totalRealDownloader / targetConfig.targetDownloader) * 100 
+
+    const progressDownloader = targetConfig.targetDownloader > 0
+      ? (totalRealDownloader / targetConfig.targetDownloader) * 100
       : 0;
-    const progressSales = targetConfig.targetSales > 0 
-      ? (totalRealSales / targetConfig.targetSales) * 100 
+    const progressSales = targetConfig.targetSales > 0
+      ? (totalRealSales / targetConfig.targetSales) * 100
       : 0;
-    const progressConversion = totalRealDownloader > 0 
-      ? (totalRealPremium / totalRealDownloader) * 100 
+    const progressConversion = totalRealDownloader > 0
+      ? (totalRealRepeatOrder / totalRealDownloader) * 100
       : 0;
 
     // Calculate Hutang Sales (Debt)
     const lastFilledIdx = dates.reduce((acc, d, i) => {
-      const data = selectedApp.dailyData[d];
+      const data = selectedApp.dailyData?.[d];
       const hasData = data && (
         (data.actualSales !== undefined && data.actualSales !== null && data.actualSales !== 0) ||
-        (data.actualDownloader !== undefined && data.actualDownloader !== null && data.actualDownloader !== 0)
+        (data.actualDownloader !== undefined && data.actualDownloader !== null && data.actualDownloader !== 0) ||
+        (data.actualRepeatOrder !== undefined && data.actualRepeatOrder !== null && data.actualRepeatOrder !== 0)
       );
       return hasData ? i : acc;
     }, -1);
 
-    const baseDailySales = targetConfig.targetSales / dates.length;
+    const baseDailySales = targetConfig.targetSales / Math.max(1, dates.length);
     const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
     const hutangSales = Math.max(0, expectedSalesSoFar - totalRealSales);
 
     return {
       totalRealDownloader,
       totalRealSales,
-      totalRealPremium,
+      totalRealRepeatOrder,
       progressDownloader,
       progressSales,
       progressConversion,
@@ -1392,7 +1403,10 @@ const TargetSection = ({
   }, [selectedApp, targetMonth, dates]);
 
   const addApp = () => {
-    const newId = Math.random().toString(36).substr(2, 9);
+    const newId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 11);
     setApps([...apps, {
       id: newId,
       name: `App ${apps.length + 1}`,
@@ -1415,8 +1429,8 @@ const TargetSection = ({
     let totalRealDownloader = 0;
     let totalTargetSales = 0;
     let totalRealSales = 0;
-    let totalTargetPremium = 0;
-    let totalRealPremium = 0;
+    let totalTargetRepeatOrder = 0;
+    let totalRealRepeatOrder = 0;
     let totalHutangSales = 0;
 
     filteredAppsForSummary.forEach(app => {
@@ -1424,13 +1438,13 @@ const TargetSection = ({
       if (targetConfig) {
         totalTargetDownloader += targetConfig.targetDownloader || 0;
         totalTargetSales += targetConfig.targetSales || 0;
-        totalTargetPremium += targetConfig.targetUserPremium || 0;
+        totalTargetRepeatOrder += targetConfig.targetRepeatOrder || 0;
       }
 
       const dailyData = app.dailyData || {};
       let appRealDownloader = 0;
       let appRealSales = 0;
-      let appRealPremium = 0;
+      let appRealRepeatOrder = 0;
       let lastFilledIdx = -1;
 
       dates.forEach((date, idx) => {
@@ -1438,12 +1452,12 @@ const TargetSection = ({
         if (d) {
           const rd = Number(d.actualDownloader) || 0;
           const rs = Number(d.actualSales) || 0;
-          const rp = Number(d.actualUserPremium) || 0;
+          const rr = Number(d.actualRepeatOrder) || 0;
           appRealDownloader += rd;
           appRealSales += rs;
-          appRealPremium += rp;
-          
-          if (rd > 0 || rs > 0 || rp > 0) {
+          appRealRepeatOrder += rr;
+
+          if (rd > 0 || rs > 0 || rr > 0) {
             lastFilledIdx = idx;
           }
         }
@@ -1451,10 +1465,10 @@ const TargetSection = ({
 
       totalRealDownloader += appRealDownloader;
       totalRealSales += appRealSales;
-      totalRealPremium += appRealPremium;
+      totalRealRepeatOrder += appRealRepeatOrder;
 
       if (targetConfig && targetConfig.targetSales > 0) {
-        const baseDailySales = targetConfig.targetSales / dates.length;
+        const baseDailySales = targetConfig.targetSales / Math.max(1, dates.length);
         const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
         totalHutangSales += Math.max(0, expectedSalesSoFar - appRealSales);
       }
@@ -1465,12 +1479,12 @@ const TargetSection = ({
       totalRealDownloader,
       totalTargetSales,
       totalRealSales,
-      totalTargetPremium,
-      totalRealPremium,
+      totalTargetRepeatOrder,
+      totalRealRepeatOrder,
       totalHutangSales,
       downloaderProgress: totalTargetDownloader > 0 ? (totalRealDownloader / totalTargetDownloader) * 100 : 0,
       salesProgress: totalTargetSales > 0 ? (totalRealSales / totalTargetSales) * 100 : 0,
-      conversionProgress: totalRealDownloader > 0 ? (totalRealPremium / totalRealDownloader) * 100 : 0
+      conversionProgress: totalRealDownloader > 0 ? (totalRealRepeatOrder / totalRealDownloader) * 100 : 0
     };
   }, [filteredAppsForSummary, targetMonth, dates]);
 
@@ -1595,7 +1609,7 @@ const TargetSection = ({
                     const dailyData = app.dailyData || {};
                     let appRealDownloader = 0;
                     let appRealSales = 0;
-                    let appRealPremium = 0;
+                    let appRealRepeatOrder = 0;
                     let lastFilledIdx = -1;
 
                     dates.forEach((date, idx) => {
@@ -1603,21 +1617,21 @@ const TargetSection = ({
                       if (d) {
                         const rd = Number(d.actualDownloader) || 0;
                         const rs = Number(d.actualSales) || 0;
-                        const rp = Number(d.actualUserPremium) || 0;
+                        const rr = Number(d.actualRepeatOrder) || 0;
                         appRealDownloader += rd;
                         appRealSales += rs;
-                        appRealPremium += rp;
-                        if (rd > 0 || rs > 0 || rp > 0) lastFilledIdx = idx;
+                        appRealRepeatOrder += rr;
+                        if (rd > 0 || rs > 0 || rr > 0) lastFilledIdx = idx;
                       }
                     });
 
                     const progressDownloader = target?.targetDownloader > 0 ? (appRealDownloader / target.targetDownloader) * 100 : 0;
                     const progressSales = target?.targetSales > 0 ? (appRealSales / target.targetSales) * 100 : 0;
-                    const progressConversion = appRealDownloader > 0 ? (appRealPremium / appRealDownloader) * 100 : 0;
-                    
+                    const progressConversion = appRealDownloader > 0 ? (appRealRepeatOrder / appRealDownloader) * 100 : 0;
+
                     let hutangSales = 0;
                     if (target?.targetSales > 0) {
-                      const baseDailySales = target.targetSales / dates.length;
+                      const baseDailySales = target.targetSales / Math.max(1, dates.length);
                       const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
                       hutangSales = Math.max(0, expectedSalesSoFar - appRealSales);
                     }
@@ -1790,11 +1804,11 @@ const TargetSection = ({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Target User Premium</label>
-              <input 
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Target Repeat Order</label>
+              <input
                 type="number"
-                value={form.targetUserPremium || ''}
-                onChange={(e) => setForm({...form, targetUserPremium: Number(e.target.value)})}
+                value={form.targetRepeatOrder || ''}
+                onChange={(e) => setForm({...form, targetRepeatOrder: Number(e.target.value)})}
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold"
                 placeholder="0"
               />
@@ -2311,302 +2325,6 @@ const FilterSection = ({ filters, setFilters, availableOptions }: {
             </select>
             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-indigo-500 transition-colors" />
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const MonitoringSection = ({ data, downloaderData, target }: { data: Transaction[], downloaderData: Downloader[], target: any }) => {
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
-  const today = new Date();
-  const daysInMonth = endOfMonth(today).getDate();
-  const currentDay = today.getDate();
-
-  const currentMonthData = useMemo(() => {
-    return data.filter(d => d.month === currentMonth && d.year === currentYear);
-  }, [data, currentMonth, currentYear]);
-
-  const currentMonthDownloader = useMemo(() => {
-    return downloaderData.filter(d => d.month === currentMonth && d.year === currentYear);
-  }, [downloaderData, currentMonth, currentYear]);
-
-  const stats = useMemo(() => {
-    const actualRevenue = currentMonthData.reduce((acc, curr) => acc + curr.revenue, 0);
-    const actualPremium = currentMonthData.length;
-    const actualDownloader = currentMonthDownloader.reduce((acc, curr) => acc + curr.count, 0);
-
-    const revenueRunRate = actualRevenue / Math.max(1, currentDay);
-    const projectedRevenue = revenueRunRate * daysInMonth;
-
-    const downloaderRunRate = actualDownloader / Math.max(1, currentDay);
-    const projectedDownloader = downloaderRunRate * daysInMonth;
-
-    const premiumRunRate = actualPremium / Math.max(1, currentDay);
-    const projectedPremium = premiumRunRate * daysInMonth;
-
-    const revenueGap = target.revenue - actualRevenue;
-    const remainingDays = Math.max(1, daysInMonth - currentDay);
-    const requiredDailyRevenue = revenueGap > 0 ? revenueGap / remainingDays : 0;
-
-    const isRevenueRealistic = projectedRevenue >= target.revenue * 0.9;
-
-    const activePackages = target.packages.filter((p: any) => p.active && p.price > 0).sort((a: any, b: any) => a.price - b.price);
-    const mainPackage = activePackages.length > 0 ? activePackages[activePackages.length - 1] : null;
-    const conversionRate = (target.targetConversion || 1) / 100;
-    
-    const monthlyPremiumTarget = mainPackage ? Math.ceil(target.revenue / mainPackage.price) : 0;
-    const monthlyDownloaderTarget = Math.ceil(monthlyPremiumTarget / (conversionRate || 0.01));
-
-    return {
-      actualRevenue,
-      actualRepeatOrder: actualPremium,
-      actualDownloader,
-      projectedRevenue,
-      projectedDownloader,
-      projectedRepeatOrder: projectedPremium,
-      revenueGap,
-      requiredDailyRevenue,
-      isRevenueRealistic,
-      monthlyDownloaderTarget,
-      monthlyRepeatOrderTarget: monthlyPremiumTarget,
-      revenueProgress: (actualRevenue / (target.revenue || 1)) * 100,
-      downloaderProgress: (actualDownloader / (monthlyDownloaderTarget || 1)) * 100,
-      repeatOrderProgress: (actualPremium / (monthlyPremiumTarget || 1)) * 100
-    };
-  }, [currentMonthData, currentMonthDownloader, target, currentDay, daysInMonth]);
-
-  const dailyTrend = useMemo(() => {
-    const days = Array.from({ length: currentDay }, (_, i) => i + 1);
-    const targetDailyRev = target.revenue / 30;
-    
-    return days.map(day => {
-      const dayData = currentMonthData.filter(d => d.parsed_payment_date.getDate() === day);
-      const revenue = dayData.reduce((acc, curr) => acc + curr.revenue, 0);
-      return {
-        day: `Day ${day}`,
-        Actual: revenue,
-        Target: targetDailyRev
-      };
-    });
-  }, [currentMonthData, target, currentDay]);
-
-  if (target.revenue === 0) {
-    return (
-      <div className="bg-white p-12 rounded-[3rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 text-center">
-        <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
-          <AlertCircle className="w-10 h-10 text-slate-300" />
-        </div>
-        <h3 className="text-xl font-black text-slate-900 mb-2">Target Belum Ditentukan</h3>
-        <p className="text-slate-400 max-w-md mx-auto">Silakan atur target bulanan Anda di menu "Strategi & Target" terlebih dahulu untuk melihat monitoring real-time.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-8">
-      {/* Real-time Status Header */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3 bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
-            <div className={cn(
-              "w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl",
-              stats.isRevenueRealistic ? "bg-emerald-500 shadow-emerald-100" : "bg-rose-500 shadow-rose-100"
-            )}>
-              {stats.isRevenueRealistic ? <Zap className="w-10 h-10 text-white" /> : <AlertCircle className="w-10 h-10 text-white" />}
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                {stats.isRevenueRealistic ? "On Track!" : "Off Track!"}
-              </h2>
-              <p className="text-slate-400 font-medium">
-                {stats.isRevenueRealistic 
-                  ? "Berdasarkan tren saat ini, target Anda masih sangat realistis untuk dicapai." 
-                  : "Tren saat ini menunjukkan target sulit tercapai. Dibutuhkan penyesuaian strategi segera."}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-nowrap">Proyeksi Akhir Bulan</p>
-              <p className="text-2xl font-black text-indigo-600">{formatCurrency(stats.projectedRevenue)}</p>
-            </div>
-            <div className="w-px h-12 bg-slate-100 hidden md:block" />
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status</p>
-              <span className={cn(
-                "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                stats.isRevenueRealistic ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-              )}>
-                {stats.isRevenueRealistic ? "Realistis" : "Berisiko"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-indigo-600 p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100 flex flex-col justify-between relative overflow-hidden group">
-          <div className="relative z-10">
-            <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mb-2">Sisa Target</p>
-            <h3 className="text-2xl font-black text-white">{formatCurrency(Math.max(0, target.revenue - stats.actualRevenue))}</h3>
-          </div>
-          <div className="relative z-10 mt-4">
-            <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mb-1">Progress</p>
-            <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, stats.revenueProgress)}%` }}
-                className="h-full bg-white"
-              />
-            </div>
-          </div>
-          <Activity className="w-24 h-24 text-white/10 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" />
-        </div>
-      </div>
-
-      {/* Detailed Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
-          <div className="flex items-center justify-between mb-6">
-            <div className="p-3 bg-indigo-50 rounded-2xl">
-              <DollarSign className="w-6 h-6 text-indigo-600" />
-            </div>
-            <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Revenue</span>
-          </div>
-          <p className="text-xs font-bold text-slate-400 uppercase mb-1">Actual vs Target</p>
-          <div className="flex items-baseline gap-2 mb-4">
-            <h4 className="text-2xl font-black text-slate-900">{formatCurrency(stats.actualRevenue)}</h4>
-            <span className="text-xs text-slate-400 font-medium">/ {formatCurrency(target.revenue)}</span>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-[10px] font-bold mb-1">
-                <span className="text-slate-400">PROGRESS</span>
-                <span className="text-indigo-600">{stats.revenueProgress.toFixed(1)}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-600" style={{ width: `${Math.min(100, stats.revenueProgress)}%` }} />
-              </div>
-            </div>
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Run Rate Harian</p>
-              <p className="text-lg font-black text-slate-700">{formatCurrency(stats.actualRevenue / Math.max(1, currentDay))}</p>
-            </div>
-            <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-              <p className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Target Harian Baru</p>
-              <p className="text-lg font-black text-indigo-700">{formatCurrency(stats.requiredDailyRevenue)}</p>
-              <p className="text-[9px] text-indigo-400 font-medium leading-tight mt-1">Minimal pendapatan per hari untuk mencapai target di sisa hari bulan ini.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
-          <div className="flex items-center justify-between mb-6">
-            <div className="p-3 bg-emerald-50 rounded-2xl">
-              <Download className="w-6 h-6 text-emerald-600" />
-            </div>
-            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">Downloads</span>
-          </div>
-          <p className="text-xs font-bold text-slate-400 uppercase mb-1">Actual vs Target</p>
-          <div className="flex items-baseline gap-2 mb-4">
-            <h4 className="text-2xl font-black text-slate-900">{formatNumber(stats.actualDownloader)}</h4>
-            <span className="text-xs text-slate-400 font-medium">/ {formatNumber(stats.monthlyDownloaderTarget)}</span>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-[10px] font-bold mb-1">
-                <span className="text-slate-400">PROGRESS</span>
-                <span className="text-emerald-600">{stats.downloaderProgress.toFixed(1)}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-600" style={{ width: `${Math.min(100, stats.downloaderProgress)}%` }} />
-              </div>
-            </div>
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Proyeksi Akhir</p>
-              <p className="text-lg font-black text-slate-700">{formatNumber(Math.ceil(stats.projectedDownloader))}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50">
-          <div className="flex items-center justify-between mb-6">
-            <div className="p-3 bg-violet-50 rounded-2xl">
-              <UserCheck className="w-6 h-6 text-violet-600" />
-            </div>
-            <span className="text-[10px] font-black text-violet-600 bg-violet-50 px-3 py-1 rounded-full">Repeat Order</span>
-          </div>
-          <p className="text-xs font-bold text-slate-400 uppercase mb-1">Actual vs Target</p>
-          <div className="flex items-baseline gap-2 mb-4">
-            <h4 className="text-2xl font-black text-slate-900">{formatNumber(stats.actualRepeatOrder)}</h4>
-            <span className="text-xs text-slate-400 font-medium">/ {formatNumber(stats.monthlyRepeatOrderTarget)}</span>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-[10px] font-bold mb-1">
-                <span className="text-slate-400">REPEAT ORDER RATE</span>
-                <span className="text-violet-600">{((stats.actualRepeatOrder / (stats.actualDownloader || 1)) * 100).toFixed(2)}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-violet-600" style={{ width: `${Math.min(100, (stats.actualRepeatOrder / (stats.actualDownloader || 1)) * 100 / (target.targetConversion || 1) * 100)}%` }} />
-              </div>
-            </div>
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Gap Target</p>
-              <p className="text-lg font-black text-rose-600">-{formatNumber(Math.max(0, stats.monthlyRepeatOrderTarget - stats.actualRepeatOrder))}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trend Chart */}
-      <div className="bg-white p-10 rounded-[3rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">Tren Harian vs Target</h3>
-            <p className="text-sm text-slate-400 font-medium mt-1">Monitoring performa harian untuk mencapai target bulanan</p>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-indigo-600" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actual</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-slate-200" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target</span>
-            </div>
-          </div>
-        </div>
-        <div className="h-[400px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={dailyTrend}>
-              <defs>
-                <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="day" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
-              />
-              <YAxis 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }}
-                tickFormatter={(val) => `Rp${val >= 1000000 ? (val/1000000).toFixed(0) + 'jt' : val}`}
-              />
-              <Tooltip 
-                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '12px' }}
-                formatter={(val: number) => [formatCurrency(val), 'Revenue']}
-              />
-              <Area type="monotone" dataKey="Actual" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorActual)" />
-              <Line type="monotone" dataKey="Target" stroke="#e2e8f0" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
         </div>
       </div>
     </div>
@@ -3193,18 +2911,20 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const bstr = event.target?.result;
-        const workbook = XLSX.read(bstr, { type: 'binary' });
-        
+        const buf = event.target?.result;
+        if (!buf) throw new Error('Failed to read file');
+        const workbook = XLSX.read(buf, { type: 'array' });
+
         let transactions: any[] = [];
         let downloaders: any[] = [];
 
         workbook.SheetNames.forEach(name => {
           const sheet = workbook.Sheets[name];
           const jsonData = XLSX.utils.sheet_to_json(sheet);
-          if (name.toUpperCase().includes('TRANSAKSI')) {
+          const upper = name.toUpperCase();
+          if (upper.includes('TRANSAKSI') || upper.includes('TRX') || upper.includes('PAID')) {
             transactions = jsonData;
-          } else if (name.toUpperCase().includes('DOWNLOADER')) {
+          } else if (upper.includes('DOWNLOADER') || upper.includes('DOWNLOAD')) {
             downloaders = jsonData;
           }
         });
@@ -3223,9 +2943,15 @@ const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[],
         alert('Gagal memproses file. Pastikan format Excel benar.');
       } finally {
         setIsUploading(false);
+        // Allow re-uploading the same file
+        e.target.value = '';
       }
     };
-    reader.readAsBinaryString(file);
+    reader.onerror = () => {
+      setIsUploading(false);
+      alert('Gagal mengunggah file.');
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -3319,7 +3045,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [filters, setFilters] = useState({
     source_app: 'All',
     year: 'All',
@@ -3327,22 +3052,61 @@ export default function App() {
     methode_name: 'All'
   });
 
-  const [apps, setApps] = useState<any[]>([
-    {
-      id: '1',
-      name: 'App Utama',
-      targetConfig: {
-        targetDownloader: 0,
-        targetUserPremium: 0,
-        targetSales: 0,
-        targetConversion: 0,
-        avgPrice: 0,
-      },
-      dailyData: {}, // Keyed by YYYY-MM-DD
-      isTargetSet: false
+  const APPS_STORAGE_KEY = 'simarsel:apps:v1';
+  const SELECTED_APP_STORAGE_KEY = 'simarsel:selectedAppId:v1';
+
+  const [apps, setApps] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(APPS_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (err) {
+        console.warn('Failed to read apps from localStorage:', err);
+      }
     }
-  ]);
-  const [selectedAppId, setSelectedAppId] = useState('1');
+    return [
+      {
+        id: '1',
+        name: 'App Utama',
+        targetConfig: {},       // keyed by YYYY-MM
+        dailyData: {},          // keyed by YYYY-MM-DD
+        isTargetSet: {},        // keyed by YYYY-MM
+      },
+    ];
+  });
+  const [selectedAppId, setSelectedAppId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(SELECTED_APP_STORAGE_KEY);
+        if (raw) return raw;
+      } catch (err) {
+        console.warn('Failed to read selectedAppId from localStorage:', err);
+      }
+    }
+    return '1';
+  });
+
+  // Persist apps & selection so refreshes don't wipe operational input.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(apps));
+    } catch (err) {
+      console.warn('Failed to persist apps to localStorage:', err);
+    }
+  }, [apps]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(SELECTED_APP_STORAGE_KEY, selectedAppId);
+    } catch (err) {
+      console.warn('Failed to persist selectedAppId to localStorage:', err);
+    }
+  }, [selectedAppId]);
   const [targetMonth, setTargetMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [calendarFocusDate, setCalendarFocusDate] = useState<Date | null>(null);
 
@@ -3500,7 +3264,7 @@ export default function App() {
     };
 
     loadInitialData();
-  }, [processData]);
+  }, [processData, processDownloaderData]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3566,46 +3330,6 @@ export default function App() {
       return matchApp && matchYear && matchMonth;
     });
   }, [downloaderData, filters]);
-
-  const recapData = useMemo(() => {
-    const yearly: any = {};
-    const monthly: any = {};
-    const weekly: any = {};
-    const daily: any = {};
-
-    filteredData.forEach(item => {
-      const d = item.parsed_payment_date;
-      const yKey = format(d, 'yyyy');
-      const mKey = format(d, 'yyyy-MM');
-      const wKey = `${format(d, 'yyyy')}-W${format(d, 'ww')}`;
-      const dKey = format(d, 'yyyy-MM-dd');
-
-      const update = (acc: any, key: string) => {
-        if (!acc[key]) acc[key] = { name: key, revenue: 0, transactions: 0, buyers: new Set() };
-        acc[key].revenue += item.revenue;
-        acc[key].transactions += 1;
-        acc[key].buyers.add(item.email || item.phone);
-      };
-
-      update(yearly, yKey);
-      update(monthly, mKey);
-      update(weekly, wKey);
-      update(daily, dKey);
-    });
-
-    const finalize = (acc: any) => Object.values(acc).map((item: any) => ({
-      ...item,
-      uniqueBuyers: item.buyers.size,
-      aov: item.transactions > 0 ? item.revenue / item.transactions : 0
-    })).sort((a: any, b: any) => a.name.localeCompare(b.name));
-
-    return {
-      yearly: finalize(yearly),
-      monthly: finalize(monthly),
-      weekly: finalize(weekly),
-      daily: finalize(daily)
-    };
-  }, [filteredData]);
 
   const availableOptions = useMemo(() => {
     const allApps = data.map(d => d.source_app).concat(downloaderData.map(d => d.source_app));
@@ -3687,12 +3411,16 @@ export default function App() {
             const data = dailyData[d];
             const hasData = data && (
               (data.actualSales !== undefined && data.actualSales !== null && data.actualSales !== 0) ||
-              (data.actualDownloader !== undefined && data.actualDownloader !== null && data.actualDownloader !== 0)
+              (data.actualDownloader !== undefined && data.actualDownloader !== null && data.actualDownloader !== 0) ||
+              (data.actualRepeatOrder !== undefined && data.actualRepeatOrder !== null && data.actualRepeatOrder !== 0)
             );
             return hasData ? i : acc;
           }, -1);
 
-          const baseDailySales = target.targetSales / 30;
+          // Use actual day count of the target month (28/29/30/31), not magic 30.
+          const [ymY, ymM] = monthKey.split('-').map(Number);
+          const daysInTargetMonth = new Date(ymY, ymM, 0).getDate();
+          const baseDailySales = target.targetSales / Math.max(1, daysInTargetMonth);
           const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
           totalHutangSales += Math.max(0, expectedSalesSoFar - appRealSales);
         }
@@ -3926,7 +3654,8 @@ export default function App() {
       };
       acc[subKey].revenue += item.revenue;
       acc[subKey].transactions += 1;
-      acc[subKey].buyers.add(item.email || item.phone);
+      const buyerId = item.email || item.phone || item.full_name || item.trx_id;
+      if (buyerId) acc[subKey].buyers.add(buyerId);
       return acc;
     }, {});
 
@@ -3951,7 +3680,8 @@ export default function App() {
       };
       acc[key].revenue += item.revenue;
       acc[key].transactions += 1;
-      acc[key].buyers.add(item.email || item.phone);
+      const buyerId = item.email || item.phone || item.full_name || item.trx_id;
+      if (buyerId) acc[key].buyers.add(buyerId);
       acc[key].prices.push(item.revenue);
       return acc;
     }, {});
