@@ -9,7 +9,17 @@ import { formatCurrency, formatNumber } from '../../lib/formatters';
 import { generateDailyInsight } from '../../lib/dailyInsight';
 import type { AppData, AvailableOptions, Downloader, Transaction } from '../../types';
 
-export const PackageCalendar = ({ data, downloaderData, availableOptions, apps, focusDate }: { data: Transaction[], downloaderData: Downloader[], availableOptions: any, apps: AppData[], focusDate?: Date | null }) => {
+interface PackageCalendarProps {
+  data: Transaction[];
+  downloaderData: Downloader[];
+  availableOptions: AvailableOptions;
+  apps: AppData[];
+  focusDate?: Date | null;
+}
+
+export const PackageCalendar = ({
+  data, downloaderData, availableOptions, apps, focusDate,
+}: PackageCalendarProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedApp, setSelectedApp] = useState('');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);

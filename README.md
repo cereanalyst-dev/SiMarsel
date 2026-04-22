@@ -17,6 +17,28 @@ sosial media.
 - **Supabase** untuk auth + persistence data & snapshot target operasional
 - **Vitest** untuk unit test lib
 
+## Customize dalam 60 Detik
+
+Semua yang sering ingin diganti sudah dikumpulkan di **[`src/config/app.config.ts`](src/config/app.config.ts)**. Buka file itu, ganti sesuai kebutuhan, save — selesai. Contoh hal yang bisa diganti:
+
+| Ingin ganti… | Ubah di file `app.config.ts` |
+|---|---|
+| Nama app (mis. "SiMarsel" → brand Anda) | `APP_NAME` |
+| Nama perusahaan di sidebar | `COMPANY_NAME` |
+| Tagline di footer | `COMPANY_TAGLINE` |
+| Logo (taruh file di `public/`) | `LOGO_PATH` |
+| Mapping nama panjang → pendek (JADIASN → ASN) | `APP_SHORT_NAMES` |
+| Warna chart | `CHART_COLORS` |
+| Tab di sidebar (tambah/hapus/urutan) | `MENU_ITEMS` |
+| Tab default saat buka dashboard | `DEFAULT_TAB` |
+| Format angka/mata uang | `LOCALE`, `CURRENCY` |
+| Email support di halaman error | `SUPPORT_EMAIL` |
+| Limit baris dari Supabase | `MAX_ROWS_PER_QUERY` |
+
+Untuk logo, letakkan file (JPG/PNG/SVG) di folder `public/` lalu set `LOGO_PATH = '/nama-file.ext'`.
+
+Secret seperti URL/key Supabase **tidak** di file ini — pakai `.env.local` (lihat bawah).
+
 ## Setup Lokal
 
 Prasyarat: Node.js 20+.

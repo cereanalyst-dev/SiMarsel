@@ -19,6 +19,7 @@ import {
 } from './lib/dataAccess';
 import { processDownloaders, processTransactions } from './lib/dataProcessing';
 import { COLORS } from './lib/constants';
+import { COMPANY_TAGLINE, DEFAULT_TAB } from './config/app.config';
 import type {
   AppData, DashboardStats, Downloader, Filters, Transaction, TrendItem,
 } from './types';
@@ -133,7 +134,7 @@ export default function App() {
   }, [supabaseReady, userId, guestMode]);
 
   // ---------- UI state ----------
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState<string>(DEFAULT_TAB);
   const [filters, setFilters] = useState<Filters>({
     source_app: 'All',
     year: 'All',
@@ -555,9 +556,6 @@ export default function App() {
                         setApps={setApps}
                         selectedAppId={selectedAppId}
                         setSelectedAppId={setSelectedAppId}
-                        filters={filters}
-                        data={data}
-                        downloaderData={downloaderData}
                         targetMonth={targetMonth}
                         setTargetMonth={setTargetMonth}
                         setActiveTab={setActiveTab}
@@ -621,7 +619,7 @@ export default function App() {
 
           <footer className="max-w-[1600px] mx-auto p-12 text-center border-t border-slate-100 mt-12">
             <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em]">
-              Dashboard analytic marketing & sales
+              {COMPANY_TAGLINE}
             </p>
           </footer>
         </div>

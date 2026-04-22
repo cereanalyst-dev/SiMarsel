@@ -1,4 +1,5 @@
 import { Search } from 'lucide-react';
+import { APP_NAME, LOGO_PATH } from '../config/app.config';
 
 export const TopBar = () => (
   <div className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 flex items-center justify-between sticky top-0 z-30">
@@ -14,15 +15,17 @@ export const TopBar = () => (
     <div className="flex items-center gap-4">
       <div className="w-10 h-10 flex items-center justify-center">
         <img
-          src="/maungmarsel.jpeg"
-          alt="Logo"
+          src={LOGO_PATH}
+          alt={APP_NAME}
           className="w-full h-full object-contain rounded-lg"
           referrerPolicy="no-referrer"
         />
       </div>
       <div className="text-right hidden sm:block">
-        <p className="text-sm font-black text-slate-900 leading-none">SiMarsel</p>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Dashboard</p>
+        <p className="text-sm font-black text-slate-900 leading-none">{APP_NAME}</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+          Dashboard
+        </p>
       </div>
     </div>
   </div>

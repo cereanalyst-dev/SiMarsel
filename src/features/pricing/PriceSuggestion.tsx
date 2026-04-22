@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import {
-  Activity, BarChart as BarChartIcon, Zap,
-} from 'lucide-react';
+import { Activity, Zap } from 'lucide-react';
 import {
   BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import type { AvailableOptions, Transaction } from '../../types';
 
-export const PriceSuggestion = ({ data, availableOptions }: { data: Transaction[], availableOptions: any }) => {
+interface PriceSuggestionProps {
+  data: Transaction[];
+  availableOptions: AvailableOptions;
+}
+
+export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps) => {
   const [platform, setPlatform] = useState('');
   const [duration, setDuration] = useState('');
   const [showAllHistory, setShowAllHistory] = useState(false);

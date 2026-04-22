@@ -6,3 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Data files — jangan commit raw Excel ke git.
+# Upload datanya lewat tab Settings → otomatis masuk ke Supabase.
+public/*.xlsx
+public/*.xls
+public/*.csv
+*.bak

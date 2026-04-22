@@ -7,34 +7,30 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
-import type { AppData, Filters, Transaction, Downloader } from '../../types';
+import type { AppData } from '../../types';
 import SocialMediaModal from './SocialMediaModal';
 
-export const TargetSection = ({ 
-  apps, 
-  setApps, 
-  selectedAppId, 
-  setSelectedAppId, 
-  filters,
-  data,
-  downloaderData,
+interface TargetSectionProps {
+  apps: AppData[];
+  setApps: (a: AppData[]) => void;
+  selectedAppId: string;
+  setSelectedAppId: (id: string) => void;
+  targetMonth: string;
+  setTargetMonth: (m: string) => void;
+  setActiveTab: (tab: string) => void;
+  setCalendarFocusDate: (d: Date | null) => void;
+}
+
+export const TargetSection = ({
+  apps,
+  setApps,
+  selectedAppId,
+  setSelectedAppId,
   targetMonth,
   setTargetMonth,
   setActiveTab,
-  setCalendarFocusDate
-}: { 
-  apps: any[], 
-  setApps: (a: any[]) => void, 
-  selectedAppId: string, 
-  setSelectedAppId: (id: string) => void,
-  filters: any,
-  data: Transaction[],
-  downloaderData: Downloader[],
-  targetMonth: string,
-  setTargetMonth: (m: string) => void,
-  setActiveTab: (tab: string) => void,
-  setCalendarFocusDate: (d: Date | null) => void
-}) => {
+  setCalendarFocusDate,
+}: TargetSectionProps) => {
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
   const [socialModalDate, setSocialModalDate] = useState<string | null>(null);
@@ -209,13 +205,6 @@ export const TargetSection = ({
       isTargetSet: {}
     }]);
     setSelectedAppId(newId);
-  };
-
-  const removeApp = (id: string) => {
-    if (apps.length <= 1) return;
-    const newApps = apps.filter(a => a.id !== id);
-    setApps(newApps);
-    if (selectedAppId === id) setSelectedAppId(newApps[0].id);
   };
 
   const globalSummary = useMemo(() => {

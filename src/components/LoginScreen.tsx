@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
+import { APP_ACCENT_SUFFIX, APP_NAME, LOGO_PATH } from '../config/app.config';
 
 type Mode = 'sign_in' | 'sign_up';
 
@@ -58,14 +59,15 @@ export const LoginScreen = ({ onGuestContinue }: Props) => {
       >
         <div className="w-20 h-20 mx-auto mb-8 flex items-center justify-center">
           <img
-            src="/maungmarsel.jpeg"
-            alt="SiMarsel"
+            src={LOGO_PATH}
+            alt={APP_NAME}
             className="w-full h-full object-contain rounded-2xl"
             referrerPolicy="no-referrer"
           />
         </div>
         <h1 className="text-3xl font-black text-slate-900 text-center mb-2 tracking-tight">
-          SiMarsel<span className="text-indigo-600">.</span>
+          {APP_NAME}
+          {APP_ACCENT_SUFFIX && <span className="text-indigo-600">{APP_ACCENT_SUFFIX}</span>}
         </h1>
         <p className="text-sm text-slate-400 text-center mb-10 font-medium">
           Masuk untuk mengakses dashboard.

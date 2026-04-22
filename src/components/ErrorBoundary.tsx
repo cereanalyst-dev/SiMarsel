@@ -1,4 +1,5 @@
 import React from 'react';
+import { SUPPORT_EMAIL } from '../config/app.config';
 
 interface Props {
   children: React.ReactNode;
@@ -33,7 +34,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
             Terjadi kesalahan
           </h2>
           <p className="text-sm text-slate-500 mb-6">
-            Dashboard gagal dirender. Coba muat ulang halaman.
+            Dashboard gagal dirender. Coba muat ulang halaman
+            {SUPPORT_EMAIL ? (
+              <> atau kirim email ke <a className="text-indigo-600 underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></>
+            ) : null}
+            .
           </p>
           <pre className="text-[11px] text-left bg-slate-50 border border-slate-100 rounded-xl p-4 overflow-auto max-h-40 whitespace-pre-wrap">
             {this.state.error.message}

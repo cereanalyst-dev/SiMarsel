@@ -6,8 +6,9 @@ import type {
 import { getSupabase, isSupabaseConfigured } from './supabase';
 import {
   APPS_STORAGE_KEY,
+  MAX_ROWS_PER_QUERY,
   SELECTED_APP_STORAGE_KEY,
-} from './constants';
+} from '../config/app.config';
 import { processDownloaders, processTransactions } from './dataProcessing';
 
 // ---------- Apps (operational data) ----------
@@ -141,8 +142,8 @@ export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
   if (!supabase) return null;
 
   const [{ data: txRows, error: txErr }, { data: dlRows, error: dlErr }] = await Promise.all([
-    supabase.from('transactions').select('*').limit(200000),
-    supabase.from('downloaders').select('*').limit(200000),
+    supabase.from('transactions').select('*').limit(MAX_ROWS_PER_QUERY),
+    supabase.from('downloaders').select('*').limit(MAX_ROWS_PER_QUERY),
   ]);
 
   if (txErr) console.warn('Failed to fetch transactions:', txErr.message);

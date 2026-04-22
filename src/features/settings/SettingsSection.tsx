@@ -1,14 +1,19 @@
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import * as XLSX from 'xlsx';
 import { Download, Plus, RefreshCw, Settings } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import type { Downloader, Transaction } from '../../types';
 
-export const SettingsSection = ({ onDataUpdate }: { onDataUpdate: (data: Transaction[], downloader: Downloader[], append: boolean) => void }) => {
+interface SettingsSectionProps {
+  // Raw rows from XLSX — App.tsx will run them through processTransactions /
+  // processDownloaders and sync to Supabase if configured.
+  onDataUpdate: (transactions: unknown[], downloaders: unknown[], append: boolean) => void;
+}
+
+export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
