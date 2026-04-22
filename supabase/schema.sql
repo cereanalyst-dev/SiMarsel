@@ -65,10 +65,13 @@ create policy "apps_snapshot_update_own"
   with check (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------
--- 2) transactions : 1 baris per transaksi (pkey = trx_id agar upsert idempotent)
+-- 2) transactions : 1 baris per line item di Excel.
+--    Duplicate trx_id dibolehkan (mis. 1 transaksi beli beberapa paket).
+--    Primary key synthetic UUID supaya semua baris Excel tersimpan.
 -- ---------------------------------------------------------------------------
 create table if not exists public.transactions (
-  trx_id            text         primary key,
+  id                uuid         primary key default uuid_generate_v4(),
+  trx_id            text,                   -- tidak unique, bisa duplicate
   user_id           uuid         references auth.users(id) on delete set null,
 
   -- Kolom sesuai urutan di Excel.
@@ -89,6 +92,7 @@ create table if not exists public.transactions (
   uploaded_at       timestamptz  not null default now()
 );
 
+create index if not exists idx_transactions_trx_id        on public.transactions (trx_id);
 create index if not exists idx_transactions_payment_date on public.transactions (payment_date);
 create index if not exists idx_transactions_source_app   on public.transactions (source_app);
 create index if not exists idx_transactions_email        on public.transactions (email);

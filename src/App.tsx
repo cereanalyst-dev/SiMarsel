@@ -94,8 +94,9 @@ export default function App() {
       setDownloaderData((prev) => (append ? [...prev, ...processedDl] : processedDl));
 
       if (userId) {
-        await uploadTransactionsToSupabase(userId, processedTx);
-        await uploadDownloadersToSupabase(userId, processedDl);
+        const replaceMode = !append;
+        await uploadTransactionsToSupabase(userId, processedTx, replaceMode);
+        await uploadDownloadersToSupabase(userId, processedDl, replaceMode);
       }
     },
     [userId],

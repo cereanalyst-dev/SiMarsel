@@ -226,6 +226,7 @@ export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
 export const uploadTransactionsToSupabase = async (
   userId: string,
   rows: Transaction[],
+  replaceMode: boolean = false,
 ): Promise<boolean> => {
   const supabase = getSupabase();
   if (!supabase) {
@@ -236,6 +237,19 @@ export const uploadTransactionsToSupabase = async (
     console.warn('[SiMarsel] Skip upload transactions — tidak ada baris.');
     return false;
   }
+
+  if (replaceMode) {
+    console.log('[SiMarsel] 🗑️ Ganti Data Total → delete transactions lama dulu…');
+    const { error: delErr } = await supabase
+      .from('transactions')
+      .delete()
+      .not('id', 'is', null);
+    if (delErr) {
+      console.error('[SiMarsel] ❌ Gagal delete transactions lama:', delErr.message, delErr);
+      return false;
+    }
+  }
+
   console.log(`[SiMarsel] ⬆️ Uploading ${rows.length} transactions ke Supabase…`);
 
   // Strip derived fields before sending. transaction_date & payment_date
@@ -258,6 +272,8 @@ export const uploadTransactionsToSupabase = async (
   }));
 
   // Chunk besar = lebih cepat. Supabase bisa handle ~1000 rows per request.
+  // Kita pakai INSERT (bukan upsert) karena trx_id sekarang tidak unique
+  // — setiap line item di Excel akan tersimpan sebagai baris tersendiri.
   const chunkSize = 1000;
   const totalChunks = Math.ceil(payload.length / chunkSize);
   const startedAt = performance.now();
@@ -265,9 +281,7 @@ export const uploadTransactionsToSupabase = async (
   for (let i = 0; i < payload.length; i += chunkSize) {
     const chunkIndex = Math.floor(i / chunkSize) + 1;
     const chunk = payload.slice(i, i + chunkSize);
-    const { error } = await supabase
-      .from('transactions')
-      .upsert(chunk, { onConflict: 'trx_id' });
+    const { error } = await supabase.from('transactions').insert(chunk);
     if (error) {
       console.error(
         `[SiMarsel] ❌ Upload transactions gagal di chunk ${chunkIndex}/${totalChunks}:`,
@@ -292,6 +306,7 @@ export const uploadTransactionsToSupabase = async (
 export const uploadDownloadersToSupabase = async (
   userId: string,
   rows: Downloader[],
+  replaceMode: boolean = false,
 ): Promise<boolean> => {
   const supabase = getSupabase();
   if (!supabase) {
@@ -302,6 +317,19 @@ export const uploadDownloadersToSupabase = async (
     console.warn('[SiMarsel] Skip upload downloaders — tidak ada baris.');
     return false;
   }
+
+  if (replaceMode) {
+    console.log('[SiMarsel] 🗑️ Ganti Data Total → delete downloaders lama dulu…');
+    const { error: delErr } = await supabase
+      .from('downloaders')
+      .delete()
+      .not('source_app', 'is', null);
+    if (delErr) {
+      console.error('[SiMarsel] ❌ Gagal delete downloaders lama:', delErr.message, delErr);
+      return false;
+    }
+  }
+
   console.log(`[SiMarsel] ⬆️ Uploading ${rows.length} downloader rows ke Supabase…`);
 
   // Pakai komponen lokal supaya date di DB = date di Excel (tidak geser via UTC).
@@ -338,8 +366,8 @@ export const uploadDownloadersToSupabase = async (
 export const clearAllTransactionsInSupabase = async (): Promise<void> => {
   const supabase = getSupabase();
   if (!supabase) return;
-  await supabase.from('transactions').delete().neq('trx_id', '');
-  await supabase.from('downloaders').delete().neq('source_app', '');
+  await supabase.from('transactions').delete().not('id', 'is', null);
+  await supabase.from('downloaders').delete().not('source_app', 'is', null);
 };
 
 export { isSupabaseConfigured };
