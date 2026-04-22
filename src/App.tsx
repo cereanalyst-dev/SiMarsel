@@ -197,34 +197,42 @@ export default function App() {
     saveSelectedAppIdToLocal(selectedAppId);
   }, [selectedAppId]);
 
+  // Helper: source_app di Excel tx pakai lowercase, di downloader uppercase.
+  // Data disimpan apa adanya di Supabase, tapi di dashboard kita samakan
+  // (uppercase) supaya aggregasi lintas tabel tidak terpisah.
+  const normApp = useCallback((s: string | null | undefined) => (s || '').toUpperCase(), []);
+
   // ---------- Derived data ----------
   const filteredData = useMemo(
     () =>
       data.filter((item) => {
-        const matchApp = filters.source_app === 'All' || item.source_app === filters.source_app;
+        const matchApp =
+          filters.source_app === 'All' || normApp(item.source_app) === normApp(filters.source_app);
         const matchYear = filters.year === 'All' || item.year === Number(filters.year);
         const matchMonth = filters.month === 'All' || item.month === Number(filters.month);
         const matchMethod = filters.methode_name === 'All' || item.methode_name === filters.methode_name;
         return matchApp && matchYear && matchMonth && matchMethod;
       }),
-    [data, filters],
+    [data, filters, normApp],
   );
 
   const filteredDownloaderData = useMemo(
     () =>
       downloaderData.filter((item) => {
-        const matchApp = filters.source_app === 'All' || item.source_app === filters.source_app;
+        const matchApp =
+          filters.source_app === 'All' || normApp(item.source_app) === normApp(filters.source_app);
         const matchYear = filters.year === 'All' || item.year === Number(filters.year);
         const matchMonth = filters.month === 'All' || item.month === Number(filters.month);
         return matchApp && matchYear && matchMonth;
       }),
-    [downloaderData, filters],
+    [downloaderData, filters, normApp],
   );
 
   const availableOptions = useMemo(() => {
+    // Normalisasi ke uppercase supaya "jadibumn" & "JADIBUMN" tidak jadi 2 option.
     const allApps = [
-      ...data.map((d) => d.source_app),
-      ...downloaderData.map((d) => d.source_app),
+      ...data.map((d) => normApp(d.source_app)),
+      ...downloaderData.map((d) => normApp(d.source_app)),
     ];
     const allYears = [
       ...data.map((d) => d.year),
@@ -235,7 +243,7 @@ export default function App() {
       years: Array.from(new Set(allYears.filter((y) => y != null))).sort((a, b) => b - a),
       methods: Array.from(new Set(data.map((d) => d.methode_name).filter(Boolean))).sort(),
     };
-  }, [data, downloaderData]);
+  }, [data, downloaderData, normApp]);
 
   const appColors = useMemo(() => {
     const colors: Record<string, string> = {};
@@ -372,7 +380,7 @@ export default function App() {
           appBreakdown: {},
         };
       }
-      const app = item.source_app;
+      const app = normApp(item.source_app);
       grouped[key].appBreakdown![app] ??= { revenue: 0, transactions: 0, downloader: 0 };
       grouped[key].revenue += item.revenue;
       grouped[key].transactions += 1;
@@ -393,7 +401,7 @@ export default function App() {
           appBreakdown: {},
         };
       }
-      const app = item.source_app;
+      const app = normApp(item.source_app);
       grouped[key].appBreakdown![app] ??= { revenue: 0, transactions: 0, downloader: 0 };
       grouped[key].downloader += item.count;
       grouped[key].appBreakdown![app].downloader += item.count;
@@ -413,7 +421,7 @@ export default function App() {
         return { ...item, conversion, ...breakdownProps } as TrendItem;
       })
       .sort((a, b) => (a.rawDate?.getTime() ?? 0) - (b.rawDate?.getTime() ?? 0));
-  }, [filteredData, filteredDownloaderData]);
+  }, [filteredData, filteredDownloaderData, normApp]);
 
   const packagePerformanceData = useMemo(() => {
     type Row = {

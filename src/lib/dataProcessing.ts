@@ -48,7 +48,8 @@ export const processTransactions = (rawData: unknown[]): Transaction[] =>
         ...(item as object),
         transaction_date: transactionDateStr,
         payment_date: paymentDateStr,
-        source_app: String(item.source_app ?? '').toUpperCase(),
+        // source_app disimpan persis seperti di Excel — tanpa uppercase.
+        source_app: String(item.source_app ?? ''),
         parsed_payment_date: paymentDate,
         year: getYear(paymentDate),
         month: getMonth(paymentDate) + 1,
@@ -78,7 +79,8 @@ export const processDownloaders = (rawData: unknown[]): Downloader[] => {
       if (['Tanggal', 'tanggal', 'date', 'Date', '__rowNum__'].includes(key)) return;
       processed.push({
         date: rawDate,
-        source_app: String(key || '').toUpperCase(),
+        // source_app dari nama kolom di Excel — tanpa uppercase.
+        source_app: String(key || ''),
         count: Number(row[key]) || 0,
         parsed_date: date,
         year,
