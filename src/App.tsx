@@ -265,9 +265,8 @@ export default function App() {
 
     // Unique Buyer & User Repeat Order dihitung dengan EMAIL saja
     // (konsisten dengan query SQL di Supabase).
-    // Rumus yang match: SELECT count(DISTINCT email) WHERE email <> ''
-    // Case-sensitive (tidak toLowerCase) agar persis sama dengan SQL DISTINCT.
-    // Hanya .trim() untuk bersihin whitespace artefak dari Excel.
+    // Case-sensitive (sama dengan SELECT DISTINCT email). Hanya .trim()
+    // untuk membersihkan whitespace artefak dari Excel.
     const emailOf = (r: { email?: string | null }): string =>
       (r.email ?? '').trim();
 
@@ -275,23 +274,35 @@ export default function App() {
       filteredData.map((item) => emailOf(item)).filter((e) => e !== ''),
     ).size;
 
-    const totalRealDownloader = filteredDownloaderData.reduce((sum, d) => sum + d.count, 0);
-
-    // User Repeat Order:
-    //   • Kriteria: user dengan email punya ≥ 2 transaksi di SELURUH data
-    //   • Dedup: 1 email = 1 count
-    //   • Email kosong diabaikan (mirror "email IS NOT NULL AND email <> ''")
-    const emailTxCount = data.reduce<Record<string, number>>((acc, curr) => {
+    // Hitung ORDER unik per email (pakai trx_id, bukan line item).
+    // Kalau 1 order punya 3 line item dengan trx_id sama, tetap dihitung 1 order.
+    const ordersPerEmail = data.reduce<Record<string, Set<string>>>((acc, curr) => {
       const e = emailOf(curr);
-      if (e) acc[e] = (acc[e] || 0) + 1;
+      const trxId = (curr.trx_id ?? '').trim();
+      if (!e || !trxId) return acc;
+      if (!acc[e]) acc[e] = new Set<string>();
+      acc[e].add(trxId);
       return acc;
     }, {});
 
+    const totalRealDownloader = filteredDownloaderData.reduce((sum, d) => sum + d.count, 0);
+
+    // User Repeat Order:
+    //   • Kriteria: user dengan ≥ 2 ORDER UNIK (distinct trx_id) di seluruh data.
+    //     Artinya user beneran datang 2x berbeda, bukan sekali beli 3 produk.
+    //   • Dedup: 1 email = 1 count.
+    //   • Email kosong diabaikan.
     const repeatOrderUsers = new Set(
       filteredData
         .map((item) => emailOf(item))
-        .filter((e) => e !== '' && emailTxCount[e] >= 2),
+        .filter((e) => e !== '' && (ordersPerEmail[e]?.size ?? 0) >= 2),
     ).size;
+
+    // Jumlah order unik (distinct trx_id) — untuk true AOV & reference.
+    const uniqueOrderIds = new Set(
+      filteredData.map((item) => (item.trx_id ?? '').trim()).filter((t) => t !== ''),
+    );
+    const totalUniqueOrders = uniqueOrderIds.size;
 
     const relevantApps = filters.source_app === 'All'
       ? apps
@@ -350,7 +361,11 @@ export default function App() {
     return {
       totalRevenue: totalRealSales,
       totalTransactions,
-      aov: totalTransactions > 0 ? totalRealSales / totalTransactions : 0,
+      totalUniqueOrders,
+      // AOV pakai distinct trx_id (order) — standar industri. Kalau mau "avg per
+      // line item" tinggal bagi totalRevenue / totalTransactions di UI.
+      aov: totalUniqueOrders > 0 ? totalRealSales / totalUniqueOrders : 0,
+      avgItemPrice: totalTransactions > 0 ? totalRealSales / totalTransactions : 0,
       uniqueBuyers,
       totalPackagesSold: totalTransactions,
       totalTargetRevenue,

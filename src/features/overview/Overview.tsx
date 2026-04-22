@@ -78,12 +78,12 @@ export const Overview = ({
       <FilterSection filters={filters} setFilters={setFilters} availableOptions={availableOptions} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <SummaryCard icon={DollarSign} color="indigo" title="Total Revenue" value={formatCurrency(stats.totalRevenue)} subtitle="Pendapatan kotor" />
-        <SummaryCard icon={ShoppingBag} color="emerald" title="Total Transaksi" value={formatNumber(stats.totalTransactions)} subtitle="Volume penjualan" />
-        <SummaryCard icon={Users} color="violet" title="Unique Buyers" value={formatNumber(stats.uniqueBuyers)} subtitle="Pelanggan unik (by Email)" />
-        <SummaryCard icon={TrendingUp} color="amber" title="AOV" value={formatCurrency(stats.aov)} subtitle="Rata-rata transaksi" />
-        <SummaryCard icon={Download} color="blue" title="Downloader" value={formatNumber(stats.totalRealDownloader)} subtitle="Total unduhan real" />
-        <SummaryCard icon={UserCheck} color="rose" title="User Repeat Order" value={formatNumber(stats.totalRepeatOrderUsers)} subtitle="Pembelian ≥ 2x (by Email)" />
+        <SummaryCard icon={DollarSign} color="indigo" title="Total Revenue" value={formatCurrency(stats.totalRevenue)} subtitle="Sum revenue semua baris" />
+        <SummaryCard icon={ShoppingBag} color="emerald" title="Total Transaksi" value={formatNumber(stats.totalTransactions)} subtitle={`${formatNumber(stats.totalUniqueOrders)} order unik`} />
+        <SummaryCard icon={Users} color="violet" title="Unique Buyers" value={formatNumber(stats.uniqueBuyers)} subtitle="Distinct email (non-kosong)" />
+        <SummaryCard icon={TrendingUp} color="amber" title="AOV" value={formatCurrency(stats.aov)} subtitle="Revenue / Order unik" />
+        <SummaryCard icon={Download} color="blue" title="Downloader" value={formatNumber(stats.totalRealDownloader)} subtitle="Sum count unduhan" />
+        <SummaryCard icon={UserCheck} color="rose" title="User Repeat Order" value={formatNumber(stats.totalRepeatOrderUsers)} subtitle="≥ 2 order unik (distinct trx_id)" />
       </div>
 
       <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
