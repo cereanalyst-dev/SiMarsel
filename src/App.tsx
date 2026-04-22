@@ -274,8 +274,25 @@ export default function App() {
       filteredData.map((item) => emailOf(item)).filter((e) => e !== ''),
     ).size;
 
-    // Hitung ORDER unik per email (pakai trx_id, bukan line item).
-    // Kalau 1 order punya 3 line item dengan trx_id sama, tetap dihitung 1 order.
+    // ==============================================================
+    // User Repeat Order — match persis dengan query SQL user:
+    //
+    //   SELECT count(*) FROM (
+    //     SELECT email FROM transactions
+    //     WHERE email IS NOT NULL AND email <> ''
+    //       AND trx_id <> ''
+    //     GROUP BY email
+    //     HAVING count(DISTINCT trx_id) >= 2
+    //   ) y;
+    //
+    // Logic di sini:
+    //   1. Build map { email → Set<trx_id> } dari SELURUH data (bukan
+    //      filteredData) supaya match SQL yang tidak pakai filter.
+    //   2. Email kosong DAN trx_id kosong di-skip (WHERE clause).
+    //   3. Hitung email dengan size(Set) >= 2 (HAVING).
+    //   4. Hasilnya angka GLOBAL — tidak terpengaruh filter bulan/app
+    //      di dashboard, sama persis dengan yang muncul di SQL editor.
+    // ==============================================================
     const ordersPerEmail = data.reduce<Record<string, Set<string>>>((acc, curr) => {
       const e = emailOf(curr);
       const trxId = (curr.trx_id ?? '').trim();
@@ -285,20 +302,14 @@ export default function App() {
       return acc;
     }, {});
 
+    const repeatOrderUsers = Object.values(ordersPerEmail).filter(
+      (orderSet) => orderSet.size >= 2,
+    ).length;
+
     const totalRealDownloader = filteredDownloaderData.reduce((sum, d) => sum + d.count, 0);
 
-    // User Repeat Order:
-    //   • Kriteria: user dengan ≥ 2 ORDER UNIK (distinct trx_id) di seluruh data.
-    //     Artinya user beneran datang 2x berbeda, bukan sekali beli 3 produk.
-    //   • Dedup: 1 email = 1 count.
-    //   • Email kosong diabaikan.
-    const repeatOrderUsers = new Set(
-      filteredData
-        .map((item) => emailOf(item))
-        .filter((e) => e !== '' && (ordersPerEmail[e]?.size ?? 0) >= 2),
-    ).size;
-
-    // Jumlah order unik (distinct trx_id) — untuk true AOV & reference.
+    // Jumlah order unik (distinct trx_id) di periode yang difilter — untuk
+    // AOV calculation (revenue / unique orders) & referensi.
     const uniqueOrderIds = new Set(
       filteredData.map((item) => (item.trx_id ?? '').trim()).filter((t) => t !== ''),
     );
