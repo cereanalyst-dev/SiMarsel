@@ -139,15 +139,28 @@ export interface DataSet {
 
 export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
   const supabase = getSupabase();
-  if (!supabase) return null;
+  if (!supabase) {
+    console.warn('[SiMarsel] Supabase client belum terkonfigurasi (VITE_SUPABASE_URL / ANON_KEY).');
+    return null;
+  }
+
+  console.log('[SiMarsel] Fetching data dari Supabase…');
 
   const [{ data: txRows, error: txErr }, { data: dlRows, error: dlErr }] = await Promise.all([
     supabase.from('transactions').select('*').limit(MAX_ROWS_PER_QUERY),
     supabase.from('downloaders').select('*').limit(MAX_ROWS_PER_QUERY),
   ]);
 
-  if (txErr) console.warn('Failed to fetch transactions:', txErr.message);
-  if (dlErr) console.warn('Failed to fetch downloaders:', dlErr.message);
+  if (txErr) {
+    console.error('[SiMarsel] ❌ Gagal fetch transactions:', txErr.message, txErr);
+  } else {
+    console.log(`[SiMarsel] ✅ transactions: ${txRows?.length ?? 0} baris`);
+  }
+  if (dlErr) {
+    console.error('[SiMarsel] ❌ Gagal fetch downloaders:', dlErr.message, dlErr);
+  } else {
+    console.log(`[SiMarsel] ✅ downloaders: ${dlRows?.length ?? 0} baris`);
+  }
 
   const rawTx = (txRows as unknown[] | null) ?? [];
   const rawDl = (dlRows as unknown[] | null) ?? [];
@@ -167,6 +180,10 @@ export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
   });
   const downloaders = processDownloaders(Array.from(dlByDate.values()));
 
+  console.log(
+    `[SiMarsel] 📊 Processed: ${transactions.length} transactions, ${downloaders.length} downloaders (long format)`,
+  );
+
   return { transactions, downloaders };
 };
 
@@ -175,7 +192,15 @@ export const uploadTransactionsToSupabase = async (
   rows: Transaction[],
 ): Promise<boolean> => {
   const supabase = getSupabase();
-  if (!supabase || rows.length === 0) return false;
+  if (!supabase) {
+    console.warn('[SiMarsel] Skip upload transactions — Supabase belum terkonfigurasi.');
+    return false;
+  }
+  if (rows.length === 0) {
+    console.warn('[SiMarsel] Skip upload transactions — tidak ada baris.');
+    return false;
+  }
+  console.log(`[SiMarsel] ⬆️ Uploading ${rows.length} transactions ke Supabase…`);
 
   // Strip derived fields before sending. transaction_date & payment_date
   // sudah di-format "YYYY-MM-DD HH:mm:ss" (lokal) oleh processTransactions,
@@ -204,10 +229,15 @@ export const uploadTransactionsToSupabase = async (
       .from('transactions')
       .upsert(chunk, { onConflict: 'trx_id' });
     if (error) {
-      console.warn('Failed to upload transactions chunk:', error.message);
+      console.error(
+        `[SiMarsel] ❌ Upload transactions gagal di chunk ${i / chunkSize + 1}:`,
+        error.message,
+        error,
+      );
       return false;
     }
   }
+  console.log(`[SiMarsel] ✅ Upload ${rows.length} transactions selesai.`);
   return true;
 };
 
@@ -216,10 +246,23 @@ export const uploadDownloadersToSupabase = async (
   rows: Downloader[],
 ): Promise<boolean> => {
   const supabase = getSupabase();
-  if (!supabase || rows.length === 0) return false;
+  if (!supabase) {
+    console.warn('[SiMarsel] Skip upload downloaders — Supabase belum terkonfigurasi.');
+    return false;
+  }
+  if (rows.length === 0) {
+    console.warn('[SiMarsel] Skip upload downloaders — tidak ada baris.');
+    return false;
+  }
+  console.log(`[SiMarsel] ⬆️ Uploading ${rows.length} downloader rows ke Supabase…`);
+
+  // Pakai komponen lokal supaya date di DB = date di Excel (tidak geser via UTC).
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const toLocalDate = (d: Date) =>
+    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
   const payload = rows.map((r) => ({
-    date: r.parsed_date.toISOString().slice(0, 10),
+    date: toLocalDate(r.parsed_date),
     source_app: r.source_app,
     count: r.count,
     user_id: userId,
@@ -232,10 +275,15 @@ export const uploadDownloadersToSupabase = async (
       .from('downloaders')
       .upsert(chunk, { onConflict: 'date,source_app' });
     if (error) {
-      console.warn('Failed to upload downloaders chunk:', error.message);
+      console.error(
+        `[SiMarsel] ❌ Upload downloaders gagal di chunk ${i / chunkSize + 1}:`,
+        error.message,
+        error,
+      );
       return false;
     }
   }
+  console.log(`[SiMarsel] ✅ Upload ${rows.length} downloader rows selesai.`);
   return true;
 };
 

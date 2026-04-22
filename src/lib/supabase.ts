@@ -11,7 +11,14 @@ export const isSupabaseConfigured = (): boolean =>
 let _client: SupabaseClient | null = null;
 export const getSupabase = (): SupabaseClient | null => {
   if (_client) return _client;
-  if (!isSupabaseConfigured()) return null;
+  if (!isSupabaseConfigured()) {
+    console.warn(
+      '[SiMarsel] Supabase belum terkonfigurasi — mode lokal.',
+      { VITE_SUPABASE_URL: url, VITE_SUPABASE_ANON_KEY: anonKey ? '(set)' : '(missing)' },
+    );
+    return null;
+  }
+  console.log('[SiMarsel] Init Supabase client:', url);
   _client = createClient(url!, anonKey!, {
     auth: {
       persistSession: true,

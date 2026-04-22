@@ -59,10 +59,15 @@ export default function App() {
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
+      console.log(
+        '[SiMarsel] Auth restored:',
+        data.session?.user?.email ?? '(no session)',
+      );
       setSession(data.session ?? null);
       setAuthChecked(true);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log('[SiMarsel] Auth event:', event, '→', newSession?.user?.email ?? '(no user)');
       setSession(newSession);
     });
     return () => {
@@ -108,21 +113,27 @@ export default function App() {
       setError(null);
       try {
         if (userId) {
+          console.log('[SiMarsel] Load data for user:', userId);
           const res = await fetchDataFromSupabase();
-          if (active && res) {
+          if (!active) return;
+          if (res) {
             setData(res.transactions);
             setDownloaderData(res.downloaders);
-            if (res.transactions.length === 0) {
-              setError('Belum ada data transaksi. Unggah file Excel di Settings.');
+            if (res.transactions.length === 0 && res.downloaders.length === 0) {
+              setError('Belum ada data di Supabase. Unggah file Excel di Settings.');
             }
+          } else {
+            // Fetch returns null only if Supabase client tidak terkonfigurasi.
+            setError(
+              'Supabase tidak bisa diakses. Cek .env.local (VITE_SUPABASE_URL / ANON_KEY).',
+            );
           }
         } else {
-          // Guest / local-only mode: nothing to preload.
           setError('Mode lokal. Unggah file Excel di Settings untuk mulai.');
         }
       } catch (err) {
-        console.warn('Initial data load failed:', err);
-        setError('Gagal memuat data. Coba unggah ulang di Settings.');
+        console.error('[SiMarsel] Initial data load failed:', err);
+        setError('Gagal memuat data. Buka DevTools Console untuk detail errornya.');
       } finally {
         if (active) setLoadingData(false);
       }
