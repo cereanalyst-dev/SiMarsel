@@ -269,14 +269,25 @@ export default function App() {
     ).size;
     const totalRealDownloader = filteredDownloaderData.reduce((sum, d) => sum + d.count, 0);
 
-    const emailCountsInAllData = data.reduce<Record<string, number>>((acc, curr) => {
-      if (curr.email) acc[curr.email] = (acc[curr.email] || 0) + 1;
+    // User Repeat Order:
+    //   • Setiap user dihitung 1x (walaupun dia punya 10 transaksi)
+    //   • Kriteria: user punya riwayat transaksi minimal 2x di SELURUH data
+    //     (bukan cuma di periode yang difilter)
+    //   • Identitas user: fallback email → phone → full_name → trx_id
+    //     supaya user tanpa email tetap ter-detect
+    const buyerIdOf = (r: { email?: string; phone?: string; full_name?: string; trx_id?: string }) =>
+      r.email || r.phone || r.full_name || r.trx_id || '';
+
+    const buyerTxCount = data.reduce<Record<string, number>>((acc, curr) => {
+      const id = buyerIdOf(curr);
+      if (id) acc[id] = (acc[id] || 0) + 1;
       return acc;
     }, {});
+
     const repeatOrderUsers = new Set(
       filteredData
-        .filter((item) => item.email && emailCountsInAllData[item.email] >= 2)
-        .map((item) => item.email),
+        .map((item) => buyerIdOf(item))
+        .filter((id) => id && buyerTxCount[id] >= 2),
     ).size;
 
     const relevantApps = filters.source_app === 'All'

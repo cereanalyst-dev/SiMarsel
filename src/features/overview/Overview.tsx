@@ -83,7 +83,7 @@ export const Overview = ({
         <SummaryCard icon={Users} color="violet" title="Unique Buyers" value={formatNumber(stats.uniqueBuyers)} subtitle="Pelanggan unik" />
         <SummaryCard icon={TrendingUp} color="amber" title="AOV" value={formatCurrency(stats.aov)} subtitle="Rata-rata transaksi" />
         <SummaryCard icon={Download} color="blue" title="Downloader" value={formatNumber(stats.totalRealDownloader)} subtitle="Total unduhan real" />
-        <SummaryCard icon={UserCheck} color="rose" title="User Repeat Order" value={formatNumber(stats.totalRepeatOrderUsers)} subtitle="Pembelian > 2x (By Email)" />
+        <SummaryCard icon={UserCheck} color="rose" title="User Repeat Order" value={formatNumber(stats.totalRepeatOrderUsers)} subtitle="Pembelian ≥ 2x (Unique)" />
       </div>
 
       <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
