@@ -137,6 +137,53 @@ export interface DataSet {
   downloaders: Downloader[];
 }
 
+// Supabase PostgREST default membatasi sekitar 1000 baris per request.
+// Kita paginate manual pakai .range() supaya bisa ambil full dataset.
+const PAGE_SIZE = 1000;
+
+async function fetchAllPages<T>(
+  supabase: ReturnType<typeof getSupabase>,
+  tableName: 'transactions' | 'downloaders',
+  label: string,
+): Promise<T[]> {
+  if (!supabase) return [];
+  const rows: T[] = [];
+  let from = 0;
+  const startedAt = performance.now();
+
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('*')
+      .range(from, to);
+
+    if (error) {
+      console.error(
+        `[SiMarsel] ❌ Gagal fetch ${label} (range ${from}-${to}):`,
+        error.message,
+        error,
+      );
+      break;
+    }
+    if (!data || data.length === 0) break;
+    rows.push(...(data as T[]));
+    if (data.length < PAGE_SIZE) break; // sudah halaman terakhir
+
+    from += PAGE_SIZE;
+    if (rows.length >= MAX_ROWS_PER_QUERY) {
+      console.warn(
+        `[SiMarsel] ⚠️ ${label} sudah mencapai batas MAX_ROWS_PER_QUERY (${MAX_ROWS_PER_QUERY}). Naikkan di config/app.config.ts kalau perlu.`,
+      );
+      break;
+    }
+  }
+
+  const ms = Math.round(performance.now() - startedAt);
+  console.log(`[SiMarsel] ✅ ${label}: ${rows.length} baris (${ms}ms)`);
+  return rows;
+}
+
 export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
   const supabase = getSupabase();
   if (!supabase) {
@@ -144,26 +191,15 @@ export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
     return null;
   }
 
-  console.log('[SiMarsel] Fetching data dari Supabase…');
+  console.log('[SiMarsel] Fetching data dari Supabase (paginated)…');
 
-  const [{ data: txRows, error: txErr }, { data: dlRows, error: dlErr }] = await Promise.all([
-    supabase.from('transactions').select('*').limit(MAX_ROWS_PER_QUERY),
-    supabase.from('downloaders').select('*').limit(MAX_ROWS_PER_QUERY),
+  const [txRows, dlRows] = await Promise.all([
+    fetchAllPages<unknown>(supabase, 'transactions', 'transactions'),
+    fetchAllPages<unknown>(supabase, 'downloaders', 'downloaders'),
   ]);
 
-  if (txErr) {
-    console.error('[SiMarsel] ❌ Gagal fetch transactions:', txErr.message, txErr);
-  } else {
-    console.log(`[SiMarsel] ✅ transactions: ${txRows?.length ?? 0} baris`);
-  }
-  if (dlErr) {
-    console.error('[SiMarsel] ❌ Gagal fetch downloaders:', dlErr.message, dlErr);
-  } else {
-    console.log(`[SiMarsel] ✅ downloaders: ${dlRows?.length ?? 0} baris`);
-  }
-
-  const rawTx = (txRows as unknown[] | null) ?? [];
-  const rawDl = (dlRows as unknown[] | null) ?? [];
+  const rawTx = txRows ?? [];
+  const rawDl = dlRows ?? [];
 
   // The DB stores normalized rows already, but we still need derived fields.
   const transactions = processTransactions(rawTx);
@@ -221,23 +257,35 @@ export const uploadTransactionsToSupabase = async (
     user_id: userId,
   }));
 
-  // Chunk to avoid payload limits.
-  const chunkSize = 500;
+  // Chunk besar = lebih cepat. Supabase bisa handle ~1000 rows per request.
+  const chunkSize = 1000;
+  const totalChunks = Math.ceil(payload.length / chunkSize);
+  const startedAt = performance.now();
+
   for (let i = 0; i < payload.length; i += chunkSize) {
+    const chunkIndex = Math.floor(i / chunkSize) + 1;
     const chunk = payload.slice(i, i + chunkSize);
     const { error } = await supabase
       .from('transactions')
       .upsert(chunk, { onConflict: 'trx_id' });
     if (error) {
       console.error(
-        `[SiMarsel] ❌ Upload transactions gagal di chunk ${i / chunkSize + 1}:`,
+        `[SiMarsel] ❌ Upload transactions gagal di chunk ${chunkIndex}/${totalChunks}:`,
         error.message,
         error,
       );
       return false;
     }
+    if (chunkIndex % 10 === 0 || chunkIndex === totalChunks) {
+      console.log(
+        `[SiMarsel] ⏳ transactions chunk ${chunkIndex}/${totalChunks} done (${
+          Math.min(i + chunkSize, payload.length)
+        }/${payload.length})`,
+      );
+    }
   }
-  console.log(`[SiMarsel] ✅ Upload ${rows.length} transactions selesai.`);
+  const ms = Math.round(performance.now() - startedAt);
+  console.log(`[SiMarsel] ✅ Upload ${rows.length} transactions selesai (${ms}ms).`);
   return true;
 };
 
