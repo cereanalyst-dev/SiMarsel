@@ -266,8 +266,10 @@ export default function App() {
     // Unique Buyer & User Repeat Order dihitung dengan EMAIL saja
     // (konsisten dengan query SQL di Supabase).
     // Rumus yang match: SELECT count(DISTINCT email) WHERE email <> ''
+    // Case-sensitive (tidak toLowerCase) agar persis sama dengan SQL DISTINCT.
+    // Hanya .trim() untuk bersihin whitespace artefak dari Excel.
     const emailOf = (r: { email?: string | null }): string =>
-      (r.email ?? '').trim().toLowerCase();
+      (r.email ?? '').trim();
 
     const uniqueBuyers = new Set(
       filteredData.map((item) => emailOf(item)).filter((e) => e !== ''),
