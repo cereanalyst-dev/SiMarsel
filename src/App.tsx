@@ -370,7 +370,7 @@ export default function App() {
       }
     });
 
-    return {
+    const result = {
       totalRevenue: totalRealSales,
       totalTransactions,
       totalUniqueOrders,
@@ -394,7 +394,28 @@ export default function App() {
       totalRealSales,
       totalRepeatOrderUsers: repeatOrderUsers,
     };
-  }, [filteredData, filteredDownloaderData, apps, filters]);
+
+    // Debug log — bisa langsung di-copy ke clipboard lalu bandingkan dengan SQL
+    console.log('[SiMarsel] 📊 Stats snapshot', {
+      filter: {
+        source_app: filters.source_app,
+        year: filters.year,
+        month: filters.month,
+        methode_name: filters.methode_name,
+      },
+      total_data_rows: data.length,
+      filtered_rows: filteredData.length,
+      total_revenue: totalRealSales,
+      unique_trx_id: totalUniqueOrders,
+      unique_email: uniqueBuyers,
+      repeat_order_email: repeatOrderUsers,
+      aov_per_order: totalUniqueOrders > 0 ? Math.round(totalRealSales / totalUniqueOrders) : 0,
+      avg_item_price: totalTransactions > 0 ? Math.round(totalRealSales / totalTransactions) : 0,
+      downloader_sum: totalRealDownloader,
+    });
+
+    return result;
+  }, [filteredData, filteredDownloaderData, apps, filters, data.length]);
 
   const trendData: TrendItem[] = useMemo(() => {
     const grouped: Record<string, TrendItem> = {};
