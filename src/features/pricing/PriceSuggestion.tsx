@@ -14,24 +14,26 @@ interface PriceSuggestionProps {
 
 export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps) => {
   const [platform, setPlatform] = useState('');
-  const [duration, setDuration] = useState('');
+  const [durationUnit, setDurationUnit] = useState<'hari' | 'bulan' | 'tahun'>('bulan');
+  const [durationValue, setDurationValue] = useState('');
   const [showAllHistory, setShowAllHistory] = useState(false);
 
   const filteredHistory = useMemo(() => {
     let base = data;
     if (platform) base = base.filter(d => d.source_app.toUpperCase() === platform.toUpperCase());
-    if (duration && !showAllHistory) {
-      // Exact match logic as requested
+    if (!showAllHistory && (durationValue || durationUnit)) {
       base = base.filter(d => {
-        const name = d.content_name.toLowerCase();
-        const search = duration.toLowerCase();
-        // Simple heuristic for "same duration": check if the search term is a distinct part of the name
-        // or if it matches exactly after some cleaning.
-        return name.includes(search);
+        const name = (d.content_name || '').toLowerCase();
+        // Kalau user isi angka → cocokkan "<angka> <unit>" (mis. "3 bulan")
+        // Kalau angka kosong → cukup cocokkan unit-nya saja (mis. mengandung "bulan")
+        const needle = durationValue
+          ? `${durationValue} ${durationUnit}`.toLowerCase()
+          : durationUnit.toLowerCase();
+        return name.includes(needle);
       });
     }
     return base;
-  }, [data, platform, duration, showAllHistory]);
+  }, [data, platform, durationValue, durationUnit, showAllHistory]);
 
   const stats = useMemo(() => {
     if (filteredHistory.length === 0) return null;
@@ -151,14 +153,29 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Masa Aktif / Durasi (Hari)</label>
-            <input 
-              type="number"
-              placeholder="Misal: 30"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-sm font-semibold text-slate-700"
-            />
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Masa Aktif / Durasi</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                placeholder="Angka"
+                value={durationValue}
+                onChange={(e) => setDurationValue(e.target.value)}
+                className="w-1/2 p-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-sm font-semibold text-slate-700"
+              />
+              <select
+                value={durationUnit}
+                onChange={(e) => setDurationUnit(e.target.value as 'hari' | 'bulan' | 'tahun')}
+                className="w-1/2 p-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-sm font-semibold text-slate-700 cursor-pointer"
+              >
+                <option value="hari">Hari</option>
+                <option value="bulan">Bulanan</option>
+                <option value="tahun">Tahunan</option>
+              </select>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium ml-1">
+              Dashboard akan mencari paket yang mengandung kata-kata tersebut di nama produknya.
+            </p>
           </div>
         </div>
 

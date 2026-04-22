@@ -587,7 +587,7 @@ export const TargetSection = ({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Target Repeat Order</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Target User Premium</label>
               <input
                 type="number"
                 value={form.targetRepeatOrder || ''}
@@ -713,7 +713,7 @@ export const TargetSection = ({
                   <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-100/50">
                     <th colSpan={2} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-slate-200/20">Waktu</th>
                     <th colSpan={2} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-indigo-100/20">Downloader</th>
-                    <th colSpan={3} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-violet-100/20 text-xs font-black uppercase tracking-widest text-violet-700">Repeat Order</th>
+                    <th colSpan={3} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-violet-100/20 text-xs font-black uppercase tracking-widest text-violet-700">User Premium</th>
                     <th colSpan={4} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-emerald-100/20">Sales & Revenue</th>
                     <th colSpan={4} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-slate-100/50">Strategi</th>
                     <th colSpan={4} className="py-2 px-4 border-b border-slate-200 text-center bg-slate-200/50">Aktivitas</th>
@@ -730,7 +730,7 @@ export const TargetSection = ({
                     <th className="py-4 px-4 border-r border-slate-200 bg-emerald-50/30">Real</th>
                     <th className="py-4 px-4 border-r border-slate-200">Status</th>
                     <th className="py-4 px-4 border-r border-slate-200">Keterangan</th>
-                    <th className="py-4 px-4 border-r border-slate-200">Repeat Order</th>
+                    <th className="py-4 px-4 border-r border-slate-200">User Premium</th>
                     <th className="py-4 px-4 border-r border-slate-200">Benefit</th>
                     <th className="py-4 px-4 border-r border-slate-200">Event</th>
                     <th className="py-4 px-4 border-r border-slate-200">Benefit</th>

@@ -373,7 +373,7 @@ export const PackageCalendar = ({
                           <div className="grid grid-cols-2 gap-3">
                             {dayData.strategy && (
                               <div>
-                                <p className="text-[8px] font-bold text-slate-400 uppercase">Repeat Order</p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase">User Premium</p>
                                 <p className="text-[10px] font-bold text-slate-700">{dayData.strategy}</p>
                               </div>
                             )}
