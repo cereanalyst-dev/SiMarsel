@@ -622,6 +622,7 @@ export default function App() {
                     >
                       <SocialMediaAnalysis
                         apps={apps}
+                        setApps={setApps}
                         setActiveTab={setActiveTab}
                         setCalendarFocusDate={setCalendarFocusDate}
                       />

@@ -56,7 +56,7 @@ export const processTransactions = (rawData: unknown[]): Transaction[] =>
         quarter: getQuarter(paymentDate),
         year_month: format(paymentDate, 'yyyy-MM'),
         hour: paymentDate.getHours(),
-        revenue: Number(item.revenue ?? item.Revenue ?? item.total_price ?? 0),
+        revenue: Number(item.revenue ?? item.Revenue ?? item.total_price) || 0,
       } as unknown as Transaction;
     });
 

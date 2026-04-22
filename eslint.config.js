@@ -38,6 +38,7 @@ export default [
         HTMLElement: 'readonly',
         MouseEvent: 'readonly',
         Event: 'readonly',
+        performance: 'readonly',
       },
     },
     plugins: {
