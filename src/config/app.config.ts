@@ -78,8 +78,11 @@ export const APPS_STORAGE_KEY = `${STORAGE_PREFIX}:apps:v2`;
 export const SELECTED_APP_STORAGE_KEY = `${STORAGE_PREFIX}:selectedAppId:v1`;
 
 // ---------- Data guardrails ----------
-// Dipakai untuk membatasi fetch dari Supabase supaya tidak meledak.
-export const MAX_ROWS_PER_QUERY = 200_000;
+// Batas maksimum baris yang di-fetch dari Supabase saat load awal.
+// Naikkan kalau dataset Anda lebih besar — tapi ingat semua rows di-load
+// ke memory browser, jadi ada limit praktis sekitar 500K-1M tergantung
+// kompleksitas kolom.
+export const MAX_ROWS_PER_QUERY = 1_000_000;
 
 // ---------- Misc ----------
 // Dipakai ErrorBoundary untuk branding halaman error.
