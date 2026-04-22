@@ -98,6 +98,19 @@ create index if not exists idx_transactions_source_app   on public.transactions 
 create index if not exists idx_transactions_email        on public.transactions (email);
 create index if not exists idx_transactions_content_name on public.transactions (content_name);
 
+-- Unique per line item: kombinasi (trx_id, content_name).
+-- Dipakai oleh upsert(onConflict='trx_id,content_name', ignoreDuplicates=true)
+-- di kode supaya "Tambah Data" tidak menggandakan baris yang sudah ada.
+-- Line item berbeda (trx_id sama, content_name beda) tetap bisa coexist.
+-- Note: kolom NULL di Postgres unique dianggap "tidak sama", jadi baris dengan
+-- NULL akan tetap bisa masuk berulang — biasanya aman karena data real punya
+-- content_name.
+alter table public.transactions
+  drop constraint if exists transactions_uniq_trx_content;
+alter table public.transactions
+  add constraint transactions_uniq_trx_content
+  unique (trx_id, content_name);
+
 alter table public.transactions enable row level security;
 
 -- Siapapun yang sudah login boleh baca & tulis transaksi (single-org).

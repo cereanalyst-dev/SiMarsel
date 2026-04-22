@@ -272,8 +272,15 @@ export const uploadTransactionsToSupabase = async (
   }));
 
   // Chunk besar = lebih cepat. Supabase bisa handle ~1000 rows per request.
-  // Kita pakai INSERT (bukan upsert) karena trx_id sekarang tidak unique
-  // — setiap line item di Excel akan tersimpan sebagai baris tersendiri.
+  //
+  // Strategi dedup:
+  //   • replaceMode=true ("Ganti Data Total")  → kita sudah DELETE semua di
+  //     atas, jadi sekarang tinggal INSERT biasa.
+  //   • replaceMode=false ("Tambah Data")      → UPSERT dengan
+  //     onConflict=(trx_id, content_name) + ignoreDuplicates=true. Artinya:
+  //       - Baris dengan pasangan (trx_id, content_name) yang belum ada → masuk.
+  //       - Baris yang pasangannya sudah ada → DI-SKIP (tidak jadi duplikat).
+  //     Butuh unique constraint di kolom (trx_id, content_name) — ada di schema.sql.
   const chunkSize = 1000;
   const totalChunks = Math.ceil(payload.length / chunkSize);
   const startedAt = performance.now();
@@ -281,7 +288,15 @@ export const uploadTransactionsToSupabase = async (
   for (let i = 0; i < payload.length; i += chunkSize) {
     const chunkIndex = Math.floor(i / chunkSize) + 1;
     const chunk = payload.slice(i, i + chunkSize);
-    const { error } = await supabase.from('transactions').insert(chunk);
+
+    const query = replaceMode
+      ? supabase.from('transactions').insert(chunk)
+      : supabase.from('transactions').upsert(chunk, {
+          onConflict: 'trx_id,content_name',
+          ignoreDuplicates: true,
+        });
+
+    const { error } = await query;
     if (error) {
       console.error(
         `[SiMarsel] ❌ Upload transactions gagal di chunk ${chunkIndex}/${totalChunks}:`,
@@ -299,7 +314,10 @@ export const uploadTransactionsToSupabase = async (
     }
   }
   const ms = Math.round(performance.now() - startedAt);
-  console.log(`[SiMarsel] ✅ Upload ${rows.length} transactions selesai (${ms}ms).`);
+  const modeLabel = replaceMode ? 'INSERT' : 'UPSERT (skip duplicates)';
+  console.log(
+    `[SiMarsel] ✅ Upload ${rows.length} transactions selesai (${ms}ms, mode: ${modeLabel}).`,
+  );
   return true;
 };
 
