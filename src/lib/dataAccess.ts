@@ -177,7 +177,9 @@ export const uploadTransactionsToSupabase = async (
   const supabase = getSupabase();
   if (!supabase || rows.length === 0) return false;
 
-  // Strip derived fields before sending.
+  // Strip derived fields before sending. transaction_date & payment_date
+  // sudah di-format "YYYY-MM-DD HH:mm:ss" (lokal) oleh processTransactions,
+  // jadi langsung dikirim apa adanya ke kolom timestamp (without time zone).
   const payload = rows.map((r) => ({
     trx_id: r.trx_id,
     source_app: r.source_app,
@@ -190,7 +192,7 @@ export const uploadTransactionsToSupabase = async (
     phone: r.phone,
     payment_status: r.payment_status,
     transaction_date: r.transaction_date,
-    payment_date: r.parsed_payment_date.toISOString(),
+    payment_date: r.payment_date,
     user_id: userId,
   }));
 

@@ -71,9 +71,11 @@ create table if not exists public.transactions (
   trx_id            text         primary key,
   user_id           uuid         references auth.users(id) on delete set null,
 
-  -- Kolom sesuai urutan di Excel
-  transaction_date  timestamptz,            -- kapan transaksi dibuat (ISO timestamp)
-  payment_date      timestamptz,            -- kapan dibayar (ISO timestamp)
+  -- Kolom sesuai urutan di Excel.
+  -- Pakai `timestamp` (tanpa time zone) supaya nilainya tersimpan & ditampilkan
+  -- persis seperti di Excel — tidak ter-convert ke UTC.
+  transaction_date  timestamp,              -- "2026-02-19 00:00:00"
+  payment_date      timestamp,              -- "2026-02-19 13:37:06"
   source_app        text,                   -- mis. "jadibumn", "jadipolisi", "cerebrum"
   methode_name      text,                   -- mis. "DANA", "Indomaret", "QRIS"
   revenue           numeric      not null default 0,

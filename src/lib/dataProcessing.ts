@@ -9,12 +9,17 @@ const coerceToDate = (raw: unknown): Date => {
   return new Date(String(raw));
 };
 
-// Convert an Excel/string/Date value into an ISO string we can store as
-// timestamptz in Supabase. Returns null if the value isn't parseable.
-const toIsoOrNull = (raw: unknown): string | null => {
+// Format Date → "YYYY-MM-DD HH:mm:ss" pakai komponen WAKTU LOKAL.
+// Ini cocok dengan kolom `timestamp` (tanpa time zone) di Postgres, jadi yang
+// ditampilkan di Supabase persis seperti yang ada di Excel — tanpa konversi UTC.
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toLocalTimestampOrNull = (raw: unknown): string | null => {
   const d = coerceToDate(raw);
   if (isNaN(d.getTime())) return null;
-  return d.toISOString();
+  return (
+    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ` +
+    `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+  );
 };
 
 export const processTransactions = (rawData: unknown[]): Transaction[] =>
@@ -34,13 +39,15 @@ export const processTransactions = (rawData: unknown[]): Transaction[] =>
       let paymentDate = coerceToDate(rawPaymentDate);
       if (isNaN(paymentDate.getTime())) paymentDate = new Date();
 
-      // Parse transaction_date secara terpisah agar tidak tersimpan
-      // sebagai Excel serial number mentah ("46237.5") di Supabase.
-      const transactionDateIso = toIsoOrNull(item.transaction_date);
+      // Format kedua kolom date sebagai local timestamp string, supaya di
+      // Supabase terlihat sama persis dengan Excel (tidak ter-convert ke UTC).
+      const transactionDateStr = toLocalTimestampOrNull(item.transaction_date);
+      const paymentDateStr = toLocalTimestampOrNull(rawPaymentDate);
 
       return {
         ...(item as object),
-        transaction_date: transactionDateIso,
+        transaction_date: transactionDateStr,
+        payment_date: paymentDateStr,
         source_app: String(item.source_app ?? '').toUpperCase(),
         parsed_payment_date: paymentDate,
         year: getYear(paymentDate),
