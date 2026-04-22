@@ -9,11 +9,21 @@ const coerceToDate = (raw: unknown): Date => {
   return new Date(String(raw));
 };
 
+// Convert an Excel/string/Date value into an ISO string we can store as
+// timestamptz in Supabase. Returns null if the value isn't parseable.
+const toIsoOrNull = (raw: unknown): string | null => {
+  const d = coerceToDate(raw);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+};
+
 export const processTransactions = (rawData: unknown[]): Transaction[] =>
   rawData
     .map((raw) => {
       const item = raw as Record<string, unknown>;
-      const rawDate =
+
+      // Parse payment_date (canonical — untuk semua chart & filter)
+      const rawPaymentDate =
         item.payment_date ??
         item.transaction_date ??
         item.Tanggal ??
@@ -21,11 +31,16 @@ export const processTransactions = (rawData: unknown[]): Transaction[] =>
         item.Date ??
         item.date;
 
-      let paymentDate = coerceToDate(rawDate);
+      let paymentDate = coerceToDate(rawPaymentDate);
       if (isNaN(paymentDate.getTime())) paymentDate = new Date();
+
+      // Parse transaction_date secara terpisah agar tidak tersimpan
+      // sebagai Excel serial number mentah ("46237.5") di Supabase.
+      const transactionDateIso = toIsoOrNull(item.transaction_date);
 
       return {
         ...(item as object),
+        transaction_date: transactionDateIso,
         source_app: String(item.source_app ?? '').toUpperCase(),
         parsed_payment_date: paymentDate,
         year: getYear(paymentDate),

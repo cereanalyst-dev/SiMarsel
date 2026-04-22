@@ -72,8 +72,8 @@ create table if not exists public.transactions (
   user_id           uuid         references auth.users(id) on delete set null,
 
   -- Kolom sesuai urutan di Excel
-  transaction_date  text,                   -- dari Excel apa adanya ("2026-02-19 00:00:00")
-  payment_date      timestamptz,            -- canonical (sudah di-parse jadi timestamp)
+  transaction_date  timestamptz,            -- kapan transaksi dibuat (ISO timestamp)
+  payment_date      timestamptz,            -- kapan dibayar (ISO timestamp)
   source_app        text,                   -- mis. "jadibumn", "jadipolisi", "cerebrum"
   methode_name      text,                   -- mis. "DANA", "Indomaret", "QRIS"
   revenue           numeric      not null default 0,
