@@ -262,32 +262,33 @@ export default function App() {
 
     const totalRealSales = filteredData.reduce((sum, item) => sum + item.revenue, 0);
     const totalTransactions = filteredData.length;
+
+    // Unique Buyer & User Repeat Order dihitung dengan EMAIL saja
+    // (konsisten dengan query SQL di Supabase).
+    // Rumus yang match: SELECT count(DISTINCT email) WHERE email <> ''
+    const emailOf = (r: { email?: string | null }): string =>
+      (r.email ?? '').trim().toLowerCase();
+
     const uniqueBuyers = new Set(
-      filteredData
-        .map((item) => item.email || item.phone || item.full_name || item.trx_id)
-        .filter(Boolean),
+      filteredData.map((item) => emailOf(item)).filter((e) => e !== ''),
     ).size;
+
     const totalRealDownloader = filteredDownloaderData.reduce((sum, d) => sum + d.count, 0);
 
     // User Repeat Order:
-    //   • Setiap user dihitung 1x (walaupun dia punya 10 transaksi)
-    //   • Kriteria: user punya riwayat transaksi minimal 2x di SELURUH data
-    //     (bukan cuma di periode yang difilter)
-    //   • Identitas user: fallback email → phone → full_name → trx_id
-    //     supaya user tanpa email tetap ter-detect
-    const buyerIdOf = (r: { email?: string; phone?: string; full_name?: string; trx_id?: string }) =>
-      r.email || r.phone || r.full_name || r.trx_id || '';
-
-    const buyerTxCount = data.reduce<Record<string, number>>((acc, curr) => {
-      const id = buyerIdOf(curr);
-      if (id) acc[id] = (acc[id] || 0) + 1;
+    //   • Kriteria: user dengan email punya ≥ 2 transaksi di SELURUH data
+    //   • Dedup: 1 email = 1 count
+    //   • Email kosong diabaikan (mirror "email IS NOT NULL AND email <> ''")
+    const emailTxCount = data.reduce<Record<string, number>>((acc, curr) => {
+      const e = emailOf(curr);
+      if (e) acc[e] = (acc[e] || 0) + 1;
       return acc;
     }, {});
 
     const repeatOrderUsers = new Set(
       filteredData
-        .map((item) => buyerIdOf(item))
-        .filter((id) => id && buyerTxCount[id] >= 2),
+        .map((item) => emailOf(item))
+        .filter((e) => e !== '' && emailTxCount[e] >= 2),
     ).size;
 
     const relevantApps = filters.source_app === 'All'
