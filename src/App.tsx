@@ -275,7 +275,7 @@ export default function App() {
     ).size;
 
     // ==============================================================
-    // User Repeat Order — match persis dengan query SQL user:
+    // User Repeat Order — logic yang sama dengan SQL user:
     //
     //   SELECT count(*) FROM (
     //     SELECT email FROM transactions
@@ -285,15 +285,16 @@ export default function App() {
     //     HAVING count(DISTINCT trx_id) >= 2
     //   ) y;
     //
-    // Logic di sini:
-    //   1. Build map { email → Set<trx_id> } dari SELURUH data (bukan
-    //      filteredData) supaya match SQL yang tidak pakai filter.
-    //   2. Email kosong DAN trx_id kosong di-skip (WHERE clause).
-    //   3. Hitung email dengan size(Set) >= 2 (HAVING).
-    //   4. Hasilnya angka GLOBAL — tidak terpengaruh filter bulan/app
-    //      di dashboard, sama persis dengan yang muncul di SQL editor.
+    // BEDA: kita pakai filteredData (bukan seluruh data) supaya angka
+    // ikut berubah saat user filter bulan/app. Artinya scope SQL-nya
+    // setara dengan menambah WHERE <filter> di query.
+    //
+    // Contoh: filter = Januari 2024
+    //   → Hitung email yang punya ≥ 2 trx_id BERBEDA di Januari 2024.
+    //   → User yang cuma beli 1x di Januari 2024 tidak dihitung repeat
+    //     walaupun totalnya dia punya 5 transaksi sepanjang waktu.
     // ==============================================================
-    const ordersPerEmail = data.reduce<Record<string, Set<string>>>((acc, curr) => {
+    const ordersPerEmail = filteredData.reduce<Record<string, Set<string>>>((acc, curr) => {
       const e = emailOf(curr);
       const trxId = (curr.trx_id ?? '').trim();
       if (!e || !trxId) return acc;
@@ -393,7 +394,7 @@ export default function App() {
       totalRealSales,
       totalRepeatOrderUsers: repeatOrderUsers,
     };
-  }, [filteredData, filteredDownloaderData, apps, filters, data]);
+  }, [filteredData, filteredDownloaderData, apps, filters]);
 
   const trendData: TrendItem[] = useMemo(() => {
     const grouped: Record<string, TrendItem> = {};
