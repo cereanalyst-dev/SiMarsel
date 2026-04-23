@@ -7,6 +7,7 @@ import { Calendar, Download, FileSpreadsheet, Plus, Search, Smartphone, Trash2, 
 import { cn } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatters';
 import { excelDateToJSDate } from '../../lib/excelDate';
+import { useToast } from '../../components/Toast';
 import type { AppData, SocialMediaContent } from '../../types';
 
 interface Props {
@@ -520,6 +521,7 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
   const [appId, setAppId] = useState<string>(apps[0]?.id || '');
   const [date, setDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [content, setContent] = useState<SocialMediaContent>(emptyContent());
+  const toast = useToast();
 
   const update = <K extends keyof SocialMediaContent>(field: K, value: SocialMediaContent[K]) => {
     setContent((prev) => ({ ...prev, [field]: value }));
@@ -528,11 +530,11 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!appId) {
-      alert('Pilih aplikasi dulu.');
+      toast.warning('Form belum lengkap', 'Pilih aplikasi dulu.');
       return;
     }
     if (!date) {
-      alert('Pilih tanggal dulu.');
+      toast.warning('Form belum lengkap', 'Pilih tanggal dulu.');
       return;
     }
     onSave(appId, date, content);

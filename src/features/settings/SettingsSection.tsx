@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from 'react';
 import * as XLSX from 'xlsx';
 import { Download, Plus, RefreshCw, Settings } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useToast } from '../../components/Toast';
 
 interface SettingsSectionProps {
   // Raw rows from XLSX — App.tsx will run them through processTransactions /
@@ -12,6 +13,7 @@ interface SettingsSectionProps {
 export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
+  const toast = useToast();
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,10 +49,13 @@ export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
         }
 
         onDataUpdate(transactions, downloaders, uploadMode === 'append');
-        alert(uploadMode === 'append' ? 'Data berhasil ditambahkan!' : 'Data berhasil diganti!');
+        toast.success(
+          uploadMode === 'append' ? 'Data berhasil ditambahkan' : 'Data berhasil diganti',
+          `${transactions.length.toLocaleString('id-ID')} transaksi • ${downloaders.length.toLocaleString('id-ID')} downloader row`,
+        );
       } catch (err) {
         console.error(err);
-        alert('Gagal memproses file. Pastikan format Excel benar.');
+        toast.error('Gagal memproses file', 'Pastikan format Excel benar dan ada sheet TRANSAKSI / DOWNLOADER.');
       } finally {
         setIsUploading(false);
         // Allow re-uploading the same file
@@ -59,7 +64,7 @@ export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
     };
     reader.onerror = () => {
       setIsUploading(false);
-      alert('Gagal mengunggah file.');
+      toast.error('Gagal mengunggah file', 'Coba pilih file Excel lain.');
     };
     reader.readAsArrayBuffer(file);
   };
