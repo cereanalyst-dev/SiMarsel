@@ -90,13 +90,49 @@ export default function App() {
       const processedTx = processTransactions(rawTransactions);
       const processedDl = processDownloaders(rawDownloaders);
 
-      setData((prev) => (append ? [...prev, ...processedTx] : processedTx));
-      setDownloaderData((prev) => (append ? [...prev, ...processedDl] : processedDl));
+      // Mode GUEST / tidak login — tidak ada Supabase, data cuma ada di
+      // memory. Set state lokal biar dashboard tetap bisa dipakai.
+      if (!userId) {
+        setData((prev) => (append ? [...prev, ...processedTx] : processedTx));
+        setDownloaderData((prev) => (append ? [...prev, ...processedDl] : processedDl));
+        return;
+      }
 
-      if (userId) {
+      // Logged in — SEMUA data di dashboard harus berasal dari Supabase.
+      // Flow: upload ke Supabase → fetch ulang → render.
+      // Kita TIDAK setData dengan `processedTx` langsung, supaya yang muncul
+      // di UI = apa yang ada di DB (source of truth).
+      setLoadingData(true);
+      setError(null);
+      try {
         const replaceMode = !append;
-        await uploadTransactionsToSupabase(userId, processedTx, replaceMode);
-        await uploadDownloadersToSupabase(userId, processedDl, replaceMode);
+        const txOk = await uploadTransactionsToSupabase(userId, processedTx, replaceMode);
+        const dlOk = await uploadDownloadersToSupabase(userId, processedDl, replaceMode);
+
+        if (!txOk || !dlOk) {
+          throw new Error(
+            'Sebagian upload ke Supabase gagal. Cek DevTools Console untuk detail error.',
+          );
+        }
+
+        console.log('[SiMarsel] ♻️ Upload sukses, fetching ulang dari Supabase…');
+        const res = await fetchDataFromSupabase();
+        if (res) {
+          setData(res.transactions);
+          setDownloaderData(res.downloaders);
+        }
+      } catch (err) {
+        console.error('[SiMarsel] Upload/refetch gagal:', err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Upload gagal. Data belum tersimpan ke database.',
+        );
+        // Sengaja TIDAK setData dengan processed lokal — kita hanya tampilkan
+        // data yang sudah berhasil masuk DB. Dashboard tetap pakai state
+        // sebelumnya (data DB lama).
+      } finally {
+        setLoadingData(false);
       }
     },
     [userId],
