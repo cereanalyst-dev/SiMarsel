@@ -241,10 +241,20 @@ export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
   return { transactions, downloaders };
 };
 
+export interface UploadProgress {
+  stage: 'deleting' | 'uploading' | 'done';
+  current: number;
+  total: number;
+  label: string;
+}
+
+export type UploadProgressCallback = (p: UploadProgress) => void;
+
 export const uploadTransactionsToSupabase = async (
   userId: string,
   rows: Transaction[],
   replaceMode: boolean = false,
+  onProgress?: UploadProgressCallback,
 ): Promise<boolean> => {
   const supabase = getSupabase();
   if (!supabase) {
@@ -258,6 +268,7 @@ export const uploadTransactionsToSupabase = async (
 
   if (replaceMode) {
     logger.info('🗑️ Ganti Data Total → delete transactions lama dulu…');
+    onProgress?.({ stage: 'deleting', current: 0, total: rows.length, label: 'Menghapus data lama…' });
     const { error: delErr } = await supabase
       .from('transactions')
       .delete()
@@ -269,6 +280,7 @@ export const uploadTransactionsToSupabase = async (
   }
 
   logger.info(`⬆️ Uploading ${rows.length} transactions ke Supabase…`);
+  onProgress?.({ stage: 'uploading', current: 0, total: rows.length, label: 'Mengunggah transactions…' });
 
   // Strip derived fields before sending. transaction_date & payment_date
   // sudah di-format "YYYY-MM-DD HH:mm:ss" (lokal) oleh processTransactions,
@@ -323,12 +335,15 @@ export const uploadTransactionsToSupabase = async (
       );
       return false;
     }
+    const current = Math.min(i + chunkSize, payload.length);
+    onProgress?.({
+      stage: 'uploading',
+      current,
+      total: rows.length,
+      label: `Mengunggah chunk ${chunkIndex}/${totalChunks}`,
+    });
     if (chunkIndex % 10 === 0 || chunkIndex === totalChunks) {
-      logger.info(
-        `⏳ transactions chunk ${chunkIndex}/${totalChunks} done (${
-          Math.min(i + chunkSize, payload.length)
-        }/${payload.length})`,
-      );
+      logger.info(`⏳ transactions chunk ${chunkIndex}/${totalChunks} done (${current}/${payload.length})`);
     }
   }
   const ms = Math.round(performance.now() - startedAt);
@@ -336,6 +351,7 @@ export const uploadTransactionsToSupabase = async (
   logger.info(
     `✅ Upload ${rows.length} transactions selesai (${ms}ms, mode: ${modeLabel}).`,
   );
+  onProgress?.({ stage: 'done', current: rows.length, total: rows.length, label: 'Selesai' });
   return true;
 };
 

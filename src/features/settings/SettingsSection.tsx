@@ -2,17 +2,28 @@ import { useState, type ChangeEvent } from 'react';
 import * as XLSX from 'xlsx';
 import { Download, Plus, RefreshCw, Settings } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { logger } from '../../lib/logger';
 import { useToast } from '../../components/Toast';
 
+interface UploadProgress {
+  current: number;
+  total: number;
+  label: string;
+}
+
 interface SettingsSectionProps {
-  // Raw rows from XLSX — App.tsx will run them through processTransactions /
-  // processDownloaders and sync to Supabase if configured.
-  onDataUpdate: (transactions: unknown[], downloaders: unknown[], append: boolean) => void;
+  onDataUpdate: (
+    transactions: unknown[],
+    downloaders: unknown[],
+    append: boolean,
+    onProgress?: (p: UploadProgress) => void,
+  ) => void | Promise<void>;
 }
 
 export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const toast = useToast();
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -20,17 +31,18 @@ export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
     if (!file) return;
 
     setIsUploading(true);
+    setProgress({ current: 0, total: 1, label: 'Membaca file Excel…' });
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const buf = event.target?.result;
         if (!buf) throw new Error('Failed to read file');
         const workbook = XLSX.read(buf, { type: 'array' });
 
-        let transactions: any[] = [];
-        let downloaders: any[] = [];
+        let transactions: unknown[] = [];
+        let downloaders: unknown[] = [];
 
-        workbook.SheetNames.forEach(name => {
+        workbook.SheetNames.forEach((name) => {
           const sheet = workbook.Sheets[name];
           const jsonData = XLSX.utils.sheet_to_json(sheet);
           const upper = name.toUpperCase();
@@ -48,22 +60,31 @@ export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
           downloaders = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[1]]);
         }
 
-        onDataUpdate(transactions, downloaders, uploadMode === 'append');
+        await onDataUpdate(
+          transactions,
+          downloaders,
+          uploadMode === 'append',
+          (p) => setProgress(p),
+        );
         toast.success(
           uploadMode === 'append' ? 'Data berhasil ditambahkan' : 'Data berhasil diganti',
           `${transactions.length.toLocaleString('id-ID')} transaksi • ${downloaders.length.toLocaleString('id-ID')} downloader row`,
         );
       } catch (err) {
-        console.error(err);
-        toast.error('Gagal memproses file', 'Pastikan format Excel benar dan ada sheet TRANSAKSI / DOWNLOADER.');
+        logger.error('Upload error:', err);
+        toast.error(
+          'Gagal memproses file',
+          'Pastikan format Excel benar dan ada sheet TRANSAKSI / DOWNLOADER.',
+        );
       } finally {
         setIsUploading(false);
-        // Allow re-uploading the same file
+        setProgress(null);
         e.target.value = '';
       }
     };
     reader.onerror = () => {
       setIsUploading(false);
+      setProgress(null);
       toast.error('Gagal mengunggah file', 'Coba pilih file Excel lain.');
     };
     reader.readAsArrayBuffer(file);
@@ -123,29 +144,72 @@ export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
         </div>
 
         <div className="max-w-xl">
-          <div className={cn(
-            "p-12 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center text-center group transition-all cursor-pointer relative",
-            uploadMode === 'replace' ? "hover:border-indigo-300 hover:bg-indigo-50/30 border-slate-200 bg-slate-50/50" : "hover:border-emerald-300 hover:bg-emerald-50/30 border-slate-200 bg-slate-50/50"
-          )}>
-            <input 
-              type="file" 
-              accept=".xlsx, .xls" 
+          <div
+            className={cn(
+              'p-12 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center text-center group transition-all cursor-pointer relative',
+              uploadMode === 'replace'
+                ? 'hover:border-indigo-300 hover:bg-indigo-50/30 border-slate-200 bg-slate-50/50'
+                : 'hover:border-emerald-300 hover:bg-emerald-50/30 border-slate-200 bg-slate-50/50',
+            )}
+          >
+            <input
+              type="file"
+              accept=".xlsx, .xls"
               onChange={handleFileUpload}
               className="absolute inset-0 opacity-0 cursor-pointer"
               disabled={isUploading}
+              aria-label="Pilih file Excel"
             />
             <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              {isUploading ? <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" /> : (
-                uploadMode === 'replace' ? <Download className="w-8 h-8 text-slate-400 group-hover:text-indigo-600" /> : <Plus className="w-8 h-8 text-slate-400 group-hover:text-emerald-500" />
+              {isUploading ? (
+                <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+              ) : uploadMode === 'replace' ? (
+                <Download className="w-8 h-8 text-slate-400 group-hover:text-indigo-600" />
+              ) : (
+                <Plus className="w-8 h-8 text-slate-400 group-hover:text-emerald-500" />
               )}
             </div>
             <h4 className="text-sm font-black text-slate-900 mb-1">
-              {isUploading ? 'Memproses File...' : `Klik atau Drag file untuk ${uploadMode === 'replace' ? 'MENGGANTI' : 'MENAMBAH'} Data`}
+              {isUploading
+                ? 'Memproses File...'
+                : `Klik atau Drag file untuk ${uploadMode === 'replace' ? 'MENGGANTI' : 'MENAMBAH'} Data`}
             </h4>
             <p className="text-xs text-slate-400 font-medium">
               Format: .xlsx atau .xls dengan sheet TRANSAKSI dan DOWNLOADER
             </p>
           </div>
+
+          {/* Progress bar */}
+          {progress && (
+            <div className="mt-6 p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest">
+                  {progress.label}
+                </p>
+                <p className="text-[11px] font-bold text-slate-500">
+                  {progress.total > 0
+                    ? `${Math.round((progress.current / progress.total) * 100)}%`
+                    : ''}
+                </p>
+              </div>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300"
+                  style={{
+                    width: `${
+                      progress.total > 0
+                        ? Math.min(100, (progress.current / progress.total) * 100)
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium mt-2">
+                {progress.current.toLocaleString('id-ID')} / {progress.total.toLocaleString('id-ID')}{' '}
+                baris
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -87,7 +87,12 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const handleDataUpdate = useCallback(
-    async (rawTransactions: unknown[], rawDownloaders: unknown[], append: boolean) => {
+    async (
+      rawTransactions: unknown[],
+      rawDownloaders: unknown[],
+      append: boolean,
+      onProgress?: (p: { current: number; total: number; label: string }) => void,
+    ) => {
       const processedTx = processTransactions(rawTransactions);
       const processedDl = processDownloaders(rawDownloaders);
 
@@ -101,13 +106,11 @@ export default function App() {
 
       // Logged in — SEMUA data di dashboard harus berasal dari Supabase.
       // Flow: upload ke Supabase → fetch ulang → render.
-      // Kita TIDAK setData dengan `processedTx` langsung, supaya yang muncul
-      // di UI = apa yang ada di DB (source of truth).
       setLoadingData(true);
       setError(null);
       try {
         const replaceMode = !append;
-        const txOk = await uploadTransactionsToSupabase(userId, processedTx, replaceMode);
+        const txOk = await uploadTransactionsToSupabase(userId, processedTx, replaceMode, onProgress);
         const dlOk = await uploadDownloadersToSupabase(userId, processedDl, replaceMode);
 
         if (!txOk || !dlOk) {

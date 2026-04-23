@@ -73,7 +73,11 @@ export const SocialMediaModal = ({
               <p className="text-xs text-slate-400 font-medium mt-1">{format(new Date(date), 'dd MMMM yyyy')}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+          <button
+            onClick={onClose}
+            aria-label="Tutup modal input konten sosial media"
+            className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+          >
             <Plus className="w-5 h-5 text-slate-400 rotate-45" />
           </button>
         </div>
