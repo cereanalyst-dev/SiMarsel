@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react';
 import * as XLSX from 'xlsx';
-import { Download, Plus, RefreshCw, Settings } from 'lucide-react';
+import { Download, Plus, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../components/Toast';
@@ -92,55 +92,99 @@ export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
 
   return (
     <div className="space-y-8">
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-2.5 bg-indigo-50 rounded-xl">
-            <Settings className="w-5 h-5 text-indigo-600" />
+      {/* Editorial header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              System
+            </span>
           </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            Pengaturan Data
+          </h1>
+          <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
+            Upload file Excel untuk mengganti atau menambah data transaksi &amp; downloader di database.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100">
+        <div className="flex items-start gap-4 mb-8">
+          <div className="w-1 h-12 rounded-full bg-gradient-to-b from-indigo-500 to-emerald-500" />
           <div>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">Pengaturan Data</h3>
-            <p className="text-xs text-slate-400 font-medium mt-1">Kelola data dashboard SiMarsel</p>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mb-1">
+              Langkah 1 — Pilih Mode
+            </p>
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">
+              Mode Upload
+            </h3>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 max-w-2xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
           <button
             onClick={() => setUploadMode('replace')}
+            aria-pressed={uploadMode === 'replace'}
             className={cn(
-              "p-6 rounded-3xl border-2 transition-all text-left group",
-              uploadMode === 'replace' 
-                ? "bg-indigo-50/50 border-indigo-600 ring-4 ring-indigo-50" 
-                : "bg-white border-slate-100 hover:border-slate-300"
+              'p-6 rounded-3xl border-2 transition-all text-left group relative overflow-hidden',
+              uploadMode === 'replace'
+                ? 'bg-gradient-to-br from-indigo-50 to-indigo-100/50 border-indigo-600 shadow-lg shadow-indigo-100'
+                : 'bg-white border-slate-200 hover:border-slate-300',
             )}
           >
+            {uploadMode === 'replace' && (
+              <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+            )}
             <div className={cn(
-              "w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all",
-              uploadMode === 'replace' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400"
+              'w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all',
+              uploadMode === 'replace' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400',
             )}>
               <RefreshCw className="w-6 h-6" />
             </div>
-            <h4 className={cn("text-sm font-black mb-1", uploadMode === 'replace' ? "text-slate-900" : "text-slate-500")}>Ganti Data Total</h4>
-            <p className="text-xs text-slate-400 font-medium tracking-tight">Menghapus data lama dan mengganti dengan file baru secara keseluruhan.</p>
+            <h4 className={cn('text-sm font-black mb-1', uploadMode === 'replace' ? 'text-indigo-900' : 'text-slate-500')}>
+              Ganti Data Total
+            </h4>
+            <p className={cn('text-xs font-medium leading-relaxed', uploadMode === 'replace' ? 'text-indigo-700/70' : 'text-slate-400')}>
+              Hapus semua data lama di DB, lalu insert data baru. Cocok untuk refresh bulanan.
+            </p>
           </button>
 
           <button
             onClick={() => setUploadMode('append')}
+            aria-pressed={uploadMode === 'append'}
             className={cn(
-              "p-6 rounded-3xl border-2 transition-all text-left group",
-              uploadMode === 'append' 
-                ? "bg-emerald-50/50 border-emerald-500 ring-4 ring-emerald-50" 
-                : "bg-white border-slate-100 hover:border-slate-300"
+              'p-6 rounded-3xl border-2 transition-all text-left group relative overflow-hidden',
+              uploadMode === 'append'
+                ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-500 shadow-lg shadow-emerald-100'
+                : 'bg-white border-slate-200 hover:border-slate-300',
             )}
           >
+            {uploadMode === 'append' && (
+              <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            )}
             <div className={cn(
-              "w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all",
-              uploadMode === 'append' ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400"
+              'w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all',
+              uploadMode === 'append' ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 text-slate-400',
             )}>
               <Plus className="w-6 h-6" />
             </div>
             <h4 className={cn("text-sm font-black mb-1", uploadMode === 'append' ? "text-slate-900" : "text-slate-500")}>Tambah Data (Merge)</h4>
             <p className="text-xs text-slate-400 font-medium tracking-tight">Menambahkan data baru ke dalam database yang sudah ada saat ini.</p>
           </button>
+        </div>
+
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-1 h-12 rounded-full bg-gradient-to-b from-emerald-500 to-amber-500" />
+          <div>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mb-1">
+              Langkah 2 — Upload File
+            </p>
+            <h3 className="text-lg font-black text-slate-900 tracking-tight">
+              Drop File Excel
+            </h3>
+          </div>
         </div>
 
         <div className="max-w-xl">

@@ -206,38 +206,114 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
         </div>
 
         {recommendations ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 text-center">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Harga Coret (Anchor)</p>
-              <p className="text-xl font-black text-slate-400 line-through">{formatCurrency(recommendations.anchor)}</p>
-              <p className="text-[9px] text-slate-400 mt-1 font-medium">Berdasarkan harga tertinggi historis</p>
-              <div className="mt-3 pt-3 border-t border-slate-200/50">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Demand High</p>
-                <p className="text-xs font-black text-slate-500">{stats?.highCount} Pembeli</p>
+          <div className="relative grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* ANCHOR */}
+            <div className="group relative p-6 bg-white border border-slate-200 rounded-3xl overflow-hidden hover:shadow-xl transition-all">
+              <div className="h-1 absolute inset-x-0 top-0 bg-gradient-to-r from-slate-400 to-slate-300" />
+              <div className="flex items-start justify-between mb-4">
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 text-slate-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Anchor</span>
+                </span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  Coret
+                </span>
+              </div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                Harga Psikologis
+              </p>
+              <p className="text-2xl font-black text-slate-400 line-through tracking-tight">
+                {formatCurrency(recommendations.anchor)}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-2 font-medium leading-relaxed">
+                Derived dari harga tertinggi historis + 15% psychological lift.
+              </p>
+              <div className="mt-5 pt-4 border-t border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  Historical Demand
+                </p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <p className="text-lg font-black text-slate-700">{stats?.highCount ?? 0}</p>
+                  <p className="text-[10px] font-bold text-slate-400">pembeli di range high</p>
+                </div>
               </div>
             </div>
-            <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100 text-center">
-              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Harga Aplikasi (Value)</p>
-              <p className="text-2xl font-black text-indigo-600">{formatCurrency(recommendations.value)}</p>
-              <p className="text-[9px] text-indigo-400 mt-1 font-medium">Kombinasi rata-rata & demand terbanyak</p>
-              <div className="mt-3 pt-3 border-t border-indigo-200/50">
-                <p className="text-[10px] font-bold text-indigo-400 uppercase">Demand Avg</p>
-                <p className="text-xs font-black text-indigo-600">{stats?.avgCount} Pembeli</p>
+
+            {/* VALUE (highlighted — primary recommendation) */}
+            <div className="group relative p-6 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-3xl overflow-hidden shadow-xl shadow-indigo-200/50 hover:shadow-2xl hover:shadow-indigo-300/50 transition-all">
+              <div className="absolute -top-16 -right-16 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+              <div className="absolute -bottom-16 -left-10 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl" />
+              <div className="relative">
+                <div className="flex items-start justify-between mb-4">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/20 backdrop-blur-sm text-white">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Value</span>
+                  </span>
+                  <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest">
+                    ⭐ Pilihan
+                  </span>
+                </div>
+                <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">
+                  Harga Aplikasi
+                </p>
+                <p className="text-3xl font-black text-white tracking-tight">
+                  {formatCurrency(recommendations.value)}
+                </p>
+                <p className="text-[10px] text-white/70 mt-2 font-medium leading-relaxed">
+                  Kombinasi rata-rata + harga modus (paling banyak dibeli).
+                </p>
+                <div className="mt-5 pt-4 border-t border-white/10">
+                  <p className="text-[9px] font-black text-white/60 uppercase tracking-widest">
+                    Historical Demand
+                  </p>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <p className="text-lg font-black text-white">{stats?.avgCount ?? 0}</p>
+                    <p className="text-[10px] font-bold text-white/60">pembeli di range avg</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 text-center">
-              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2">Harga Marketing (Campaign)</p>
-              <p className="text-2xl font-black text-emerald-600">{formatCurrency(recommendations.campaign)}</p>
-              <p className="text-[9px] text-emerald-400 mt-1 font-medium">Dioptimasi untuk konversi maksimal</p>
-              <div className="mt-3 pt-3 border-t border-emerald-200/50">
-                <p className="text-[10px] font-bold text-emerald-400 uppercase">Demand Low</p>
-                <p className="text-xs font-black text-emerald-600">{stats?.lowCount} Pembeli</p>
+
+            {/* CAMPAIGN */}
+            <div className="group relative p-6 bg-white border border-emerald-200 rounded-3xl overflow-hidden hover:shadow-xl transition-all">
+              <div className="h-1 absolute inset-x-0 top-0 bg-gradient-to-r from-emerald-500 to-teal-500" />
+              <div className="flex items-start justify-between mb-4">
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 text-emerald-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Campaign</span>
+                </span>
+                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">
+                  Promo
+                </span>
+              </div>
+              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">
+                Harga Marketing
+              </p>
+              <p className="text-2xl font-black text-emerald-600 tracking-tight">
+                {formatCurrency(recommendations.campaign)}
+              </p>
+              <p className="text-[10px] text-emerald-500/70 mt-2 font-medium leading-relaxed">
+                Optimized untuk konversi — hemat ~30% dari Value.
+              </p>
+              <div className="mt-5 pt-4 border-t border-emerald-100">
+                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">
+                  Historical Demand
+                </p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <p className="text-lg font-black text-emerald-700">{stats?.lowCount ?? 0}</p>
+                  <p className="text-[10px] font-bold text-emerald-500/70">pembeli di range low</p>
+                </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100 text-center border-dashed">
-            <p className="text-sm font-bold text-slate-400">Pilih platform untuk melihat saran harga berbasis demand.</p>
+          <div className="relative p-10 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center">
+            <p className="text-sm font-bold text-slate-500">
+              Pilih platform dulu untuk melihat saran harga berbasis demand.
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Dashboard akan compute Anchor / Value / Campaign dari histori transaksi.
+            </p>
           </div>
         )}
       </motion.div>
