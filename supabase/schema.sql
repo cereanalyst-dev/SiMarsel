@@ -159,6 +159,62 @@ create policy "downloaders_write_auth"
   with check (true);
 
 -- ---------------------------------------------------------------------------
+-- 4) api_sync_state : config & status per-platform untuk auto-fetch Markaz API
+--    Dipakai oleh cron Vercel (jam 12:00 & 23:59 WIB) + tombol "Fetch Sekarang"
+--    di Settings. Cron jalan server-side pakai service_role key, jadi RLS
+--    dibuat per-user supaya dashboard cuma lihat row miliknya sendiri.
+-- ---------------------------------------------------------------------------
+create table if not exists public.api_sync_state (
+  id                  uuid         primary key default uuid_generate_v4(),
+  user_id             uuid         not null references auth.users(id) on delete cascade,
+  platform            text         not null,                  -- lowercase: jadibumn, jadipolisi, ...
+  enabled             boolean      not null default true,
+  last_run_at         timestamptz,
+  last_status         text,                                   -- 'success' | 'error'
+  last_error          text,
+  last_tx_inserted    integer      not null default 0,
+  last_dl_total       integer      not null default 0,
+  created_at          timestamptz  not null default now(),
+  updated_at          timestamptz  not null default now(),
+  unique (user_id, platform)
+);
+
+create index if not exists idx_api_sync_state_user_enabled
+  on public.api_sync_state (user_id, enabled);
+
+drop trigger if exists trg_api_sync_state_touch on public.api_sync_state;
+create trigger trg_api_sync_state_touch
+  before update on public.api_sync_state
+  for each row execute function public.touch_updated_at();
+
+alter table public.api_sync_state enable row level security;
+
+drop policy if exists "api_sync_state_select_own" on public.api_sync_state;
+create policy "api_sync_state_select_own"
+  on public.api_sync_state for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "api_sync_state_insert_own" on public.api_sync_state;
+create policy "api_sync_state_insert_own"
+  on public.api_sync_state for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "api_sync_state_update_own" on public.api_sync_state;
+create policy "api_sync_state_update_own"
+  on public.api_sync_state for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "api_sync_state_delete_own" on public.api_sync_state;
+create policy "api_sync_state_delete_own"
+  on public.api_sync_state for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
 -- Helper views (opsional — membantu eksplorasi di SQL editor)
 -- ---------------------------------------------------------------------------
 
