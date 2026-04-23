@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
-  Activity, Calendar, MessageSquare, Package, ShoppingBag, Smartphone, TrendingUp, Zap,
+  Activity, MessageSquare, Package, ShoppingBag, Smartphone, TrendingUp, Zap,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
@@ -144,15 +144,43 @@ export const PackageCalendar = ({
 
   return (
     <div className="space-y-8">
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-50 rounded-xl">
-              <Calendar className="w-5 h-5 text-indigo-600" />
-            </div>
+      {/* Editorial header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 -mt-2">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-600 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              Kalender Aktivitas
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            Kalender Marsel
+          </h1>
+          <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
+            Visualisasi transaksi harian per paket — klik hari untuk lihat detail strategi &amp;
+            konten sosial media.
+          </p>
+        </div>
+      </div>
+
+      <div className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 overflow-hidden">
+        {/* Decorative */}
+        <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 bg-gradient-to-br from-amber-100/60 to-transparent rounded-full blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 w-60 h-60 bg-gradient-to-br from-indigo-100/40 to-transparent rounded-full blur-3xl" />
+
+        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
+          <div className="flex items-start gap-4">
+            <div className="w-1 h-12 rounded-full bg-gradient-to-b from-amber-500 via-rose-400 to-indigo-500" />
             <div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">Kalender Marsel</h3>
-              <p className="text-xs text-slate-400 font-medium mt-1">Visualisasi paket yang aktif berdasarkan transaksi harian</p>
+              <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.25em] mb-1">
+                {format(currentMonth, 'MMMM yyyy')}
+              </p>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                Transaksi Bulan Ini
+              </h3>
+              <p className="text-xs text-slate-400 font-medium mt-1">
+                Klik tanggal dengan indikator untuk buka detail harian
+              </p>
             </div>
           </div>
           

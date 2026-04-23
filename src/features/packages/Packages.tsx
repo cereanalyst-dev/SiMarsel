@@ -85,11 +85,41 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
       exit={{ opacity: 0, x: -20 }}
       className="space-y-8"
     >
+      {/* Editorial header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-50 text-pink-600 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              Product Analytics
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            Performa Produk
+          </h1>
+          <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
+            Agregasi revenue dan volume per nama paket — bandingkan performa antar produk.
+          </p>
+        </div>
+        <div className="text-right hidden md:block">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">
+            Total Paket
+          </p>
+          <p className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+            {packagePerformance.length.toLocaleString('id-ID')}
+          </p>
+        </div>
+      </div>
+
       <FilterSection filters={filters} setFilters={setFilters} availableOptions={availableOptions} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-          <h3 className="text-lg font-bold mb-8 text-slate-900">Top Paket (Pendapatan)</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-violet-100/50 to-transparent rounded-full blur-2xl" />
+          <div className="relative flex items-center gap-3 mb-8">
+            <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
+            <h3 className="text-base font-black text-slate-900 tracking-tight">Top Paket · Pendapatan</h3>
+          </div>
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={packagePerformance.slice(0, 10)}>
@@ -110,8 +140,12 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-          <h3 className="text-lg font-bold mb-8 text-slate-900">Top Paket (Volume)</h3>
+        <div className="bg-white p-6 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-pink-100/50 to-transparent rounded-full blur-2xl" />
+          <div className="relative flex items-center gap-3 mb-8">
+            <div className="w-1 h-8 rounded-full bg-gradient-to-b from-pink-500 to-rose-500" />
+            <h3 className="text-base font-black text-slate-900 tracking-tight">Top Paket · Volume</h3>
+          </div>
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={packagePerformance.slice(0, 10)}>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
-  Activity, Calendar, ChevronDown, ChevronRight, LayoutDashboard,
+  Activity, Calendar, ChevronDown, ChevronRight,
   MessageSquare, Plus, RefreshCw, Smartphone, Target,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -275,16 +275,52 @@ export const TargetSection = ({
   if (showAppSelection) {
     return (
       <div className="space-y-10">
+        {/* Editorial header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 mb-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+                Operasional Harian
+              </span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+              Strategi &amp; Target
+            </h1>
+            <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
+              Atur target bulanan per aplikasi, tracking aktual harian, dan monitor hutang/kelebihan
+              sales secara real-time.
+            </p>
+          </div>
+          <div className="text-right hidden md:block">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">
+              Periode
+            </p>
+            <p className="text-xl font-black text-slate-900 tracking-tight mt-1">
+              {format(new Date(targetMonth + '-01'), 'MMMM yyyy')}
+            </p>
+          </div>
+        </div>
+
         {/* Global Summary Dashboard */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-50 rounded-xl">
-                <LayoutDashboard className="w-5 h-5 text-indigo-600" />
-              </div>
+        <div className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 overflow-hidden">
+          {/* Subtle decorative accent */}
+          <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 bg-gradient-to-br from-indigo-100/50 to-transparent rounded-full blur-3xl" />
+
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+            <div className="flex items-start gap-4">
+              <div className="w-1 h-12 rounded-full bg-gradient-to-b from-indigo-500 via-amber-400 to-rose-500" />
               <div>
-                <h3 className="text-lg font-black text-slate-900 tracking-tight">Ringkasan Semua Platform</h3>
-                <p className="text-xs text-slate-400 font-medium mt-1">Akumulasi performa dari seluruh aplikasi di bulan {format(new Date(targetMonth + '-01'), 'MMMM yyyy')}</p>
+                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.25em] mb-1">
+                  Analytics
+                </p>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                  Ringkasan Semua Platform
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-1">
+                  Akumulasi performa dari seluruh aplikasi di bulan{' '}
+                  {format(new Date(targetMonth + '-01'), 'MMMM yyyy')}
+                </p>
               </div>
             </div>
 
@@ -292,23 +328,27 @@ export const TargetSection = ({
             <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100">
               <div className="flex items-center gap-2 px-3 border-r border-slate-200">
                 <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-                <select 
+                <select
                   value={platformFilter}
                   onChange={(e) => setPlatformFilter(e.target.value)}
+                  aria-label="Filter platform"
                   className="bg-transparent border-none text-[11px] font-black text-slate-600 outline-none py-1.5 cursor-pointer"
                 >
                   <option value="All">Semua Platform</option>
-                  {apps.map(app => <option key={app.id} value={app.name}>{app.name}</option>)}
+                  {apps.map((app) => (
+                    <option key={app.id} value={app.name}>{app.name}</option>
+                  ))}
                 </select>
               </div>
               <div className="flex items-center gap-2 px-3 border-r border-slate-200">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <select 
+                <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}
+                  aria-label="Filter tahun"
                   className="bg-transparent border-none text-[11px] font-black text-slate-600 outline-none py-1.5 cursor-pointer"
                 >
-                  {Array.from(new Set(availableMonths.map(m => m.split('-')[0]))).sort().map(y => (
+                  {Array.from(new Set(availableMonths.map((m) => m.split('-')[0]))).sort().map((y) => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
@@ -503,63 +543,103 @@ export const TargetSection = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Pilih Aplikasi</h2>
-            <p className="text-sm text-slate-400 font-medium mt-1">Pilih aplikasi untuk mengatur target operasional</p>
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-start gap-4">
+            <div className="w-1 h-12 rounded-full bg-gradient-to-b from-emerald-500 via-amber-400 to-rose-500" />
+            <div>
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.25em] mb-1">
+                Operasional
+              </p>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                Pilih Aplikasi
+              </h2>
+              <p className="text-sm text-slate-400 font-medium mt-1">
+                Klik kartu untuk mengatur target per bulan
+              </p>
+            </div>
           </div>
-          <button 
+          <button
             onClick={addApp}
-            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Tambah Aplikasi
+            Tambah App
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {apps.map(app => (
-            <motion.div
-              key={app.id}
-              whileHover={{ y: -5 }}
-              className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 cursor-pointer group hover:border-indigo-200 transition-all relative"
-            >
-              <div 
-                onClick={() => {
-                  setSelectedAppId(app.id);
-                  setShowAppSelection(false);
-                }}
-                className="absolute inset-0 z-0"
-              />
-              <div className="relative z-10">
-                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Smartphone className="w-7 h-7 text-indigo-600" />
-                </div>
-                <input
-                  type="text"
-                  value={app.name}
-                  onChange={(e) => {
-                    setApps(apps.map(a => a.id === app.id ? { ...a, name: e.target.value } : a));
-                  }}
-                  className="text-lg font-black text-slate-900 mb-2 bg-transparent border-none outline-none focus:ring-2 focus:ring-indigo-100 rounded px-1 w-full"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
-                  {Object.keys(app.targetConfig || {}).length} Target Terpasang
-                </p>
-                <div 
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {apps.map((app, idx) => {
+            const configuredMonths = Object.keys(app.targetConfig || {}).length;
+            // Rotate accent color for visual variety
+            const accents = [
+              { gradient: 'from-indigo-500 to-violet-500', bg: 'bg-indigo-50', text: 'text-indigo-600' },
+              { gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50', text: 'text-emerald-600' },
+              { gradient: 'from-rose-500 to-pink-500', bg: 'bg-rose-50', text: 'text-rose-600' },
+              { gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', text: 'text-amber-600' },
+              { gradient: 'from-cyan-500 to-blue-500', bg: 'bg-cyan-50', text: 'text-cyan-600' },
+            ];
+            const accent = accents[idx % accents.length];
+
+            return (
+              <motion.div
+                key={app.id}
+                whileHover={{ y: -4 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="group bg-white rounded-3xl border border-slate-100 overflow-hidden cursor-pointer hover:shadow-xl hover:border-slate-200 transition-all relative"
+              >
+                <div
                   onClick={() => {
                     setSelectedAppId(app.id);
                     setShowAppSelection(false);
                   }}
-                  className="mt-6 flex items-center justify-between text-indigo-600"
-                >
-                  <span className="text-xs font-black uppercase tracking-widest">Atur Target</span>
-                  <ChevronRight className="w-4 h-4" />
+                  className="absolute inset-0 z-0"
+                  role="button"
+                  aria-label={`Pilih aplikasi ${app.name}`}
+                />
+
+                {/* Top accent bar */}
+                <div className={cn('h-1 bg-gradient-to-r', accent.gradient)} />
+
+                <div className="relative z-10 p-6">
+                  <div className="flex items-start justify-between mb-5">
+                    <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110', accent.bg)}>
+                      <Smartphone className={cn('w-6 h-6', accent.text)} />
+                    </div>
+                    <span className={cn('text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg', accent.bg, accent.text)}>
+                      {configuredMonths > 0 ? `${configuredMonths} Bulan` : 'Kosong'}
+                    </span>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={app.name}
+                    onChange={(e) => {
+                      setApps(apps.map((a) => (a.id === app.id ? { ...a, name: e.target.value } : a)));
+                    }}
+                    aria-label="Nama aplikasi"
+                    className="text-base font-black text-slate-900 mb-1 bg-transparent border-none outline-none focus:ring-2 focus:ring-indigo-100 rounded px-1 w-full"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-5">
+                    Target terpasang · klik untuk atur
+                  </p>
+
+                  <div
+                    onClick={() => {
+                      setSelectedAppId(app.id);
+                      setShowAppSelection(false);
+                    }}
+                    className={cn('flex items-center justify-between pt-4 border-t border-slate-100', accent.text)}
+                  >
+                    <span className="text-[10px] font-black uppercase tracking-widest">Atur Target</span>
+                    <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     );

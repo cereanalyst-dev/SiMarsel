@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Activity, Zap } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import {
   BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
@@ -123,22 +123,48 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
 
   return (
     <div className="space-y-10">
-      <motion.div 
+      {/* Editorial header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 -mt-2">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-600 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              Pricing Intelligence
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            Optimasi Harga
+          </h1>
+          <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
+            Rekomendasi 3-tier (Anchor, Value, Campaign) berbasis histori demand pembeli.
+          </p>
+        </div>
+      </div>
+
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50"
+        className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 overflow-hidden"
       >
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-2.5 bg-indigo-50 rounded-xl">
-            <Zap className="w-5 h-5 text-indigo-600" />
-          </div>
+        {/* Decorative */}
+        <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 bg-gradient-to-br from-violet-100/50 to-transparent rounded-full blur-3xl" />
+
+        <div className="relative flex items-start gap-4 mb-8">
+          <div className="w-1 h-12 rounded-full bg-gradient-to-b from-violet-500 via-indigo-500 to-blue-500" />
           <div>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">Saran Harga Paket</h3>
-            <p className="text-xs text-slate-400 font-medium mt-1">Rekomendasi harga berbasis histori & distribusi demand pembeli</p>
+            <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.25em] mb-1">
+              Pricing Engine
+            </p>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">
+              Saran Harga Paket
+            </h3>
+            <p className="text-xs text-slate-400 font-medium mt-1">
+              Rekomendasi berbasis histori &amp; distribusi demand pembeli
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="relative grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Platform</label>
             <select 
