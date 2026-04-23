@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { logger } from '../../lib/logger';
 import { motion } from 'motion/react';
 import { format, parse } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -253,11 +254,11 @@ export const SocialMediaAnalysis = ({
       let msg = `✅ Berhasil impor ${imported} konten.`;
       if (skipped.length > 0) {
         msg += ` ${skipped.length} baris di-skip. Cek Console untuk detail.`;
-        console.warn('[SiMarsel] Social media import skipped rows:', skipped);
+        logger.warn('Social media import skipped rows:', skipped);
       }
       setImportStatus(msg);
     } catch (err) {
-      console.error('[SiMarsel] Import social media error:', err);
+      logger.error('Import social media error:', err);
       setImportStatus('❌ Gagal membaca file. Pastikan format sesuai template.');
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';

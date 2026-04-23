@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { logger } from './lib/logger';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Session } from '@supabase/supabase-js';
 import Sidebar from './layout/Sidebar';
@@ -59,15 +60,15 @@ export default function App() {
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
-      console.log(
-        '[SiMarsel] Auth restored:',
+      logger.info(
+        'Auth restored:',
         data.session?.user?.email ?? '(no session)',
       );
       setSession(data.session ?? null);
       setAuthChecked(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
-      console.log('[SiMarsel] Auth event:', event, '→', newSession?.user?.email ?? '(no user)');
+      logger.info('Auth event:', event, '→', newSession?.user?.email ?? '(no user)');
       setSession(newSession);
     });
     return () => {
@@ -115,14 +116,14 @@ export default function App() {
           );
         }
 
-        console.log('[SiMarsel] ♻️ Upload sukses, fetching ulang dari Supabase…');
+        logger.info('♻️ Upload sukses, fetching ulang dari Supabase…');
         const res = await fetchDataFromSupabase();
         if (res) {
           setData(res.transactions);
           setDownloaderData(res.downloaders);
         }
       } catch (err) {
-        console.error('[SiMarsel] Upload/refetch gagal:', err);
+        logger.error('Upload/refetch gagal:', err);
         setError(
           err instanceof Error
             ? err.message
@@ -150,7 +151,7 @@ export default function App() {
       setError(null);
       try {
         if (userId) {
-          console.log('[SiMarsel] Load data for user:', userId);
+          logger.info('Load data for user:', userId);
           const res = await fetchDataFromSupabase();
           if (!active) return;
           if (res) {
@@ -169,7 +170,7 @@ export default function App() {
           setError('Mode lokal. Unggah file Excel di Settings untuk mulai.');
         }
       } catch (err) {
-        console.error('[SiMarsel] Initial data load failed:', err);
+        logger.error('Initial data load failed:', err);
         setError('Gagal memuat data. Buka DevTools Console untuk detail errornya.');
       } finally {
         if (active) setLoadingData(false);
@@ -430,7 +431,7 @@ export default function App() {
     };
 
     // Debug log — bisa langsung di-copy ke clipboard lalu bandingkan dengan SQL
-    console.log('[SiMarsel] 📊 Stats snapshot', {
+    logger.info('📊 Stats snapshot', {
       filter: {
         source_app: filters.source_app,
         year: filters.year,

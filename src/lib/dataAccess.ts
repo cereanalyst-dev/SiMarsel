@@ -4,6 +4,7 @@ import type {
   Transaction,
 } from '../types';
 import { getSupabase, isSupabaseConfigured } from './supabase';
+import { logger } from './logger';
 import {
   APPS_STORAGE_KEY,
   MAX_ROWS_PER_QUERY,
@@ -55,7 +56,7 @@ export const loadAppsFromLocal = (): AppData[] => {
     if (!Array.isArray(parsed) || parsed.length === 0) return defaultApps();
     return parsed.map(migrateApp);
   } catch (err) {
-    console.warn('Failed to load apps from localStorage:', err);
+    logger.warn('Failed to load apps from localStorage:', err);
     return defaultApps();
   }
 };
@@ -65,7 +66,7 @@ export const saveAppsToLocal = (apps: AppData[]): void => {
   try {
     window.localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(apps));
   } catch (err) {
-    console.warn('Failed to persist apps to localStorage:', err);
+    logger.warn('Failed to persist apps to localStorage:', err);
   }
 };
 
@@ -105,7 +106,7 @@ export const fetchAppsFromSupabase = async (userId: string): Promise<AppData[] |
     .eq('user_id', userId)
     .maybeSingle();
   if (error) {
-    console.warn('Failed to fetch apps from Supabase:', error.message);
+    logger.warn('Failed to fetch apps from Supabase:', error.message);
     return null;
   }
   if (!data) return null;
@@ -124,7 +125,7 @@ export const saveAppsToSupabase = async (
     .from('apps_snapshot')
     .upsert({ user_id: userId, apps }, { onConflict: 'user_id' });
   if (error) {
-    console.warn('Failed to save apps to Supabase:', error.message);
+    logger.warn('Failed to save apps to Supabase:', error.message);
     return false;
   }
   return true;
@@ -176,8 +177,8 @@ async function fetchAllPages<T>(
     const { data, error } = await query.range(from, to);
 
     if (error) {
-      console.error(
-        `[SiMarsel] ❌ Gagal fetch ${label} (range ${from}-${to}):`,
+      logger.error(
+        `❌ Gagal fetch ${label} (range ${from}-${to}):`,
         error.message,
         error,
       );
@@ -189,26 +190,26 @@ async function fetchAllPages<T>(
 
     from += PAGE_SIZE;
     if (rows.length >= MAX_ROWS_PER_QUERY) {
-      console.warn(
-        `[SiMarsel] ⚠️ ${label} sudah mencapai batas MAX_ROWS_PER_QUERY (${MAX_ROWS_PER_QUERY}). Naikkan di config/app.config.ts kalau perlu.`,
+      logger.warn(
+        `⚠️ ${label} sudah mencapai batas MAX_ROWS_PER_QUERY (${MAX_ROWS_PER_QUERY}). Naikkan di config/app.config.ts kalau perlu.`,
       );
       break;
     }
   }
 
   const ms = Math.round(performance.now() - startedAt);
-  console.log(`[SiMarsel] ✅ ${label}: ${rows.length} baris (${ms}ms)`);
+  logger.info(`✅ ${label}: ${rows.length} baris (${ms}ms)`);
   return rows;
 }
 
 export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
   const supabase = getSupabase();
   if (!supabase) {
-    console.warn('[SiMarsel] Supabase client belum terkonfigurasi (VITE_SUPABASE_URL / ANON_KEY).');
+    logger.warn('Supabase client belum terkonfigurasi (VITE_SUPABASE_URL / ANON_KEY).');
     return null;
   }
 
-  console.log('[SiMarsel] Fetching data dari Supabase (paginated)…');
+  logger.info('Fetching data dari Supabase (paginated)…');
 
   const [txRows, dlRows] = await Promise.all([
     fetchAllPages<unknown>(supabase, 'transactions', 'transactions'),
@@ -233,8 +234,8 @@ export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
   });
   const downloaders = processDownloaders(Array.from(dlByDate.values()));
 
-  console.log(
-    `[SiMarsel] 📊 Processed: ${transactions.length} transactions, ${downloaders.length} downloaders (long format)`,
+  logger.info(
+    `📊 Processed: ${transactions.length} transactions, ${downloaders.length} downloaders (long format)`,
   );
 
   return { transactions, downloaders };
@@ -247,27 +248,27 @@ export const uploadTransactionsToSupabase = async (
 ): Promise<boolean> => {
   const supabase = getSupabase();
   if (!supabase) {
-    console.warn('[SiMarsel] Skip upload transactions — Supabase belum terkonfigurasi.');
+    logger.warn('Skip upload transactions — Supabase belum terkonfigurasi.');
     return false;
   }
   if (rows.length === 0) {
-    console.warn('[SiMarsel] Skip upload transactions — tidak ada baris.');
+    logger.warn('Skip upload transactions — tidak ada baris.');
     return false;
   }
 
   if (replaceMode) {
-    console.log('[SiMarsel] 🗑️ Ganti Data Total → delete transactions lama dulu…');
+    logger.info('🗑️ Ganti Data Total → delete transactions lama dulu…');
     const { error: delErr } = await supabase
       .from('transactions')
       .delete()
       .not('id', 'is', null);
     if (delErr) {
-      console.error('[SiMarsel] ❌ Gagal delete transactions lama:', delErr.message, delErr);
+      logger.error('❌ Gagal delete transactions lama:', delErr.message, delErr);
       return false;
     }
   }
 
-  console.log(`[SiMarsel] ⬆️ Uploading ${rows.length} transactions ke Supabase…`);
+  logger.info(`⬆️ Uploading ${rows.length} transactions ke Supabase…`);
 
   // Strip derived fields before sending. transaction_date & payment_date
   // sudah di-format "YYYY-MM-DD HH:mm:ss" (lokal) oleh processTransactions,
@@ -315,16 +316,16 @@ export const uploadTransactionsToSupabase = async (
 
     const { error } = await query;
     if (error) {
-      console.error(
-        `[SiMarsel] ❌ Upload transactions gagal di chunk ${chunkIndex}/${totalChunks}:`,
+      logger.error(
+        `❌ Upload transactions gagal di chunk ${chunkIndex}/${totalChunks}:`,
         error.message,
         error,
       );
       return false;
     }
     if (chunkIndex % 10 === 0 || chunkIndex === totalChunks) {
-      console.log(
-        `[SiMarsel] ⏳ transactions chunk ${chunkIndex}/${totalChunks} done (${
+      logger.info(
+        `⏳ transactions chunk ${chunkIndex}/${totalChunks} done (${
           Math.min(i + chunkSize, payload.length)
         }/${payload.length})`,
       );
@@ -332,8 +333,8 @@ export const uploadTransactionsToSupabase = async (
   }
   const ms = Math.round(performance.now() - startedAt);
   const modeLabel = replaceMode ? 'INSERT' : 'UPSERT (skip duplicates)';
-  console.log(
-    `[SiMarsel] ✅ Upload ${rows.length} transactions selesai (${ms}ms, mode: ${modeLabel}).`,
+  logger.info(
+    `✅ Upload ${rows.length} transactions selesai (${ms}ms, mode: ${modeLabel}).`,
   );
   return true;
 };
@@ -345,27 +346,27 @@ export const uploadDownloadersToSupabase = async (
 ): Promise<boolean> => {
   const supabase = getSupabase();
   if (!supabase) {
-    console.warn('[SiMarsel] Skip upload downloaders — Supabase belum terkonfigurasi.');
+    logger.warn('Skip upload downloaders — Supabase belum terkonfigurasi.');
     return false;
   }
   if (rows.length === 0) {
-    console.warn('[SiMarsel] Skip upload downloaders — tidak ada baris.');
+    logger.warn('Skip upload downloaders — tidak ada baris.');
     return false;
   }
 
   if (replaceMode) {
-    console.log('[SiMarsel] 🗑️ Ganti Data Total → delete downloaders lama dulu…');
+    logger.info('🗑️ Ganti Data Total → delete downloaders lama dulu…');
     const { error: delErr } = await supabase
       .from('downloaders')
       .delete()
       .not('source_app', 'is', null);
     if (delErr) {
-      console.error('[SiMarsel] ❌ Gagal delete downloaders lama:', delErr.message, delErr);
+      logger.error('❌ Gagal delete downloaders lama:', delErr.message, delErr);
       return false;
     }
   }
 
-  console.log(`[SiMarsel] ⬆️ Uploading ${rows.length} downloader rows ke Supabase…`);
+  logger.info(`⬆️ Uploading ${rows.length} downloader rows ke Supabase…`);
 
   // Pakai komponen lokal supaya date di DB = date di Excel (tidak geser via UTC).
   const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -386,15 +387,15 @@ export const uploadDownloadersToSupabase = async (
       .from('downloaders')
       .upsert(chunk, { onConflict: 'date,source_app' });
     if (error) {
-      console.error(
-        `[SiMarsel] ❌ Upload downloaders gagal di chunk ${i / chunkSize + 1}:`,
+      logger.error(
+        `❌ Upload downloaders gagal di chunk ${i / chunkSize + 1}:`,
         error.message,
         error,
       );
       return false;
     }
   }
-  console.log(`[SiMarsel] ✅ Upload ${rows.length} downloader rows selesai.`);
+  logger.info(`✅ Upload ${rows.length} downloader rows selesai.`);
   return true;
 };
 

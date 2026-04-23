@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { logger } from './logger';
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
@@ -12,13 +13,13 @@ let _client: SupabaseClient | null = null;
 export const getSupabase = (): SupabaseClient | null => {
   if (_client) return _client;
   if (!isSupabaseConfigured()) {
-    console.warn(
-      '[SiMarsel] Supabase belum terkonfigurasi — mode lokal.',
+    logger.warn(
+      'Supabase belum terkonfigurasi — mode lokal.',
       { VITE_SUPABASE_URL: url, VITE_SUPABASE_ANON_KEY: anonKey ? '(set)' : '(missing)' },
     );
     return null;
   }
-  console.log('[SiMarsel] Init Supabase client:', url);
+  logger.info('Init Supabase client:', url);
   _client = createClient(url!, anonKey!, {
     auth: {
       persistSession: true,
