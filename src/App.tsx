@@ -309,13 +309,6 @@ export default function App() {
 
     const totalRealDownloader = filteredDownloaderData.reduce((sum, d) => sum + d.count, 0);
 
-    // Jumlah order unik (distinct trx_id) di periode yang difilter — untuk
-    // AOV calculation (revenue / unique orders) & referensi.
-    const uniqueOrderIds = new Set(
-      filteredData.map((item) => (item.trx_id ?? '').trim()).filter((t) => t !== ''),
-    );
-    const totalUniqueOrders = uniqueOrderIds.size;
-
     const relevantApps = filters.source_app === 'All'
       ? apps
       : apps.filter((a) => a.name.toUpperCase() === filters.source_app.toUpperCase());
@@ -373,11 +366,10 @@ export default function App() {
     const result = {
       totalRevenue: totalRealSales,
       totalTransactions,
-      totalUniqueOrders,
-      // AOV pakai distinct trx_id (order) — standar industri. Kalau mau "avg per
-      // line item" tinggal bagi totalRevenue / totalTransactions di UI.
-      aov: totalUniqueOrders > 0 ? totalRealSales / totalUniqueOrders : 0,
-      avgItemPrice: totalTransactions > 0 ? totalRealSales / totalTransactions : 0,
+      // AOV per definisi user: revenue / jumlah transaksi (baris), BUKAN per
+      // distinct trx_id. Artinya kalau 1 order ada 3 line item, dianggap 3
+      // "transaksi".
+      aov: totalTransactions > 0 ? totalRealSales / totalTransactions : 0,
       uniqueBuyers,
       totalPackagesSold: totalTransactions,
       totalTargetRevenue,
@@ -387,8 +379,10 @@ export default function App() {
         totalTargetDownloader > 0 ? (totalRealDownloader / totalTargetDownloader) * 100 : 0,
       progressSales:
         totalTargetRevenue > 0 ? (totalRealSales / totalTargetRevenue) * 100 : 0,
+      // Conversion per definisi user: transaksi / downloader × 100.
+      // Downloader = sum count di filteredDownloaderData.
       progressConversion:
-        totalRealDownloader > 0 ? (repeatOrderUsers / totalRealDownloader) * 100 : 0,
+        totalRealDownloader > 0 ? (totalTransactions / totalRealDownloader) * 100 : 0,
       hutangSales: totalHutangSales,
       totalRealDownloader,
       totalRealSales,
@@ -406,11 +400,14 @@ export default function App() {
       total_data_rows: data.length,
       filtered_rows: filteredData.length,
       total_revenue: totalRealSales,
-      unique_trx_id: totalUniqueOrders,
+      total_transaksi_rows: totalTransactions,
       unique_email: uniqueBuyers,
       repeat_order_email: repeatOrderUsers,
-      aov_per_order: totalUniqueOrders > 0 ? Math.round(totalRealSales / totalUniqueOrders) : 0,
-      avg_item_price: totalTransactions > 0 ? Math.round(totalRealSales / totalTransactions) : 0,
+      aov_per_row: totalTransactions > 0 ? Math.round(totalRealSales / totalTransactions) : 0,
+      conversion_pct:
+        totalRealDownloader > 0
+          ? Math.round((totalTransactions / totalRealDownloader) * 10000) / 100
+          : 0,
       downloader_sum: totalRealDownloader,
     });
 

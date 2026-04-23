@@ -98,9 +98,7 @@ export interface AppData {
 export interface DashboardStats {
   totalRevenue: number;
   totalTransactions: number;
-  totalUniqueOrders: number;
   aov: number;
-  avgItemPrice: number;
   uniqueBuyers: number;
   totalPackagesSold: number;
   totalTargetRevenue: number;
