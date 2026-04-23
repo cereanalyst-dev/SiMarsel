@@ -782,7 +782,10 @@ export default function App() {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
                     >
-                      <SettingsSection onDataUpdate={handleDataUpdate} />
+                      <SettingsSection
+                        onDataUpdate={handleDataUpdate}
+                        detectedPlatforms={availableOptions.source_apps}
+                      />
                     </motion.div>
                   )}
                 </AnimatePresence>

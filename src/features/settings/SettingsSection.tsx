@@ -4,6 +4,7 @@ import { Download, Plus, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../components/Toast';
+import MarkazApiCard from './MarkazApiCard';
 
 interface UploadProgress {
   current: number;
@@ -18,9 +19,10 @@ interface SettingsSectionProps {
     append: boolean,
     onProgress?: (p: UploadProgress) => void,
   ) => void | Promise<void>;
+  detectedPlatforms?: string[];
 }
 
-export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
+export const SettingsSection = ({ onDataUpdate, detectedPlatforms = [] }: SettingsSectionProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -256,6 +258,8 @@ export const SettingsSection = ({ onDataUpdate }: SettingsSectionProps) => {
           )}
         </div>
       </div>
+
+      <MarkazApiCard detectedPlatforms={detectedPlatforms} />
     </div>
   );
 };

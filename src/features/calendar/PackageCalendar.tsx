@@ -2,12 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
-  Activity, MessageSquare, Package, ShoppingBag, Smartphone, TrendingUp, Zap,
+  Activity, ChevronLeft, ChevronRight, Crown, Flame,
+  MessageSquare, Package, ShoppingBag, Smartphone, TrendingUp, Zap,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import { generateDailyInsight } from '../../lib/dailyInsight';
 import type { AppData, AvailableOptions, Downloader, Transaction } from '../../types';
+
+const compactRp = (v: number) => {
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}M`;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}jt`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}rb`;
+  return String(v);
+};
 
 interface PackageCalendarProps {
   data: Transaction[];
@@ -132,10 +140,50 @@ export const PackageCalendar = ({
     })).sort((a: any, b: any) => b.revenue - a.revenue);
   }, [filteredData, currentMonth]);
 
+  // Heatmap intensity + bulan-level KPI (supaya kalender ga flat)
+  const { maxDayRevenue, monthTotals, topDay } = useMemo(() => {
+    let max = 0;
+    let totalRev = 0;
+    let totalTx = 0;
+    let topDate: string | null = null;
+    let activeDays = 0;
+    daysInMonth.forEach((day) => {
+      const key = format(day, 'yyyy-MM-dd');
+      const pkgs = activePackagesByDay[key]?.packages ?? [];
+      if (pkgs.length === 0) return;
+      activeDays += 1;
+      const rev = pkgs.reduce((s, p) => s + p.revenue, 0);
+      const tx = pkgs.reduce((s, p) => s + p.transactions, 0);
+      totalRev += rev;
+      totalTx += tx;
+      if (rev > max) {
+        max = rev;
+        topDate = key;
+      }
+    });
+    return {
+      maxDayRevenue: max,
+      monthTotals: {
+        revenue: totalRev,
+        transactions: totalTx,
+        activeDays,
+        avgPerDay: activeDays > 0 ? totalRev / activeDays : 0,
+      },
+      topDay: topDate,
+    };
+  }, [daysInMonth, activePackagesByDay]);
+
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return Array.from({ length: 5 }, (_, i) => (currentYear - 2 + i).toString());
   }, []);
+
+  const goPrevMonth = () =>
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  const goNextMonth = () =>
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
 
   const months = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -200,27 +248,90 @@ export const PackageCalendar = ({
               </select>
             </div>
 
-            {/* Year & Month Selectors */}
-            <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
-              <select 
+            {/* Year & Month Selectors dengan prev/next */}
+            <div className="flex items-center gap-1 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+              <button
+                type="button"
+                onClick={goPrevMonth}
+                aria-label="Bulan sebelumnya"
+                className="p-1.5 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-white transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <select
                 value={currentMonth.getFullYear()}
                 onChange={(e) => setCurrentMonth(new Date(Number(e.target.value), currentMonth.getMonth(), 1))}
                 className="bg-transparent border-none text-[11px] font-black text-slate-600 outline-none px-3 py-1.5 cursor-pointer border-r border-slate-200"
               >
                 {years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
-              <select 
+              <select
                 value={currentMonth.getMonth()}
                 onChange={(e) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(e.target.value), 1))}
                 className="bg-transparent border-none text-[11px] font-black text-slate-600 outline-none px-3 py-1.5 cursor-pointer"
               >
                 {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
               </select>
+              <button
+                type="button"
+                onClick={goNextMonth}
+                aria-label="Bulan berikutnya"
+                className="p-1.5 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-white transition-all"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-3 mb-8">
+        {/* KPI strip bulanan — revenue, transaksi, top day, rata2 per hari aktif */}
+        <div className="relative grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-indigo-700 p-5 rounded-2xl text-white shadow-lg shadow-indigo-200/40">
+            <div className="pointer-events-none absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-200 mb-1.5">Revenue Bulan Ini</p>
+            <h3 className="text-xl font-black tracking-tight">{formatCurrency(monthTotals.revenue)}</h3>
+            <p className="text-[9px] font-bold text-indigo-200 mt-1">{monthTotals.activeDays} hari aktif</p>
+          </div>
+          <div className="relative overflow-hidden bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="pointer-events-none absolute -top-4 -right-4 w-16 h-16 bg-emerald-100/60 rounded-full blur-xl" />
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="p-1 bg-emerald-50 rounded-md">
+                <ShoppingBag className="w-3 h-3 text-emerald-600" />
+              </div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total Transaksi</p>
+            </div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">{formatNumber(monthTotals.transactions)}</h3>
+            <p className="text-[9px] font-bold text-slate-400 mt-1">
+              Avg {compactRp(monthTotals.activeDays > 0 ? monthTotals.transactions / monthTotals.activeDays : 0)}/hari
+            </p>
+          </div>
+          <div className="relative overflow-hidden bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="pointer-events-none absolute -top-4 -right-4 w-16 h-16 bg-amber-100/60 rounded-full blur-xl" />
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="p-1 bg-amber-50 rounded-md">
+                <Crown className="w-3 h-3 text-amber-600" />
+              </div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Hari Paling Ramai</p>
+            </div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">
+              {topDay ? format(new Date(topDay), 'dd MMM') : '—'}
+            </h3>
+            <p className="text-[9px] font-bold text-amber-600 mt-1">{topDay ? formatCurrency(maxDayRevenue) : 'Belum ada data'}</p>
+          </div>
+          <div className="relative overflow-hidden bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="pointer-events-none absolute -top-4 -right-4 w-16 h-16 bg-violet-100/60 rounded-full blur-xl" />
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="p-1 bg-violet-50 rounded-md">
+                <Flame className="w-3 h-3 text-violet-600" />
+              </div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Rata-rata / Hari Aktif</p>
+            </div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">{formatCurrency(monthTotals.avgPerDay)}</h3>
+            <p className="text-[9px] font-bold text-slate-400 mt-1">{monthTotals.activeDays > 0 ? 'Basis hari jualan' : 'Basis hari jualan'}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-2 md:gap-3 mb-4">
           {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map(day => (
             <div key={day} className="text-center py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               {day}
@@ -234,35 +345,93 @@ export const PackageCalendar = ({
             const packages = activePackagesByDay[dateStr]?.packages || [];
             const hasActivity = packages.length > 0;
             const isSelected = selectedDay === dateStr;
-            
+            const isToday = dateStr === todayKey;
+            const isTop = dateStr === topDay;
+            const dow = day.getDay();
+            const isWeekend = dow === 0 || dow === 6;
+
+            // Heatmap tier — 0..4, dihitung dari revenue hari ini terhadap max bulan
+            const dayRevenue = packages.reduce((s, p) => s + p.revenue, 0);
+            const ratio = maxDayRevenue > 0 ? dayRevenue / maxDayRevenue : 0;
+            const tier = !hasActivity ? 0 : ratio >= 0.75 ? 4 : ratio >= 0.5 ? 3 : ratio >= 0.25 ? 2 : 1;
+
+            const heatmap = [
+              // 0 — no activity
+              isWeekend
+                ? 'bg-slate-50/60 border-slate-100'
+                : 'bg-white border-slate-100',
+              // 1
+              'bg-indigo-50 border-indigo-100 hover:bg-indigo-100',
+              // 2
+              'bg-indigo-100 border-indigo-200 hover:bg-indigo-200',
+              // 3
+              'bg-indigo-300/80 border-indigo-300 hover:bg-indigo-300',
+              // 4 — hottest
+              'bg-gradient-to-br from-indigo-500 to-violet-600 border-indigo-500 hover:from-indigo-600 hover:to-violet-700 text-white shadow-md shadow-indigo-200/50',
+            ][tier];
+
+            const dateColor =
+              tier === 0 ? (isWeekend ? 'text-rose-300' : 'text-slate-300')
+                : tier >= 4 ? 'text-white'
+                  : tier >= 3 ? 'text-indigo-900'
+                    : 'text-indigo-700';
+
+            const amountColor =
+              tier >= 4 ? 'text-white/90' : tier >= 3 ? 'text-indigo-900' : 'text-indigo-600';
+
             return (
-              <div 
-                key={dateStr} 
+              <div
+                key={dateStr}
                 onClick={() => hasActivity && setSelectedDay(isSelected ? null : dateStr)}
                 className={cn(
-                  "aspect-square rounded-2xl border p-2 flex flex-col items-center justify-center gap-1 transition-all relative group",
-                  hasActivity 
-                    ? "bg-indigo-50/30 border-indigo-100 hover:bg-indigo-50 hover:scale-105 cursor-pointer" 
-                    : "bg-slate-50/30 border-slate-100",
-                  isSelected && "ring-2 ring-indigo-500 bg-indigo-50 border-transparent scale-105"
+                  'aspect-square rounded-2xl border p-2 flex flex-col items-center justify-between transition-all relative group',
+                  heatmap,
+                  hasActivity && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg',
+                  isSelected && 'ring-2 ring-indigo-500 ring-offset-2 scale-[1.04] z-10',
+                  isToday && !isSelected && 'ring-2 ring-amber-400 ring-offset-1',
                 )}
               >
-                <span className={cn(
-                  "text-xs font-black",
-                  hasActivity ? "text-indigo-600" : "text-slate-300"
-                )}>
-                  {format(day, 'd')}
-                </span>
+                {/* Top row: date + optional crown */}
+                <div className="w-full flex items-start justify-between">
+                  <span className={cn('text-xs md:text-sm font-black leading-none', dateColor)}>
+                    {format(day, 'd')}
+                  </span>
+                  {isTop && hasActivity && (
+                    <Crown className={cn('w-3 h-3', tier >= 4 ? 'text-amber-300' : 'text-amber-500')} />
+                  )}
+                </div>
+
+                {/* Revenue amount (compact) */}
                 {hasActivity && (
-                  <div className="flex gap-0.5">
-                    <div className="w-1 h-1 rounded-full bg-indigo-400" />
-                    {packages.length > 1 && <div className="w-1 h-1 rounded-full bg-indigo-300" />}
-                    {packages.length > 2 && <div className="w-1 h-1 rounded-full bg-indigo-200" />}
+                  <div className="w-full text-center">
+                    <p className={cn('text-[9px] md:text-[10px] font-black tracking-tight leading-none', amountColor)}>
+                      {compactRp(dayRevenue)}
+                    </p>
+                    <p className={cn(
+                      'text-[7px] md:text-[8px] font-bold uppercase tracking-widest mt-0.5 leading-none',
+                      tier >= 4 ? 'text-indigo-100' : 'text-slate-400',
+                    )}>
+                      {packages.length} pkt
+                    </p>
                   </div>
                 )}
+
+                {/* Today badge */}
+                {isToday && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow">
+                    Ini
+                  </span>
+                )}
+
+                {/* Tooltip */}
                 {hasActivity && !isSelected && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900 text-white p-3 rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 shadow-2xl">
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-2 border-b border-white/10 pb-1">Paket Aktif ({packages.length})</p>
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-slate-900 text-white p-3 rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 shadow-2xl">
+                    <div className="flex items-center justify-between mb-2 pb-1 border-b border-white/10">
+                      <p className="text-[10px] font-black uppercase tracking-widest">
+                        {format(day, 'dd MMM')}
+                      </p>
+                      <p className="text-[9px] font-black text-indigo-400">{formatCurrency(dayRevenue)}</p>
+                    </div>
                     <div className="space-y-1.5">
                       {packages.slice(0, 3).map((p, i) => (
                         <div key={i} className="flex justify-between items-center gap-2">
@@ -277,6 +446,31 @@ export const PackageCalendar = ({
               </div>
             );
           })}
+        </div>
+
+        {/* Legend heatmap */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-8 px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Intensitas</span>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-md bg-white border border-slate-100" title="Tanpa transaksi" />
+              <span className="w-3 h-3 rounded-md bg-indigo-50 border border-indigo-100" />
+              <span className="w-3 h-3 rounded-md bg-indigo-100 border border-indigo-200" />
+              <span className="w-3 h-3 rounded-md bg-indigo-300/80 border border-indigo-300" />
+              <span className="w-3 h-3 rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 border border-indigo-500" title="Paling ramai" />
+            </div>
+            <span className="text-[9px] font-bold text-slate-400">Sedikit → Banyak</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-[9px] font-bold text-slate-400">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-md ring-2 ring-amber-400" />
+              Hari ini
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Crown className="w-3 h-3 text-amber-500" />
+              Top day
+            </span>
+          </div>
         </div>
 
         {/* Daily Detail View */}
