@@ -223,6 +223,46 @@ export default function App() {
     };
   }, [userId]);
 
+  // Auto-sync app cards dari source_app yang ada di DB (transactions + downloaders).
+  // Daftar platform di Strategi & Target jadi auto-derived — user cuma perlu
+  // set targetnya. App lama dengan target/dailyData dipreserve.
+  // App placeholder default (mis. "App Utama" yang belum diisi) dibuang
+  // begitu DB punya data nyata.
+  useEffect(() => {
+    const platforms = new Set<string>();
+    data.forEach((t) => {
+      const p = (t.source_app ?? '').trim();
+      if (p) platforms.add(p.toUpperCase());
+    });
+    downloaderData.forEach((d) => {
+      const p = (d.source_app ?? '').trim();
+      if (p) platforms.add(p.toUpperCase());
+    });
+    if (platforms.size === 0) return;
+
+    setApps((prev) => {
+      const kept = prev.filter((a) => {
+        const inDb = platforms.has(a.name.trim().toUpperCase());
+        const hasTarget = Object.keys(a.targetConfig ?? {}).length > 0;
+        const hasDaily = Object.keys(a.dailyData ?? {}).length > 0;
+        return inDb || hasTarget || hasDaily;
+      });
+      const existing = new Set(kept.map((a) => a.name.trim().toUpperCase()));
+      const missing = Array.from(platforms).filter((p) => !existing.has(p));
+      if (missing.length === 0 && kept.length === prev.length) return prev;
+      const additions: AppData[] = missing.map((name) => ({
+        id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : Math.random().toString(36).substring(2, 11),
+        name,
+        targetConfig: {},
+        dailyData: {},
+        isTargetSet: {},
+      }));
+      return [...kept, ...additions];
+    });
+  }, [data, downloaderData]);
+
   // Persist apps: always localStorage, plus Supabase if signed in.
   useEffect(() => {
     saveAppsToLocal(apps);

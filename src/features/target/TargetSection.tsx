@@ -3,12 +3,11 @@ import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
   Activity, Calendar, ChevronDown, ChevronRight,
-  MessageSquare, Plus, RefreshCw, Smartphone, Target, Trash2,
+  MessageSquare, RefreshCw, Smartphone, Target,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import type { AppData, Downloader, Transaction } from '../../types';
-import SocialMediaModal from './SocialMediaModal';
 
 interface TargetSectionProps {
   apps: AppData[];
@@ -38,7 +37,6 @@ export const TargetSection = ({
 }: TargetSectionProps) => {
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
-  const [socialModalDate, setSocialModalDate] = useState<string | null>(null);
   const selectedApp = apps.find(a => a.id === selectedAppId) || apps[0];
 
   const filteredAppsForSummary = useMemo(() => {
@@ -261,42 +259,6 @@ export const TargetSection = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedApp, targetMonth, dates, actualsByAppByDate]);
-
-  const addApp = () => {
-    const newId =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : Math.random().toString(36).substring(2, 11);
-    setApps([...apps, {
-      id: newId,
-      name: `App ${apps.length + 1}`,
-      targetConfig: {},
-      dailyData: {},
-      isTargetSet: {}
-    }]);
-    setSelectedAppId(newId);
-  };
-
-  const removeApp = (id: string) => {
-    if (apps.length <= 1) {
-      window.alert('Minimal harus ada 1 aplikasi. Tambah dulu aplikasi lain sebelum menghapus.');
-      return;
-    }
-    const target = apps.find((a) => a.id === id);
-    const appName = target?.name ?? 'aplikasi ini';
-    const configured = Object.keys(target?.targetConfig ?? {}).length;
-    const warning =
-      configured > 0
-        ? `"${appName}" punya ${configured} bulan target yang akan hilang.\n\nHapus tetap?`
-        : `Hapus "${appName}"?`;
-    if (!window.confirm(warning)) return;
-
-    const next = apps.filter((a) => a.id !== id);
-    setApps(next);
-    if (selectedAppId === id && next.length > 0) {
-      setSelectedAppId(next[0].id);
-    }
-  };
 
   const globalSummary = useMemo(() => {
     let totalTargetDownloader = 0;
@@ -623,28 +585,19 @@ export const TargetSection = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-2">
-          <div className="flex items-start gap-4">
-            <div className="w-1 h-12 rounded-full bg-gradient-to-b from-emerald-500 via-amber-400 to-rose-500" />
-            <div>
-              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.25em] mb-1">
-                Operasional
-              </p>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                Pilih Aplikasi
-              </h2>
-              <p className="text-sm text-slate-400 font-medium mt-1">
-                Klik kartu untuk mengatur target per bulan
-              </p>
-            </div>
+        <div className="flex items-start gap-4 mt-2">
+          <div className="w-1 h-12 rounded-full bg-gradient-to-b from-emerald-500 via-amber-400 to-rose-500" />
+          <div>
+            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.25em] mb-1">
+              Operasional
+            </p>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+              Pilih Aplikasi
+            </h2>
+            <p className="text-sm text-slate-400 font-medium mt-1">
+              Daftar aplikasi auto-sync dari database. Klik kartu untuk mengatur target.
+            </p>
           </div>
-          <button
-            onClick={addApp}
-            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Tambah App
-          </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -682,27 +635,6 @@ export const TargetSection = ({
                 {/* Top accent bar */}
                 <div className={cn('h-1 bg-gradient-to-r', accent.gradient)} />
 
-                {/* Delete button — show on hover, disabled kalau cuma 1 app tersisa */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeApp(app.id);
-                  }}
-                  disabled={apps.length <= 1}
-                  aria-label={`Hapus aplikasi ${app.name}`}
-                  title={apps.length <= 1 ? 'Tidak bisa hapus aplikasi terakhir' : `Hapus ${app.name}`}
-                  className={cn(
-                    'absolute top-3 right-3 z-20 p-2 rounded-xl transition-all',
-                    'opacity-0 group-hover:opacity-100',
-                    'text-rose-500 bg-white shadow-md border border-rose-100',
-                    'hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600',
-                    'disabled:opacity-30 disabled:cursor-not-allowed',
-                  )}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-
                 <div className="relative z-10 p-6">
                   <div className="flex items-start justify-between mb-5">
                     <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110', accent.bg)}>
@@ -713,18 +645,11 @@ export const TargetSection = ({
                     </span>
                   </div>
 
-                  <input
-                    type="text"
-                    value={app.name}
-                    onChange={(e) => {
-                      setApps(apps.map((a) => (a.id === app.id ? { ...a, name: e.target.value } : a)));
-                    }}
-                    aria-label="Nama aplikasi"
-                    className="text-base font-black text-slate-900 mb-1 bg-transparent border-none outline-none focus:ring-2 focus:ring-indigo-100 rounded px-1 w-full"
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                  <h3 className="text-base font-black text-slate-900 mb-1 px-1 truncate">
+                    {app.name}
+                  </h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-5">
-                    Target terpasang · klik untuk atur
+                    Auto dari DB · klik untuk atur target
                   </p>
 
                   <div
@@ -1228,17 +1153,16 @@ export const TargetSection = ({
                           />
                         </td>
                         <td className="py-3 px-4 bg-indigo-50/30">
-                          <button 
-                            onClick={() => setSocialModalDate(date)}
-                            className={cn(
-                              "w-full py-1.5 rounded-lg text-[9px] font-black uppercase transition-all flex items-center justify-center gap-1.5",
-                              dayData.socialContent?.length > 0 
-                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-100" 
-                                : "bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-50"
-                            )}
+                          <button
+                            onClick={() => {
+                              setCalendarFocusDate(new Date(date));
+                              setActiveTab('social');
+                            }}
+                            title="Buka Analisa Sosial Media"
+                            className="w-full py-1.5 rounded-lg text-[9px] font-black uppercase transition-all flex items-center justify-center gap-1.5 bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-600 hover:text-white hover:border-indigo-600"
                           >
                             <MessageSquare className="w-3 h-3" />
-                            {dayData.socialContent?.length > 0 ? `${dayData.socialContent.length} Konten` : 'Input'}
+                            Buka Sosmed
                           </button>
                         </td>
                       </tr>
@@ -1251,15 +1175,6 @@ export const TargetSection = ({
         </motion.div>
       )}
 
-      {socialModalDate && (
-        <SocialMediaModal 
-          isOpen={!!socialModalDate}
-          onClose={() => setSocialModalDate(null)}
-          date={socialModalDate}
-          content={selectedApp.dailyData[socialModalDate]?.socialContent || []}
-          onSave={(newContent) => updateDailyValue(socialModalDate, 'socialContent', newContent)}
-        />
-      )}
     </div>
   );
 };
