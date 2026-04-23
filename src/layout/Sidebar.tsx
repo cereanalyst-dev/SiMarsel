@@ -1,5 +1,5 @@
-import { ChevronRight, LogOut } from 'lucide-react';
-import { motion } from 'motion/react';
+import { ChevronRight, LogOut, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import {
   APP_ACCENT_SUFFIX, APP_NAME, COMPANY_NAME, LOGO_PATH, MENU_ITEMS,
@@ -10,9 +10,18 @@ interface Props {
   setActiveTab: (t: string) => void;
   onSignOut?: () => void;
   userEmail?: string | null;
+  // Mobile-only: controls slide-in open state
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
-export const Sidebar = ({ activeTab, setActiveTab, onSignOut, userEmail }: Props) => {
+export const Sidebar = ({
+  activeTab, setActiveTab, onSignOut, userEmail, mobileOpen = false, onCloseMobile,
+}: Props) => {
+  const handleNavClick = (id: string) => {
+    setActiveTab(id);
+    onCloseMobile?.();
+  };
   const mainItems = MENU_ITEMS.filter((m) => m.group === 'main');
   const systemItems = MENU_ITEMS.filter((m) => m.group === 'system');
 
@@ -21,7 +30,7 @@ export const Sidebar = ({ activeTab, setActiveTab, onSignOut, userEmail }: Props
     return (
       <button
         key={item.id}
-        onClick={() => setActiveTab(item.id)}
+        onClick={() => handleNavClick(item.id)}
         className={cn(
           'group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200',
           isActive
@@ -48,9 +57,9 @@ export const Sidebar = ({ activeTab, setActiveTab, onSignOut, userEmail }: Props
     );
   };
 
-  return (
+  const sidebarContent = (
     <aside
-      className="w-72 flex flex-col h-screen sticky top-0 overflow-hidden"
+      className="w-72 flex flex-col h-full overflow-hidden"
       style={{
         background:
           'linear-gradient(180deg, #0f172a 0%, #111c36 50%, #0b1424 100%)',
@@ -158,6 +167,44 @@ export const Sidebar = ({ activeTab, setActiveTab, onSignOut, userEmail }: Props
         </div>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop — sticky */}
+      <div className="hidden lg:block sticky top-0 h-screen">{sidebarContent}</div>
+
+      {/* Mobile — overlay slide-in */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onCloseMobile}
+              className="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40"
+            />
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+              className="lg:hidden fixed inset-y-0 left-0 z-50 shadow-2xl"
+            >
+              <button
+                onClick={onCloseMobile}
+                aria-label="Tutup menu"
+                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              {sidebarContent}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 

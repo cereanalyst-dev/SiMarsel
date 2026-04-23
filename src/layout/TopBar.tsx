@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Activity, ChevronRight, Database } from 'lucide-react';
+import { Activity, ChevronRight, Database, Menu } from 'lucide-react';
 import { APP_NAME, LOGO_PATH, MENU_ITEMS } from '../config/app.config';
 
 interface Props {
   activeTab: string;
   rowsLoaded?: number;
+  onOpenMobileMenu?: () => void;
 }
 
-export const TopBar = ({ activeTab, rowsLoaded }: Props) => {
+export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu }: Props) => {
   const active = MENU_ITEMS.find((m) => m.id === activeTab);
   const [now, setNow] = useState(new Date());
 
@@ -22,9 +23,18 @@ export const TopBar = ({ activeTab, rowsLoaded }: Props) => {
       {/* Decorative accent under topbar */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-200/40 to-transparent" />
 
-      {/* Left: breadcrumb */}
+      {/* Left: burger (mobile) + breadcrumb */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+        {onOpenMobileMenu && (
+          <button
+            onClick={onOpenMobileMenu}
+            aria-label="Buka menu navigasi"
+            className="lg:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+        <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
           <span>{APP_NAME}</span>
           <ChevronRight className="w-3 h-3" />
         </div>
