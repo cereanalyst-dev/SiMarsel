@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
 import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
+import { exportToCSV, exportToExcel } from '../../lib/exporter';
+import { useToast } from '../../components/Toast';
 import FilterSection from '../../components/FilterSection';
 import type { AvailableOptions, Filters } from '../../types';
 
@@ -32,6 +34,37 @@ interface Props {
 const ITEMS_PER_PAGE = 10;
 
 export const Packages = ({ filters, setFilters, availableOptions, packagePerformance }: Props) => {
+  const toast = useToast();
+
+  const handleExport = (format: 'csv' | 'xlsx') => {
+    if (packagePerformance.length === 0) {
+      toast.warning('Tidak ada data', 'Paket performance kosong untuk filter aktif.');
+      return;
+    }
+    const rows = packagePerformance.map((p) => ({
+      'Nama Paket': p.name,
+      'Revenue': p.revenue,
+      'Transaksi': p.transactions,
+      'Harga Terendah': p.minPrice,
+      'Low Trx': p.lowTrx,
+      'Harga Rata-rata': Math.round(p.avgPrice),
+      'Avg Trx': p.avgTrx,
+      'Harga Tertinggi': p.maxPrice,
+      'High Trx': p.highTrx,
+      'Durasi': p.durationLabel,
+    }));
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename = `packages-${timestamp}`;
+    if (format === 'csv') {
+      exportToCSV(rows, filename);
+    } else {
+      void exportToExcel(rows, filename, 'Packages');
+    }
+    toast.success(
+      'Export sukses',
+      `${rows.length.toLocaleString('id-ID')} baris disimpan sebagai ${format.toUpperCase()}.`,
+    );
+  };
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(packagePerformance.length / ITEMS_PER_PAGE));
 
@@ -97,7 +130,29 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
       </div>
 
       <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-        <h3 className="text-xl font-black mb-10 text-slate-900 tracking-tight">Detail Performa Paket</h3>
+        <div className="flex items-center justify-between mb-10 gap-4">
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Detail Performa Paket</h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleExport('csv')}
+              aria-label="Export ke CSV"
+              title="Export ke CSV"
+              className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-widest hover:border-emerald-400 hover:text-emerald-600 transition-all"
+            >
+              <Download className="w-4 h-4" />
+              CSV
+            </button>
+            <button
+              onClick={() => handleExport('xlsx')}
+              aria-label="Export ke Excel"
+              title="Export ke Excel"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border-2 border-emerald-200 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-100 transition-all"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel
+            </button>
+          </div>
+        </div>
         <div className="overflow-x-auto -mx-4 px-4 custom-scrollbar">
           <table className="w-full text-left min-w-[1600px] border-separate border-spacing-0">
             <thead>
