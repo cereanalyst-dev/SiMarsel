@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
   Activity, Calendar, ChevronDown, ChevronRight,
-  MessageSquare, Plus, RefreshCw, Smartphone, Target,
+  MessageSquare, Plus, RefreshCw, Smartphone, Target, Trash2,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
@@ -206,6 +206,27 @@ export const TargetSection = ({
       isTargetSet: {}
     }]);
     setSelectedAppId(newId);
+  };
+
+  const removeApp = (id: string) => {
+    if (apps.length <= 1) {
+      window.alert('Minimal harus ada 1 aplikasi. Tambah dulu aplikasi lain sebelum menghapus.');
+      return;
+    }
+    const target = apps.find((a) => a.id === id);
+    const appName = target?.name ?? 'aplikasi ini';
+    const configured = Object.keys(target?.targetConfig ?? {}).length;
+    const warning =
+      configured > 0
+        ? `"${appName}" punya ${configured} bulan target yang akan hilang.\n\nHapus tetap?`
+        : `Hapus "${appName}"?`;
+    if (!window.confirm(warning)) return;
+
+    const next = apps.filter((a) => a.id !== id);
+    setApps(next);
+    if (selectedAppId === id && next.length > 0) {
+      setSelectedAppId(next[0].id);
+    }
   };
 
   const globalSummary = useMemo(() => {
@@ -601,6 +622,27 @@ export const TargetSection = ({
 
                 {/* Top accent bar */}
                 <div className={cn('h-1 bg-gradient-to-r', accent.gradient)} />
+
+                {/* Delete button — show on hover, disabled kalau cuma 1 app tersisa */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeApp(app.id);
+                  }}
+                  disabled={apps.length <= 1}
+                  aria-label={`Hapus aplikasi ${app.name}`}
+                  title={apps.length <= 1 ? 'Tidak bisa hapus aplikasi terakhir' : `Hapus ${app.name}`}
+                  className={cn(
+                    'absolute top-3 right-3 z-20 p-2 rounded-xl transition-all',
+                    'opacity-0 group-hover:opacity-100',
+                    'text-rose-500 bg-white shadow-md border border-rose-100',
+                    'hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600',
+                    'disabled:opacity-30 disabled:cursor-not-allowed',
+                  )}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
 
                 <div className="relative z-10 p-6">
                   <div className="flex items-start justify-between mb-5">
