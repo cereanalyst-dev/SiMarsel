@@ -190,3 +190,55 @@ from public.transactions
 where payment_date is not null
 group by 1, 2
 order by 1 desc, 2;
+
+-- ---------------------------------------------------------------------------
+-- Overview stats — computed di server, single row hasil query.
+-- Dipakai dashboard untuk skip fetch 294K rows saat load awal.
+-- Kalau filter dipakai, dashboard fetch raw data dan aggregate di client
+-- (karena view ini tidak accept param).
+-- ---------------------------------------------------------------------------
+create or replace view public.overview_stats as
+with base as (
+  select
+    trim(coalesce(email, ''))      as email,
+    trim(coalesce(trx_id, ''))     as trx_id,
+    revenue
+  from public.transactions
+),
+tx_sum as (
+  select
+    sum(revenue)       as total_revenue,
+    count(*)           as total_transaksi,
+    round(sum(revenue) / nullif(count(*), 0)) as aov
+  from public.transactions
+),
+unique_buyer as (
+  select count(distinct email) as unique_buyers
+  from base where email <> ''
+),
+repeat_order as (
+  select count(*) as user_repeat_order
+  from (
+    select email from base
+    where email <> '' and trx_id <> ''
+    group by email
+    having count(distinct trx_id) >= 2
+  ) t
+),
+dl_sum as (
+  select coalesce(sum(count), 0) as total_downloader
+  from public.downloaders
+)
+select
+  t.total_revenue,
+  t.total_transaksi,
+  t.aov,
+  u.unique_buyers,
+  r.user_repeat_order,
+  d.total_downloader,
+  case
+    when d.total_downloader > 0
+      then round((t.total_transaksi::numeric / d.total_downloader) * 10000) / 100
+    else 0
+  end as konversi_pct
+from tx_sum t, unique_buyer u, repeat_order r, dl_sum d;
