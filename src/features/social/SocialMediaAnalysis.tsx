@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { motion } from 'motion/react';
 import { format, parse } from 'date-fns';
-import { Calendar, Plus, Search, Smartphone, Trash2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Calendar, Download, FileSpreadsheet, Plus, Search, Smartphone, Trash2, Upload } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatters';
+import { excelDateToJSDate } from '../../lib/excelDate';
 import type { AppData, SocialMediaContent } from '../../types';
 
 interface Props {
@@ -102,6 +104,166 @@ export const SocialMediaAnalysis = ({
     );
   };
 
+  // ===================== IMPORT / TEMPLATE EXCEL =====================
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  const handleDownloadTemplate = () => {
+    const appNamesHint = apps.map((a) => a.name).join(', ');
+    const exampleAppName = apps[0]?.name ?? 'JADIBUMN';
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    const rows = [
+      {
+        'Nama App':   exampleAppName,
+        'Tanggal':    today,
+        'Jam Posting':'10:00',
+        'Platform':   'Instagram',
+        'Jenis Konten':'Reels',
+        'Objective':  'Awareness',
+        'Judul':      'Tips Jitu Lolos Tes BUMN 2026',
+        'Hook':       'Jangan asal ikut tes — simak dulu...',
+        'Caption':    'Caption lengkap di sini. Pakai kalimat persuasif dan CTA jelas.',
+        'CTA':        'Daftar sekarang',
+        'Topik':      'Persiapan tes BUMN',
+        'Link':       'https://example.com',
+        'Reach':      5000,
+        'Engagement': 250,
+        'Views':      8000,
+        'Likes':      200,
+        'Comments':   30,
+        'Shares':     20,
+      },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Set column widths for readability
+    ws['!cols'] = [
+      { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
+      { wch: 40 }, { wch: 40 }, { wch: 60 }, { wch: 20 }, { wch: 24 }, { wch: 30 },
+      { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Konten Sosial Media');
+
+    // Sheet kedua: petunjuk
+    const noteRows = [
+      ['Petunjuk Pengisian Template'],
+      [''],
+      ['1.', 'Kolom "Nama App" HARUS cocok dengan salah satu: ' + appNamesHint],
+      ['2.', 'Tanggal format YYYY-MM-DD (mis. 2024-03-15). Boleh juga format Excel Date.'],
+      ['3.', 'Jam Posting format HH:mm (24 jam), mis. 09:30, 14:15.'],
+      ['4.', 'Platform: Instagram, TikTok, Facebook, Twitter/X, YouTube, LinkedIn.'],
+      ['5.', 'Jenis Konten: Feed, Reels, Story, Video, Shorts, Live, Carousel.'],
+      ['6.', 'Objective: Awareness, Engagement, Traffic, Conversion, Retention.'],
+      ['7.', 'Kolom angka (Reach, Engagement, Views, Likes, Comments, Shares) isi angka saja.'],
+      ['8.', 'Kolom teks kosong diperbolehkan kecuali Nama App dan Tanggal.'],
+      ['9.', 'Baris contoh di sheet "Konten Sosial Media" boleh dihapus setelah diisi.'],
+    ];
+    const notesWs = XLSX.utils.aoa_to_sheet(noteRows);
+    notesWs['!cols'] = [{ wch: 4 }, { wch: 100 }];
+    XLSX.utils.book_append_sheet(wb, notesWs, 'Petunjuk');
+
+    XLSX.writeFile(wb, 'template-social-media.xlsx');
+  };
+
+  const handleImportExcel = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportStatus('Memproses file…');
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
+
+      if (rows.length === 0) {
+        setImportStatus('❌ File kosong. Tidak ada baris yang diimpor.');
+        return;
+      }
+
+      const appByName = new Map(apps.map((a) => [a.name.toLowerCase().trim(), a]));
+
+      // Collect updates: { appId → { date → [new content...] } }
+      const updates = new Map<string, Map<string, SocialMediaContent[]>>();
+      let imported = 0;
+      const skipped: string[] = [];
+
+      rows.forEach((row, idx) => {
+        const appName = String(row['Nama App'] ?? row['App'] ?? '').trim();
+        const app = appByName.get(appName.toLowerCase());
+        if (!app) {
+          skipped.push(`Baris ${idx + 2}: App "${appName}" tidak dikenal`);
+          return;
+        }
+
+        const rawDate = row['Tanggal'] ?? row['Date'] ?? row['tanggal'];
+        const dateObj =
+          typeof rawDate === 'number' ? excelDateToJSDate(rawDate) : new Date(String(rawDate));
+        if (isNaN(dateObj.getTime())) {
+          skipped.push(`Baris ${idx + 2}: Tanggal tidak valid`);
+          return;
+        }
+        const dateKey = format(dateObj, 'yyyy-MM-dd');
+
+        const content: SocialMediaContent = {
+          platform:    String(row['Platform'] ?? 'Instagram'),
+          postingTime: String(row['Jam Posting'] ?? row['Posting Time'] ?? '10:00'),
+          contentType: String(row['Jenis Konten'] ?? row['Content Type'] ?? 'Feed'),
+          title:       String(row['Judul'] ?? row['Title'] ?? ''),
+          caption:     String(row['Caption'] ?? ''),
+          cta:         String(row['CTA'] ?? ''),
+          topic:       String(row['Topik'] ?? row['Topic'] ?? ''),
+          hook:        String(row['Hook'] ?? ''),
+          link:        String(row['Link'] ?? ''),
+          objective:   String(row['Objective'] ?? 'Awareness'),
+          reach:      Number(row['Reach'])      || 0,
+          engagement: Number(row['Engagement']) || 0,
+          views:      Number(row['Views'])      || 0,
+          likes:      Number(row['Likes'])      || 0,
+          comments:   Number(row['Comments'])   || 0,
+          shares:     Number(row['Shares'])     || 0,
+        };
+
+        if (!updates.has(app.id)) updates.set(app.id, new Map());
+        const byDate = updates.get(app.id)!;
+        if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+        byDate.get(dateKey)!.push(content);
+        imported += 1;
+      });
+
+      setApps(
+        apps.map((app) => {
+          const byDate = updates.get(app.id);
+          if (!byDate) return app;
+          const newDaily = { ...(app.dailyData || {}) };
+          byDate.forEach((contents, dateKey) => {
+            const existing = newDaily[dateKey]?.socialContent || [];
+            newDaily[dateKey] = {
+              ...(newDaily[dateKey] || {}),
+              socialContent: [...existing, ...contents],
+            };
+          });
+          return { ...app, dailyData: newDaily };
+        }),
+      );
+
+      let msg = `✅ Berhasil impor ${imported} konten.`;
+      if (skipped.length > 0) {
+        msg += ` ${skipped.length} baris di-skip. Cek Console untuk detail.`;
+        console.warn('[SiMarsel] Social media import skipped rows:', skipped);
+      }
+      setImportStatus(msg);
+    } catch (err) {
+      console.error('[SiMarsel] Import social media error:', err);
+      setImportStatus('❌ Gagal membaca file. Pastikan format sesuai template.');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleAddContent = (appId: string, date: string, content: SocialMediaContent) => {
     setApps(
       apps.map((app) => {
@@ -163,6 +325,29 @@ export const SocialMediaAnalysis = ({
               ))}
             </select>
             <button
+              onClick={handleDownloadTemplate}
+              title="Download template Excel"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-xs font-black uppercase tracking-widest hover:border-emerald-400 hover:text-emerald-600 transition-all"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Template</span>
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              title="Import konten dari file Excel"
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border-2 border-emerald-200 text-emerald-700 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-100 transition-all"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span className="hidden sm:inline">Import Excel</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImportExcel}
+              className="hidden"
+            />
+            <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
             >
@@ -171,6 +356,28 @@ export const SocialMediaAnalysis = ({
             </button>
           </div>
         </div>
+
+        {importStatus && (
+          <div
+            className={cn(
+              'mb-6 p-4 rounded-2xl border flex items-start gap-3',
+              importStatus.startsWith('❌')
+                ? 'bg-rose-50 border-rose-100 text-rose-700'
+                : importStatus.startsWith('✅')
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                  : 'bg-slate-50 border-slate-100 text-slate-700',
+            )}
+          >
+            <Upload className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 text-[11px] font-bold">{importStatus}</div>
+            <button
+              onClick={() => setImportStatus(null)}
+              className="text-[10px] font-black opacity-60 hover:opacity-100"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {allContent.length === 0 ? (
           <div className="py-24 text-center">
@@ -259,7 +466,7 @@ export const SocialMediaAnalysis = ({
                           <button
                             onClick={() => handleDateClick(item.date)}
                             className="p-2 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
-                            title="Lihat di Kalender Paket"
+                            title="Lihat di Kalender Marsel"
                           >
                             <Calendar className="w-4 h-4" />
                           </button>

@@ -165,7 +165,7 @@ export const TargetSection = ({
       ? (totalRealRepeatOrder / totalRealDownloader) * 100
       : 0;
 
-    // Calculate Hutang Sales (Debt)
+    // Selisih Sales (signed — bisa hutang atau kelebihan)
     const lastFilledIdx = dates.reduce((acc, d, i) => {
       const data = selectedApp.dailyData?.[d];
       const hasData = data && (
@@ -178,7 +178,8 @@ export const TargetSection = ({
 
     const baseDailySales = targetConfig.targetSales / Math.max(1, dates.length);
     const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
-    const hutangSales = Math.max(0, expectedSalesSoFar - totalRealSales);
+    // Signed: negatif = Hutang, positif = Kelebihan
+    const selisihSales = totalRealSales - expectedSalesSoFar;
 
     return {
       totalRealDownloader,
@@ -187,8 +188,8 @@ export const TargetSection = ({
       progressDownloader,
       progressSales,
       progressConversion,
-      hutangSales,
-      targetConfig
+      selisihSales,
+      targetConfig,
     };
   }, [selectedApp, targetMonth, dates]);
 
@@ -214,7 +215,7 @@ export const TargetSection = ({
     let totalRealSales = 0;
     let totalTargetRepeatOrder = 0;
     let totalRealRepeatOrder = 0;
-    let totalHutangSales = 0;
+    let totalSelisihSales = 0; // signed: negatif=hutang, positif=kelebihan
 
     filteredAppsForSummary.forEach(app => {
       const targetConfig = app.targetConfig?.[targetMonth];
@@ -253,7 +254,7 @@ export const TargetSection = ({
       if (targetConfig && targetConfig.targetSales > 0) {
         const baseDailySales = targetConfig.targetSales / Math.max(1, dates.length);
         const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
-        totalHutangSales += Math.max(0, expectedSalesSoFar - appRealSales);
+        totalSelisihSales += appRealSales - expectedSalesSoFar;
       }
     });
 
@@ -264,7 +265,7 @@ export const TargetSection = ({
       totalRealSales,
       totalTargetRepeatOrder,
       totalRealRepeatOrder,
-      totalHutangSales,
+      totalSelisihSales,
       downloaderProgress: totalTargetDownloader > 0 ? (totalRealDownloader / totalTargetDownloader) * 100 : 0,
       salesProgress: totalTargetSales > 0 ? (totalRealSales / totalTargetSales) * 100 : 0,
       conversionProgress: totalRealDownloader > 0 ? (totalRealRepeatOrder / totalRealDownloader) * 100 : 0
@@ -348,11 +349,46 @@ export const TargetSection = ({
                 <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.conversionProgress)}%` }} />
               </div>
             </div>
-            <div className="bg-rose-50 p-5 rounded-3xl border border-rose-100 shadow-sm hover:bg-rose-100/50 transition-all">
-              <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest mb-2">Hutang Sales</p>
-              <h3 className="text-xl font-black text-rose-600">{formatCurrency(globalSummary.totalHutangSales)}</h3>
-              <p className="text-[8px] text-rose-400 font-bold mt-1">Defisit s/d hari ini</p>
-            </div>
+            {(() => {
+              const s = globalSummary.totalSelisihSales;
+              const isSurplus = s >= 0;
+              return (
+                <div
+                  className={cn(
+                    'p-5 rounded-3xl border shadow-sm transition-all',
+                    isSurplus
+                      ? 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100/50'
+                      : 'bg-rose-50 border-rose-100 hover:bg-rose-100/50',
+                  )}
+                >
+                  <p
+                    className={cn(
+                      'text-[9px] font-bold uppercase tracking-widest mb-2',
+                      isSurplus ? 'text-emerald-500' : 'text-rose-400',
+                    )}
+                  >
+                    {isSurplus ? 'Kelebihan Sales' : 'Hutang Sales'}
+                  </p>
+                  <h3
+                    className={cn(
+                      'text-xl font-black',
+                      isSurplus ? 'text-emerald-600' : 'text-rose-600',
+                    )}
+                  >
+                    {isSurplus ? '+' : '-'}
+                    {formatCurrency(Math.abs(s))}
+                  </h3>
+                  <p
+                    className={cn(
+                      'text-[8px] font-bold mt-1',
+                      isSurplus ? 'text-emerald-500' : 'text-rose-400',
+                    )}
+                  >
+                    {isSurplus ? 'Di atas target s/d hari ini' : 'Defisit s/d hari ini'}
+                  </p>
+                </div>
+              );
+            })()}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-slate-200 transition-all">
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Real Downloader</p>
               <h3 className="text-xl font-black text-slate-900">{formatNumber(globalSummary.totalRealDownloader)}</h3>
@@ -381,7 +417,7 @@ export const TargetSection = ({
                     <th className="py-4 px-4">Progress Downloader</th>
                     <th className="py-4 px-4">Progress Sales</th>
                     <th className="py-4 px-4">Progres Konversi</th>
-                    <th className="py-4 px-4">Hutang Sales</th>
+                    <th className="py-4 px-4">Selisih Sales</th>
                     <th className="py-4 px-4">Total Real Downloader</th>
                     <th className="py-4 px-4">Total Real Sales</th>
                   </tr>
@@ -412,12 +448,13 @@ export const TargetSection = ({
                     const progressSales = target?.targetSales > 0 ? (appRealSales / target.targetSales) * 100 : 0;
                     const progressConversion = appRealDownloader > 0 ? (appRealRepeatOrder / appRealDownloader) * 100 : 0;
 
-                    let hutangSales = 0;
+                    let selisihSales = 0;
                     if (target?.targetSales > 0) {
                       const baseDailySales = target.targetSales / Math.max(1, dates.length);
                       const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
-                      hutangSales = Math.max(0, expectedSalesSoFar - appRealSales);
+                      selisihSales = appRealSales - expectedSalesSoFar;
                     }
+                    const isSurplus = selisihSales >= 0;
 
                     return (
                       <tr key={app.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all group">
@@ -446,7 +483,15 @@ export const TargetSection = ({
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-xs font-bold text-rose-600">{formatCurrency(hutangSales)}</td>
+                        <td className={cn('py-4 px-4 text-xs font-black', isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
+                          <span className="inline-flex items-center gap-1">
+                            <span>{isSurplus ? '+' : '-'}</span>
+                            {formatCurrency(Math.abs(selisihSales))}
+                          </span>
+                          <span className={cn('block text-[9px] font-bold uppercase tracking-widest mt-0.5', isSurplus ? 'text-emerald-400' : 'text-rose-400')}>
+                            {isSurplus ? 'Kelebihan' : 'Hutang'}
+                          </span>
+                        </td>
                         <td className="py-4 px-4 text-xs font-bold text-slate-500">{formatNumber(appRealDownloader)}</td>
                         <td className="py-4 px-4 text-xs font-black text-slate-900">{formatCurrency(appRealSales)}</td>
                       </tr>
@@ -665,11 +710,44 @@ export const TargetSection = ({
                 <div className="h-full bg-violet-500" style={{ width: `${Math.min(100, summary.progressConversion)}%` }} />
               </div>
             </div>
-            <div className="bg-rose-50 p-5 rounded-3xl border border-rose-100 shadow-sm">
-              <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest mb-2">Hutang Sales</p>
-              <h3 className="text-xl font-black text-rose-600">{formatCurrency(summary.hutangSales)}</h3>
-              <p className="text-[8px] text-rose-400 font-bold mt-1">Defisit s/d hari ini</p>
-            </div>
+            {(() => {
+              const s = summary.selisihSales;
+              const isSurplus = s >= 0;
+              return (
+                <div
+                  className={cn(
+                    'p-5 rounded-3xl border shadow-sm',
+                    isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100',
+                  )}
+                >
+                  <p
+                    className={cn(
+                      'text-[9px] font-bold uppercase tracking-widest mb-2',
+                      isSurplus ? 'text-emerald-500' : 'text-rose-400',
+                    )}
+                  >
+                    {isSurplus ? 'Kelebihan Sales' : 'Hutang Sales'}
+                  </p>
+                  <h3
+                    className={cn(
+                      'text-xl font-black',
+                      isSurplus ? 'text-emerald-600' : 'text-rose-600',
+                    )}
+                  >
+                    {isSurplus ? '+' : '-'}
+                    {formatCurrency(Math.abs(s))}
+                  </h3>
+                  <p
+                    className={cn(
+                      'text-[8px] font-bold mt-1',
+                      isSurplus ? 'text-emerald-500' : 'text-rose-400',
+                    )}
+                  >
+                    {isSurplus ? 'Di atas target s/d hari ini' : 'Defisit s/d hari ini'}
+                  </p>
+                </div>
+              );
+            })()}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Real Downloader</p>
               <h3 className="text-xl font-black text-slate-900">{formatNumber(summary.totalRealDownloader)}</h3>

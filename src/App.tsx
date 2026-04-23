@@ -352,7 +352,10 @@ export default function App() {
     let totalTargetRevenue = 0;
     let totalTargetDownloader = 0;
     let totalTargetRepeatOrder = 0;
-    let totalHutangSales = 0;
+    // selisihSales = actualSales - expectedSoFar (signed)
+    //   negatif → "Hutang Sales" (belum mencapai target)
+    //   positif → "Kelebihan Sales" (sudah melebihi target)
+    let totalSelisihSales = 0;
 
     relevantApps.forEach((app) => {
       if (monthKey) {
@@ -385,7 +388,8 @@ export default function App() {
           const daysInMonth = new Date(ymY, ymM, 0).getDate();
           const baseDailySales = (target.targetSales || 0) / Math.max(1, daysInMonth);
           const expectedSoFar = baseDailySales * (lastFilledIdx + 1);
-          totalHutangSales += Math.max(0, expectedSoFar - appRealSales);
+          // signed difference: negative = hutang, positive = kelebihan
+          totalSelisihSales += appRealSales - expectedSoFar;
         }
       } else {
         Object.keys(app.targetConfig || {}).forEach((m) => {
@@ -419,7 +423,7 @@ export default function App() {
       // Downloader = sum count di filteredDownloaderData.
       progressConversion:
         totalRealDownloader > 0 ? (totalTransactions / totalRealDownloader) * 100 : 0,
-      hutangSales: totalHutangSales,
+      selisihSales: totalSelisihSales,
       totalRealDownloader,
       totalRealSales,
       totalRepeatOrderUsers: repeatOrderUsers,

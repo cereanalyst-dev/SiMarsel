@@ -60,7 +60,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: 'optimasi', icon: TrendingUp,      label: 'Optimasi Harga',       group: 'main' },
   { id: 'target',   icon: Target,          label: 'Strategi & Target',    group: 'main' },
   { id: 'packages', icon: Package,         label: 'Performa Produk',      group: 'main' },
-  { id: 'calendar', icon: Calendar,        label: 'Kalender Paket',       group: 'main' },
+  { id: 'calendar', icon: Calendar,        label: 'Kalender Marsel',      group: 'main' },
   { id: 'social',   icon: MessageSquare,   label: 'Analisa Sosial Media', group: 'main' },
   { id: 'settings', icon: Settings,        label: 'Settings',             group: 'system' },
 ];

@@ -66,12 +66,12 @@ export const Sidebar = ({ activeTab, setActiveTab, onSignOut, userEmail }: Props
       {/* Brand */}
       <div className="relative px-7 pt-8 pb-6">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 relative">
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-amber-400 to-rose-500 blur-[3px] opacity-60" />
+          <div className="w-16 h-16 relative flex-shrink-0">
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-amber-400 via-rose-500 to-indigo-500 blur-md opacity-50" />
             <img
               src={LOGO_PATH}
               alt={APP_NAME}
-              className="relative w-full h-full object-contain rounded-xl ring-2 ring-white/10"
+              className="relative w-full h-full object-contain rounded-2xl ring-2 ring-white/10"
               referrerPolicy="no-referrer"
             />
           </div>

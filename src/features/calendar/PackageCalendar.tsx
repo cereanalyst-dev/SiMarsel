@@ -151,7 +151,7 @@ export const PackageCalendar = ({
               <Calendar className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">Kalender Paket Aktif</h3>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Kalender Marsel</h3>
               <p className="text-xs text-slate-400 font-medium mt-1">Visualisasi paket yang aktif berdasarkan transaksi harian</p>
             </div>
           </div>
