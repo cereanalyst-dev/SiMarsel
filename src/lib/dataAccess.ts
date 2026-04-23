@@ -139,6 +139,10 @@ export interface DataSet {
 
 // Supabase PostgREST default membatasi sekitar 1000 baris per request.
 // Kita paginate manual pakai .range() supaya bisa ambil full dataset.
+// PENTING: HARUS .order() pakai kolom unik — kalau tidak, urutan row antar
+// request tidak deterministik, jadi range(0-999) & range(1000-1999) bisa
+// overlap atau skip rows. Hasilnya state browser punya duplikat +
+// distinct email turun padahal total rows match.
 const PAGE_SIZE = 1000;
 
 async function fetchAllPages<T>(
@@ -151,12 +155,25 @@ async function fetchAllPages<T>(
   let from = 0;
   const startedAt = performance.now();
 
+  // Order column harus deterministik + indexed:
+  //   transactions: id (uuid PK)
+  //   downloaders:  date + source_app (composite PK)
+  const orderColumn = tableName === 'transactions' ? 'id' : 'date';
+
   while (true) {
     const to = from + PAGE_SIZE - 1;
-    const { data, error } = await supabase
+    const query = supabase
       .from(tableName)
       .select('*')
-      .range(from, to);
+      .order(orderColumn, { ascending: true });
+
+    // Tambahan order secondary untuk downloaders supaya stabil kalau date
+    // sama (beda source_app).
+    if (tableName === 'downloaders') {
+      query.order('source_app', { ascending: true });
+    }
+
+    const { data, error } = await query.range(from, to);
 
     if (error) {
       console.error(
