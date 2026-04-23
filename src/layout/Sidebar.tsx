@@ -1,4 +1,4 @@
-import { LogOut } from 'lucide-react';
+import { ChevronRight, LogOut } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import {
@@ -16,103 +16,148 @@ export const Sidebar = ({ activeTab, setActiveTab, onSignOut, userEmail }: Props
   const mainItems = MENU_ITEMS.filter((m) => m.group === 'main');
   const systemItems = MENU_ITEMS.filter((m) => m.group === 'system');
 
-  const renderItem = (item: (typeof MENU_ITEMS)[number]) => (
-    <button
-      key={item.id}
-      onClick={() => setActiveTab(item.id)}
-      className={cn(
-        'w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-bold transition-all group',
-        activeTab === item.id
-          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
-          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50',
-      )}
-    >
-      <div className="flex items-center gap-3">
+  const renderItem = (item: (typeof MENU_ITEMS)[number]) => {
+    const isActive = activeTab === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => setActiveTab(item.id)}
+        className={cn(
+          'group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200',
+          isActive
+            ? 'bg-white text-slate-900 shadow-[0_6px_20px_-6px_rgba(0,0,0,0.4)]'
+            : 'text-slate-300 hover:text-white hover:bg-white/5',
+        )}
+      >
+        {isActive && (
+          <motion.span
+            layoutId="sidebar-indicator"
+            className="absolute inset-y-1.5 -left-4 w-1 rounded-full bg-amber-400"
+          />
+        )}
         <item.icon
           className={cn(
-            'w-5 h-5',
-            activeTab === item.id ? 'text-white' : 'text-slate-500 group-hover:text-slate-300',
+            'w-4.5 h-4.5 flex-shrink-0 transition-colors',
+            isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-amber-300',
           )}
+          strokeWidth={isActive ? 2.5 : 2}
         />
-        {item.label}
-      </div>
-      {activeTab === item.id && (
-        <motion.div layoutId="activeTab" className="w-1.5 h-1.5 bg-white rounded-full" />
-      )}
-    </button>
-  );
+        <span className="flex-1 text-left">{item.label}</span>
+        {isActive && <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+      </button>
+    );
+  };
 
   return (
-    <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col h-screen sticky top-0 overflow-y-auto">
-      <div className="p-8 border-b border-slate-800 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 flex items-center justify-center">
+    <aside
+      className="w-72 flex flex-col h-screen sticky top-0 overflow-hidden"
+      style={{
+        background:
+          'linear-gradient(180deg, #0f172a 0%, #111c36 50%, #0b1424 100%)',
+      }}
+    >
+      {/* Decorative layer */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-indigo-500/10 to-transparent" />
+        <div className="absolute top-20 -right-10 w-40 h-40 bg-amber-400/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 -left-20 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl" />
+      </div>
+
+      {/* Brand */}
+      <div className="relative px-7 pt-8 pb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 relative">
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-amber-400 to-rose-500 blur-[3px] opacity-60" />
             <img
               src={LOGO_PATH}
               alt={APP_NAME}
-              className="w-full h-full object-contain rounded-xl"
+              className="relative w-full h-full object-contain rounded-xl ring-2 ring-white/10"
               referrerPolicy="no-referrer"
             />
           </div>
-          <div>
-            <h1 className="text-xl font-black text-white tracking-tight leading-none">
+          <div className="leading-none">
+            <h1 className="text-[22px] font-black text-white tracking-tight">
               {APP_NAME}
-              {APP_ACCENT_SUFFIX && <span className="text-indigo-500">{APP_ACCENT_SUFFIX}</span>}
+              {APP_ACCENT_SUFFIX && (
+                <span className="text-amber-400">{APP_ACCENT_SUFFIX}</span>
+              )}
             </h1>
-            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1.5">
+            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1.5">
               {COMPANY_NAME}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 px-4 space-y-8">
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">
-            Menu Utama
-          </p>
-          <div className="space-y-1">{mainItems.map(renderItem)}</div>
-        </div>
-
-        {systemItems.length > 0 && (
-          <div>
-            <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">
-              Sistem
-            </p>
-            <div className="space-y-1">
-              {systemItems.map(renderItem)}
-              {onSignOut && (
-                <button
-                  onClick={onSignOut}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold text-slate-400 hover:text-rose-400 hover:bg-slate-800/50 transition-all"
-                >
-                  <LogOut className="w-5 h-5 text-slate-500" />
-                  Sign Out
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+      {/* Divider with label */}
+      <div className="relative px-7 flex items-center gap-3 mb-5">
+        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em]">
+          Navigasi
+        </p>
+        <span className="flex-1 h-px bg-gradient-to-r from-slate-700/50 to-transparent" />
       </div>
 
-      <div className="p-6 mt-auto">
-        <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-            {userEmail ? 'Masuk sebagai' : 'Status Server'}
-          </p>
-          {userEmail ? (
-            <p className="text-[11px] font-black text-white truncate" title={userEmail}>
-              {userEmail}
-            </p>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[11px] font-black text-white">Online &amp; Terkoneksi</span>
+      <nav className="relative flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+        {mainItems.map(renderItem)}
+
+        {systemItems.length > 0 && (
+          <>
+            <div className="flex items-center gap-3 px-3 pt-6 pb-2">
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em]">
+                Sistem
+              </p>
+              <span className="flex-1 h-px bg-gradient-to-r from-slate-700/50 to-transparent" />
             </div>
+            {systemItems.map(renderItem)}
+            {onSignOut && (
+              <button
+                onClick={onSignOut}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all"
+              >
+                <LogOut className="w-4.5 h-4.5 text-slate-500" />
+                Keluar
+              </button>
+            )}
+          </>
+        )}
+      </nav>
+
+      {/* Status card */}
+      <div className="relative p-5 pt-4">
+        <div className="relative rounded-2xl p-4 bg-white/[0.03] border border-white/5 overflow-hidden">
+          <div className="absolute -right-4 -top-4 w-20 h-20 bg-amber-400/10 rounded-full blur-2xl" />
+          {userEmail ? (
+            <>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em] mb-1.5">
+                Akun Aktif
+              </p>
+              <p
+                className="text-[11px] font-black text-white truncate"
+                title={userEmail}
+              >
+                {userEmail}
+              </p>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[9px] font-bold text-emerald-300/80 uppercase tracking-wider">
+                  Synced · Supabase
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em] mb-1.5">
+                Status
+              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-[11px] font-black text-white">Mode Lokal</span>
+              </div>
+            </>
           )}
         </div>
       </div>
-    </div>
+    </aside>
   );
 };
 

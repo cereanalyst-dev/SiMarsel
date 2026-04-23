@@ -75,6 +75,33 @@ export const Overview = ({
       exit={{ opacity: 0, x: -20 }}
       className="space-y-10"
     >
+      {/* ============ EDITORIAL HEADER ============ */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              Live Dashboard
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            Ringkasan Performa
+          </h1>
+          <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
+            Snapshot metrik utama — revenue, konversi, repeat order, dan volume
+            transaksi lintas aplikasi.
+          </p>
+        </div>
+        <div className="text-right hidden md:block">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">
+            Total Rows
+          </p>
+          <p className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+            {formatNumber(stats.totalTransactions)}
+          </p>
+        </div>
+      </div>
+
       <FilterSection filters={filters} setFilters={setFilters} availableOptions={availableOptions} />
 
       {/* ============ HERO CARDS (3 big) ============ */}
@@ -132,13 +159,26 @@ export const Overview = ({
         />
       </div>
 
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
-          <div>
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">Analisa Tren & Performa</h3>
-            <p className="text-sm text-slate-400 font-medium mt-1">
-              Visualisasi data multi-app dengan kontrol fleksibel
-            </p>
+      <div className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
+        {/* Decorative accents */}
+        <div className="pointer-events-none absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br from-indigo-100/50 to-transparent rounded-full blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 w-64 h-64 bg-gradient-to-br from-amber-100/40 to-transparent rounded-full blur-3xl" />
+
+        <div className="relative flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+          <div className="flex items-start gap-4">
+            <div className="w-1 h-14 rounded-full bg-gradient-to-b from-indigo-500 via-amber-400 to-rose-500" />
+            <div>
+              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.25em] mb-1.5">
+                Analytics
+              </p>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                Analisa Tren &amp; Performa
+              </h3>
+              <p className="text-sm text-slate-500 font-medium mt-1 max-w-md">
+                Visualisasi data multi-app dengan kontrol fleksibel — pilih metrik,
+                tipe chart, dan granularity.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
@@ -160,7 +200,7 @@ export const Overview = ({
           </div>
         </div>
 
-        <div className="h-[500px] mb-8">
+        <div className="relative h-[500px] mb-8">
           <FlexibleChart
             data={trendData}
             type={chartType}

@@ -622,7 +622,7 @@ export default function App() {
         />
 
         <div className="flex-1 flex flex-col min-w-0">
-          <TopBar />
+          <TopBar activeTab={activeTab} rowsLoaded={data.length} />
 
           <main className="p-8 max-w-[1600px] mx-auto w-full">
             {error && data.length === 0 && (

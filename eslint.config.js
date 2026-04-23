@@ -25,6 +25,8 @@ export default [
         crypto: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
         fetch: 'readonly',
         FileReader: 'readonly',
         File: 'readonly',
