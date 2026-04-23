@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
-import type { AppData } from '../../types';
+import type { AppData, Downloader, Transaction } from '../../types';
 import SocialMediaModal from './SocialMediaModal';
 
 interface TargetSectionProps {
@@ -19,6 +19,9 @@ interface TargetSectionProps {
   setTargetMonth: (m: string) => void;
   setActiveTab: (tab: string) => void;
   setCalendarFocusDate: (d: Date | null) => void;
+  // Auto-sourced dari database — tidak perlu input manual
+  transactions?: Transaction[];
+  downloaders?: Downloader[];
 }
 
 export const TargetSection = ({
@@ -30,6 +33,8 @@ export const TargetSection = ({
   setTargetMonth,
   setActiveTab,
   setCalendarFocusDate,
+  transactions = [],
+  downloaders = [],
 }: TargetSectionProps) => {
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
@@ -83,6 +88,71 @@ export const TargetSection = ({
       return format(new Date(year, month - 1, i + 1), 'yyyy-MM-dd');
     });
   }, [targetMonth, daysInMonthCount]);
+
+  // ==============================================================
+  // Auto-fill actuals dari database, keyed by APP_NAME_UPPER → DATE_KEY.
+  //   • downloader = SUM(count) dari tabel downloaders
+  //   • sales      = SUM(revenue) dari transactions
+  //   • premium    = COUNT(DISTINCT trx_id) per (app, date)
+  //
+  // Dipakai oleh: operational sheet, summary, globalSummary, recap.
+  // User tidak perlu isi Real manual — semua auto dari DB.
+  // ==============================================================
+  type ActualRow = { downloader: number; sales: number; trxIds: Set<string> };
+  const actualsByAppByDate = useMemo(() => {
+    const outer = new Map<string, Map<string, ActualRow>>();
+    const ensure = (appKey: string, dateKey: string): ActualRow => {
+      let inner = outer.get(appKey);
+      if (!inner) {
+        inner = new Map();
+        outer.set(appKey, inner);
+      }
+      let row = inner.get(dateKey);
+      if (!row) {
+        row = { downloader: 0, sales: 0, trxIds: new Set() };
+        inner.set(dateKey, row);
+      }
+      return row;
+    };
+
+    downloaders.forEach((d) => {
+      const appKey = (d.source_app ?? '').trim().toUpperCase();
+      if (!appKey) return;
+      const raw = typeof d.date === 'string'
+        ? d.date
+        : d.parsed_date instanceof Date
+          ? format(d.parsed_date, 'yyyy-MM-dd')
+          : '';
+      const dateKey = raw.slice(0, 10);
+      if (!dateKey) return;
+      ensure(appKey, dateKey).downloader += Number(d.count) || 0;
+    });
+
+    transactions.forEach((t) => {
+      const appKey = (t.source_app ?? '').trim().toUpperCase();
+      if (!appKey) return;
+      const dateKey = t.parsed_payment_date instanceof Date
+        ? format(t.parsed_payment_date, 'yyyy-MM-dd')
+        : typeof t.payment_date === 'string'
+          ? String(t.payment_date).slice(0, 10)
+          : '';
+      if (!dateKey) return;
+      const row = ensure(appKey, dateKey);
+      row.sales += Number(t.revenue) || 0;
+      const trxId = (t.trx_id ?? '').trim();
+      if (trxId) row.trxIds.add(trxId);
+    });
+
+    return outer;
+  }, [transactions, downloaders]);
+
+  // Helper untuk ambil actuals per app+date
+  const getActual = (appName: string | undefined, dateKey: string) => {
+    if (!appName) return { downloader: 0, sales: 0, premium: 0 };
+    const row = actualsByAppByDate.get(appName.trim().toUpperCase())?.get(dateKey);
+    if (!row) return { downloader: 0, sales: 0, premium: 0 };
+    return { downloader: row.downloader, sales: row.sales, premium: row.trxIds.size };
+  };
 
   const handleGenerateSheet = () => {
     const dailyDownloader = Math.ceil(form.targetDownloader / daysInMonthCount);
@@ -142,10 +212,11 @@ export const TargetSection = ({
   const isTargetSetForMonth = selectedApp.isTargetSet?.[targetMonth];
 
   const summary = useMemo(() => {
-    const dailyValues = dates.map(date => selectedApp.dailyData?.[date] || {});
-    const totalRealDownloader = dailyValues.reduce((sum, d) => sum + (Number(d.actualDownloader) || 0), 0);
-    const totalRealSales = dailyValues.reduce((sum, d) => sum + (Number(d.actualSales) || 0), 0);
-    const totalRealRepeatOrder = dailyValues.reduce((sum, d) => sum + (Number(d.actualRepeatOrder) || 0), 0);
+    // AUTO dari DB — tidak lagi pakai dailyData manual
+    const perDate = dates.map((date) => getActual(selectedApp.name, date));
+    const totalRealDownloader = perDate.reduce((sum, p) => sum + p.downloader, 0);
+    const totalRealSales = perDate.reduce((sum, p) => sum + p.sales, 0);
+    const totalRealRepeatOrder = perDate.reduce((sum, p) => sum + p.premium, 0);
 
     const targetConfig = selectedApp.targetConfig?.[targetMonth] || {
       targetDownloader: 0,
@@ -166,13 +237,10 @@ export const TargetSection = ({
       : 0;
 
     // Selisih Sales (signed — bisa hutang atau kelebihan)
+    // lastFilledIdx sekarang = indeks tanggal terakhir yang ada data DB
     const lastFilledIdx = dates.reduce((acc, d, i) => {
-      const data = selectedApp.dailyData?.[d];
-      const hasData = data && (
-        (data.actualSales !== undefined && data.actualSales !== null && data.actualSales !== 0) ||
-        (data.actualDownloader !== undefined && data.actualDownloader !== null && data.actualDownloader !== 0) ||
-        (data.actualRepeatOrder !== undefined && data.actualRepeatOrder !== null && data.actualRepeatOrder !== 0)
-      );
+      const a = getActual(selectedApp.name, d);
+      const hasData = a.sales > 0 || a.downloader > 0 || a.premium > 0;
       return hasData ? i : acc;
     }, -1);
 
@@ -191,7 +259,8 @@ export const TargetSection = ({
       selisihSales,
       targetConfig,
     };
-  }, [selectedApp, targetMonth, dates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedApp, targetMonth, dates, actualsByAppByDate]);
 
   const addApp = () => {
     const newId =
@@ -246,25 +315,19 @@ export const TargetSection = ({
         totalTargetRepeatOrder += targetConfig.targetRepeatOrder || 0;
       }
 
-      const dailyData = app.dailyData || {};
+      // Auto dari DB — loop tiap tanggal pakai getActual(app.name, date)
       let appRealDownloader = 0;
       let appRealSales = 0;
       let appRealRepeatOrder = 0;
       let lastFilledIdx = -1;
 
       dates.forEach((date, idx) => {
-        const d = dailyData[date];
-        if (d) {
-          const rd = Number(d.actualDownloader) || 0;
-          const rs = Number(d.actualSales) || 0;
-          const rr = Number(d.actualRepeatOrder) || 0;
-          appRealDownloader += rd;
-          appRealSales += rs;
-          appRealRepeatOrder += rr;
-
-          if (rd > 0 || rs > 0 || rr > 0) {
-            lastFilledIdx = idx;
-          }
+        const a = getActual(app.name, date);
+        appRealDownloader += a.downloader;
+        appRealSales += a.sales;
+        appRealRepeatOrder += a.premium;
+        if (a.downloader > 0 || a.sales > 0 || a.premium > 0) {
+          lastFilledIdx = idx;
         }
       });
 
@@ -291,7 +354,8 @@ export const TargetSection = ({
       salesProgress: totalTargetSales > 0 ? (totalRealSales / totalTargetSales) * 100 : 0,
       conversionProgress: totalRealDownloader > 0 ? (totalRealRepeatOrder / totalRealDownloader) * 100 : 0
     };
-  }, [filteredAppsForSummary, targetMonth, dates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredAppsForSummary, targetMonth, dates, actualsByAppByDate]);
 
   if (showAppSelection) {
     return (
@@ -486,23 +550,18 @@ export const TargetSection = ({
                 <tbody>
                   {filteredAppsForSummary.map(app => {
                     const target = app.targetConfig?.[targetMonth];
-                    const dailyData = app.dailyData || {};
                     let appRealDownloader = 0;
                     let appRealSales = 0;
                     let appRealRepeatOrder = 0;
                     let lastFilledIdx = -1;
 
+                    // AUTO dari DB
                     dates.forEach((date, idx) => {
-                      const d = dailyData[date];
-                      if (d) {
-                        const rd = Number(d.actualDownloader) || 0;
-                        const rs = Number(d.actualSales) || 0;
-                        const rr = Number(d.actualRepeatOrder) || 0;
-                        appRealDownloader += rd;
-                        appRealSales += rs;
-                        appRealRepeatOrder += rr;
-                        if (rd > 0 || rs > 0 || rr > 0) lastFilledIdx = idx;
-                      }
+                      const a = getActual(app.name, date);
+                      appRealDownloader += a.downloader;
+                      appRealSales += a.sales;
+                      appRealRepeatOrder += a.premium;
+                      if (a.downloader > 0 || a.sales > 0 || a.premium > 0) lastFilledIdx = idx;
                     });
 
                     const progressDownloader = target?.targetDownloader > 0 ? (appRealDownloader / target.targetDownloader) * 100 : 0;
@@ -944,81 +1003,75 @@ export const TargetSection = ({
                 <tbody>
                   {dates.map((date, idx) => {
                     const dayData = selectedApp.dailyData[date] || {};
-                    const conv = dayData.actualDownloader > 0 ? (dayData.actualRepeatOrder / dayData.actualDownloader) * 100 : 0;
-                    
+                    // AUTO dari DB — user tidak isi manual lagi
+                    const actualToday = getActual(selectedApp.name, date);
+                    const actualDownloader = actualToday.downloader;
+                    const actualRepeatOrder = actualToday.premium;
+                    const actualSales = actualToday.sales;
+
+                    const conv = actualDownloader > 0 ? (actualRepeatOrder / actualDownloader) * 100 : 0;
+
                     // Chained Dynamic Target Logic
                     const totalTargetSales = selectedApp.targetConfig[targetMonth]?.targetSales || 0;
                     const totalTargetDownloader = selectedApp.targetConfig[targetMonth]?.targetDownloader || 0;
                     const totalTargetRepeatOrder = selectedApp.targetConfig[targetMonth]?.targetRepeatOrder || 0;
-                    
+
                     const baseDailySales = totalTargetSales / dates.length;
                     const baseDailyDownloader = totalTargetDownloader / dates.length;
                     const baseDailyRepeatOrder = totalTargetRepeatOrder / dates.length;
 
-                    // Find the last day that has real data (not null/undefined)
+                    // lastFilledIdx = tanggal terakhir yang ada data di DB
                     const lastFilledIdx = dates.reduce((acc, d, i) => {
-                      const data = selectedApp.dailyData[d];
-                      const hasData = data && (
-                        (data.actualSales !== undefined && data.actualSales !== null) ||
-                        (data.actualDownloader !== undefined && data.actualDownloader !== null) ||
-                        (data.actualRepeatOrder !== undefined && data.actualRepeatOrder !== null)
-                      );
-                      return hasData ? i : acc;
+                      const a = getActual(selectedApp.name, d);
+                      return a.sales > 0 || a.downloader > 0 || a.premium > 0 ? i : acc;
                     }, -1);
 
                     let flexibleTargetSales = baseDailySales;
                     let flexibleTargetDownloader = baseDailyDownloader;
                     let flexibleTargetRepeatOrder = baseDailyRepeatOrder;
 
-                    // If this is the day immediately after the last filled day, apply the accumulated deficit
                     if (idx === lastFilledIdx + 1) {
-                      const actualsBefore = dates.slice(0, lastFilledIdx + 1).map(d => selectedApp.dailyData[d] || {});
-                      const totalActualSalesBefore = actualsBefore.reduce((sum, d) => sum + (d.actualSales || 0), 0);
-                      const totalActualDownloaderBefore = actualsBefore.reduce((sum, d) => sum + (d.actualDownloader || 0), 0);
-                      const totalActualRepeatOrderBefore = actualsBefore.reduce((sum, d) => sum + (d.actualRepeatOrder || 0), 0);
-                      
-                      const expectedSalesBefore = baseDailySales * (lastFilledIdx + 1);
-                      const expectedDownloaderBefore = baseDailyDownloader * (lastFilledIdx + 1);
-                      const expectedRepeatOrderBefore = baseDailyRepeatOrder * (lastFilledIdx + 1);
+                      const before = dates.slice(0, lastFilledIdx + 1).map((d) => getActual(selectedApp.name, d));
+                      const totalActualSalesBefore = before.reduce((s, a) => s + a.sales, 0);
+                      const totalActualDownloaderBefore = before.reduce((s, a) => s + a.downloader, 0);
+                      const totalActualRepeatOrderBefore = before.reduce((s, a) => s + a.premium, 0);
 
-                      const deficitSales = expectedSalesBefore - totalActualSalesBefore;
-                      const deficitDownloader = expectedDownloaderBefore - totalActualDownloaderBefore;
-                      const deficitRepeatOrder = expectedRepeatOrderBefore - totalActualRepeatOrderBefore;
+                      const deficitSales = baseDailySales * (lastFilledIdx + 1) - totalActualSalesBefore;
+                      const deficitDownloader = baseDailyDownloader * (lastFilledIdx + 1) - totalActualDownloaderBefore;
+                      const deficitRepeatOrder = baseDailyRepeatOrder * (lastFilledIdx + 1) - totalActualRepeatOrderBefore;
 
-                      // Apply reasonable limits (max 2x base target, min 0.2x base target)
                       flexibleTargetSales = Math.max(baseDailySales * 0.2, Math.min(baseDailySales * 2, baseDailySales + deficitSales));
                       flexibleTargetDownloader = Math.max(baseDailyDownloader * 0.2, Math.min(baseDailyDownloader * 2, baseDailyDownloader + deficitDownloader));
                       flexibleTargetRepeatOrder = Math.max(baseDailyRepeatOrder * 0.2, Math.min(baseDailyRepeatOrder * 2, baseDailyRepeatOrder + deficitRepeatOrder));
                     }
 
-                    // Use manual override if exists
                     const displayTargetSales = dayData.manualTargetSales || flexibleTargetSales;
                     const displayTargetDownloader = dayData.manualTargetDownloader || flexibleTargetDownloader;
                     const displayTargetRepeatOrder = dayData.manualTargetRepeatOrder || flexibleTargetRepeatOrder;
 
-                    const achievement = displayTargetSales > 0 ? (dayData.actualSales / displayTargetSales) * 100 : 0;
-                    let statusColor = "text-slate-400";
-                    let statusText = "Menunggu";
-                    let statusBg = "bg-slate-50";
+                    const achievement = displayTargetSales > 0 ? (actualSales / displayTargetSales) * 100 : 0;
+                    let statusColor = 'text-slate-400';
+                    let statusText = 'Menunggu';
+                    let statusBg = 'bg-slate-50';
 
-                    if (dayData.actualSales > 0) {
+                    if (actualSales > 0) {
                       if (achievement >= 100) {
-                        statusColor = "text-emerald-600";
-                        statusText = "Melebihi";
-                        statusBg = "bg-emerald-50";
+                        statusColor = 'text-emerald-600';
+                        statusText = 'Melebihi';
+                        statusBg = 'bg-emerald-50';
                       } else if (achievement >= 90) {
-                        statusColor = "text-amber-600";
-                        statusText = "Mendekati";
-                        statusBg = "bg-amber-50";
+                        statusColor = 'text-amber-600';
+                        statusText = 'Mendekati';
+                        statusBg = 'bg-amber-50';
                       } else {
-                        statusColor = "text-rose-600";
-                        statusText = "Kurang";
-                        statusBg = "bg-rose-50";
+                        statusColor = 'text-rose-600';
+                        statusText = 'Kurang';
+                        statusBg = 'bg-rose-50';
                       }
                     }
 
-                    const salesDiff = (dayData.actualSales || 0) - displayTargetSales;
-                    const keteranganText = dayData.actualSales > 0 
+                    const salesDiff = actualSales - displayTargetSales;
+                    const keteranganText = actualSales > 0
                       ? `${salesDiff >= 0 ? '+' : ''}${formatCurrency(salesDiff)}`
                       : '-';
 
@@ -1053,48 +1106,44 @@ export const TargetSection = ({
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors"
                           />
                         </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="number" 
-                            value={dayData.actualDownloader === null || dayData.actualDownloader === undefined ? '' : dayData.actualDownloader} 
-                            onChange={(e) => updateDailyValue(date, 'actualDownloader', e.target.value === '' ? null : Number(e.target.value))}
-                            className="w-full bg-transparent text-[11px] font-black text-indigo-600 outline-none"
-                          />
+                        {/* Actual Downloader — AUTO dari DB (read-only) */}
+                        <td className="py-3 px-4 border-r border-slate-100" title="Auto dari database">
+                          <span className="block w-full text-[11px] font-black text-indigo-600 tabular-nums">
+                            {actualDownloader > 0 ? formatNumber(actualDownloader) : '–'}
+                          </span>
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20">
-                          <input 
-                            type="number" 
-                            value={dayData.manualTargetRepeatOrder || Math.round(displayTargetRepeatOrder)} 
+                          <input
+                            type="number"
+                            value={dayData.manualTargetRepeatOrder || Math.round(displayTargetRepeatOrder)}
                             onChange={(e) => updateDailyValue(date, 'manualTargetRepeatOrder', Number(e.target.value))}
+                            aria-label={`Target user premium ${date}`}
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors"
                           />
                         </td>
-                        <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20">
-                          <input 
-                            type="number" 
-                            value={dayData.actualRepeatOrder === null || dayData.actualRepeatOrder === undefined ? '' : dayData.actualRepeatOrder} 
-                            onChange={(e) => updateDailyValue(date, 'actualRepeatOrder', e.target.value === '' ? null : Number(e.target.value))}
-                            className="w-full bg-transparent text-[11px] font-black text-indigo-600 outline-none"
-                          />
+                        {/* Actual User Premium — AUTO dari DB (read-only) */}
+                        <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20" title="Auto dari database">
+                          <span className="block w-full text-[11px] font-black text-indigo-600 tabular-nums">
+                            {actualRepeatOrder > 0 ? formatNumber(actualRepeatOrder) : '–'}
+                          </span>
                         </td>
-                        <td className={cn("py-3 px-4 text-[11px] font-black border-r border-slate-100", conv >= (selectedApp.targetConfig[targetMonth]?.targetConversion || 0) ? "text-emerald-600" : "text-rose-600")}>
+                        <td className={cn('py-3 px-4 text-[11px] font-black border-r border-slate-100', conv >= (selectedApp.targetConfig[targetMonth]?.targetConversion || 0) ? 'text-emerald-600' : 'text-rose-600')}>
                           {conv.toFixed(1)}%
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100 bg-emerald-50/20">
-                          <input 
-                            type="number" 
-                            value={dayData.manualTargetSales || Math.round(displayTargetSales)} 
+                          <input
+                            type="number"
+                            value={dayData.manualTargetSales || Math.round(displayTargetSales)}
                             onChange={(e) => updateDailyValue(date, 'manualTargetSales', Number(e.target.value))}
+                            aria-label={`Target sales ${date}`}
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-emerald-600 transition-colors"
                           />
                         </td>
-                        <td className="py-3 px-4 border-r border-slate-100 bg-emerald-50/20">
-                          <input 
-                            type="number" 
-                            value={dayData.actualSales === null || dayData.actualSales === undefined ? '' : dayData.actualSales} 
-                            onChange={(e) => updateDailyValue(date, 'actualSales', e.target.value === '' ? null : Number(e.target.value))}
-                            className="w-full bg-transparent text-[11px] font-black text-emerald-600 outline-none"
-                          />
+                        {/* Actual Sales/Revenue — AUTO dari DB (read-only) */}
+                        <td className="py-3 px-4 border-r border-slate-100 bg-emerald-50/20" title="Auto dari database">
+                          <span className="block w-full text-[11px] font-black text-emerald-600 tabular-nums">
+                            {actualSales > 0 ? formatCurrency(actualSales) : '–'}
+                          </span>
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100">
                           <div className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase text-center", statusBg, statusColor)}>

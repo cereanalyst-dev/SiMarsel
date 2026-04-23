@@ -690,6 +690,8 @@ export default function App() {
                         setTargetMonth={setTargetMonth}
                         setActiveTab={setActiveTab}
                         setCalendarFocusDate={setCalendarFocusDate}
+                        transactions={data}
+                        downloaders={downloaderData}
                       />
                     </motion.div>
                   )}
