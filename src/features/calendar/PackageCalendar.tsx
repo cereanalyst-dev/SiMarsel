@@ -379,70 +379,118 @@ export const PackageCalendar = ({
             const amountColor =
               tier >= 4 ? 'text-white/90' : tier >= 3 ? 'text-indigo-900' : 'text-indigo-600';
 
+            const totalTx = packages.reduce((s, p) => s + p.transactions, 0);
+
             return (
               <div
                 key={dateStr}
                 onClick={() => hasActivity && setSelectedDay(isSelected ? null : dateStr)}
                 className={cn(
-                  'aspect-square rounded-2xl border p-2 flex flex-col items-center justify-between transition-all relative group',
-                  heatmap,
-                  hasActivity && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg',
-                  isSelected && 'ring-2 ring-indigo-500 ring-offset-2 scale-[1.04] z-10',
-                  isToday && !isSelected && 'ring-2 ring-amber-400 ring-offset-1',
+                  'aspect-square relative group',
+                  hasActivity && 'cursor-pointer',
+                  isSelected && 'z-10',
                 )}
+                style={{ perspective: '1000px' }}
               >
-                {/* Top row: date + optional crown */}
-                <div className="w-full flex items-start justify-between">
-                  <span className={cn('text-xs md:text-sm font-black leading-none', dateColor)}>
-                    {format(day, 'd')}
-                  </span>
-                  {isTop && hasActivity && (
-                    <Crown className={cn('w-3 h-3', tier >= 4 ? 'text-amber-300' : 'text-amber-500')} />
+                {/* Flip wrapper — 3D transform pas hover */}
+                <div
+                  className={cn(
+                    'relative w-full h-full transition-transform duration-500 ease-out',
+                    hasActivity && 'group-hover:[transform:rotateY(180deg)]',
+                    isSelected && '[transform:rotateY(180deg)]',
+                  )}
+                  style={{ transformStyle: 'preserve-3d' }}
+                >
+                  {/* ===== FRONT FACE — heatmap + tanggal + revenue ===== */}
+                  <div
+                    className={cn(
+                      'absolute inset-0 rounded-2xl border p-2 flex flex-col items-center justify-between transition-all',
+                      heatmap,
+                      hasActivity && 'group-hover:shadow-xl',
+                      isSelected && 'ring-2 ring-indigo-500 ring-offset-2',
+                      isToday && !isSelected && 'ring-2 ring-amber-400 ring-offset-1',
+                    )}
+                    style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+                  >
+                    <div className="w-full flex items-start justify-between">
+                      <span className={cn('text-xs md:text-sm font-black leading-none', dateColor)}>
+                        {format(day, 'd')}
+                      </span>
+                      {isTop && hasActivity && (
+                        <Crown className={cn('w-3 h-3', tier >= 4 ? 'text-amber-300' : 'text-amber-500')} />
+                      )}
+                    </div>
+
+                    {hasActivity && (
+                      <div className="w-full text-center">
+                        <p className={cn('text-[9px] md:text-[10px] font-black tracking-tight leading-none', amountColor)}>
+                          {compactRp(dayRevenue)}
+                        </p>
+                        <p className={cn(
+                          'text-[7px] md:text-[8px] font-bold uppercase tracking-widest mt-0.5 leading-none',
+                          tier >= 4 ? 'text-indigo-100' : 'text-slate-400',
+                        )}>
+                          {packages.length} pkt
+                        </p>
+                      </div>
+                    )}
+
+                    {isToday && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow">
+                        Ini
+                      </span>
+                    )}
+                  </div>
+
+                  {/* ===== BACK FACE — detail revenue + paket teratas ===== */}
+                  {hasActivity && (
+                    <div
+                      className="absolute inset-0 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 text-white p-2.5 flex flex-col justify-between shadow-2xl shadow-indigo-500/30 ring-2 ring-indigo-400/40"
+                      style={{
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                        transform: 'rotateY(180deg)',
+                      }}
+                    >
+                      {/* Header: tanggal + revenue */}
+                      <div className="flex items-start justify-between border-b border-white/10 pb-1">
+                        <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-indigo-200">
+                          {format(day, 'd MMM')}
+                        </span>
+                        {isTop && (
+                          <Crown className="w-3 h-3 text-amber-300" />
+                        )}
+                      </div>
+
+                      {/* Stats compact */}
+                      <div className="text-center -my-0.5">
+                        <p className="text-[9px] md:text-[11px] font-black text-emerald-300 leading-tight tabular-nums">
+                          {compactRp(dayRevenue)}
+                        </p>
+                        <p className="text-[7px] md:text-[8px] font-bold text-slate-300 leading-none mt-0.5">
+                          {totalTx} trx · {packages.length} paket
+                        </p>
+                      </div>
+
+                      {/* Paket teratas (1-2 max — keterbatasan ruang cell) */}
+                      <div className="space-y-0.5 overflow-hidden">
+                        {packages.slice(0, 2).map((p, i) => (
+                          <div key={i} className="flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-indigo-400 flex-shrink-0" />
+                            <span className="text-[7px] md:text-[8px] font-bold text-slate-200 truncate flex-1 leading-none">
+                              {p.name}
+                            </span>
+                          </div>
+                        ))}
+                        {packages.length > 2 && (
+                          <p className="text-[7px] font-bold text-indigo-300 italic leading-none">
+                            +{packages.length - 2} lainnya
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {/* Revenue amount (compact) */}
-                {hasActivity && (
-                  <div className="w-full text-center">
-                    <p className={cn('text-[9px] md:text-[10px] font-black tracking-tight leading-none', amountColor)}>
-                      {compactRp(dayRevenue)}
-                    </p>
-                    <p className={cn(
-                      'text-[7px] md:text-[8px] font-bold uppercase tracking-widest mt-0.5 leading-none',
-                      tier >= 4 ? 'text-indigo-100' : 'text-slate-400',
-                    )}>
-                      {packages.length} pkt
-                    </p>
-                  </div>
-                )}
-
-                {/* Today badge */}
-                {isToday && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow">
-                    Ini
-                  </span>
-                )}
-
-                {/* Tooltip */}
-                {hasActivity && !isSelected && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-slate-900 text-white p-3 rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 shadow-2xl">
-                    <div className="flex items-center justify-between mb-2 pb-1 border-b border-white/10">
-                      <p className="text-[10px] font-black uppercase tracking-widest">
-                        {format(day, 'dd MMM')}
-                      </p>
-                      <p className="text-[9px] font-black text-indigo-400">{formatCurrency(dayRevenue)}</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      {packages.slice(0, 3).map((p, i) => (
-                        <div key={i} className="flex justify-between items-center gap-2">
-                          <span className="text-[9px] font-bold truncate">{p.name}</span>
-                          <span className="text-[9px] font-black text-indigo-400">{p.transactions}x</span>
-                        </div>
-                      ))}
-                      {packages.length > 3 && <p className="text-[8px] text-slate-400 italic">+{packages.length - 3} paket lainnya</p>}
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}
