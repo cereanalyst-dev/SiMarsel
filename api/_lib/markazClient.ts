@@ -118,8 +118,8 @@ export async function syncPlatform(opts: {
 
   try {
     // ---------- 1) Transactions ----------
-    const txRes = await markazGet<TransactionResponse>('/transaction', { date, platform });
-    if (!txRes.status) throw new Error(`API /transaction status=false: ${txRes.message}`);
+    const txRes = await markazGet<TransactionResponse>('/api/transactions', { date, platform });
+    if (!txRes.status) throw new Error(`API /api/transactions status=false: ${txRes.message}`);
     const allTx = Array.isArray(txRes.data) ? txRes.data : [];
     out.txFetched = allTx.length;
 
@@ -138,7 +138,7 @@ export async function syncPlatform(opts: {
     }
 
     // ---------- 2) Downloaders (user-daily) ----------
-    const dlRes = await markazGet<UserDailyResponse>('/user-daily', { date, platform });
+    const dlRes = await markazGet<UserDailyResponse>('/api/user-daily', { date, platform });
     if (dlRes.status && dlRes.data && typeof dlRes.data.total === 'number') {
       out.dlTotal = dlRes.data.total;
       // Upsert: (date, source_app) sebagai PK → UPDATE count ke snapshot terbaru.
