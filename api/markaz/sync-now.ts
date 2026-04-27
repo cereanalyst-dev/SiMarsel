@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { syncAllEnabled, todayWIB } from '../_lib/markazClient.js';
 
-export const config = { runtime: 'nodejs' };
+export const config = { runtime: 'edge' };
 
 interface SyncNowBody {
   date?: string;

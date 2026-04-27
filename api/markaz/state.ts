@@ -7,7 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-export const config = { runtime: 'nodejs' };
+export const config = { runtime: 'edge' };
 
 async function resolveUser(req: Request) {
   const authHeader = req.headers.get('authorization') || '';
