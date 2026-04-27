@@ -4,8 +4,8 @@
 // Auth: Vercel Cron kirim header `Authorization: Bearer ${CRON_SECRET}`.
 // Kita verifikasi supaya endpoint ini gak bisa di-trigger orang random.
 
-import { getSupabaseAdmin } from '../_lib/supabaseAdmin';
-import { syncAllEnabled, todayWIB } from '../_lib/markazClient';
+import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { syncAllEnabled, todayWIB } from '../_lib/markazClient.js';
 
 export const config = { runtime: 'nodejs' };
 
