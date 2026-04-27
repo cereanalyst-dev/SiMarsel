@@ -10,6 +10,7 @@ import { getSupabase, isSupabaseConfigured } from './lib/supabase';
 import {
   fetchAppsFromSupabase,
   fetchDataFromSupabase,
+  fetchOverviewStats,
   loadAppsFromLocal,
   loadSelectedAppIdFromLocal,
   saveAppsToLocal,
@@ -17,6 +18,7 @@ import {
   saveSelectedAppIdToLocal,
   uploadDownloadersToSupabase,
   uploadTransactionsToSupabase,
+  type QuickOverviewStats,
 } from './lib/dataAccess';
 import { processDownloaders, processTransactions } from './lib/dataProcessing';
 import { COLORS } from './lib/constants';
@@ -43,6 +45,38 @@ const TabLoading = () => (
       transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
       className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full"
     />
+  </div>
+);
+
+// Skeleton untuk tab yang butuh raw data tapi raw data masih download.
+// Memberi user feedback bahwa tab BELUM kosong/error, cuma menunggu data.
+const RawDataSkeleton = ({ label }: { label: string }) => (
+  <div className="space-y-6">
+    <div className="flex items-center gap-3">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full"
+      />
+      <div>
+        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">
+          Memuat {label}
+        </p>
+        <p className="text-xs text-slate-500 font-medium mt-0.5">
+          Tunggu beberapa detik — data sedang di-download dari database…
+        </p>
+      </div>
+    </div>
+    {/* Skeleton bars */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="h-32 rounded-3xl bg-gradient-to-br from-slate-100 to-slate-50 animate-pulse"
+        />
+      ))}
+    </div>
+    <div className="h-72 rounded-[2rem] bg-gradient-to-br from-slate-100 to-slate-50 animate-pulse" />
   </div>
 );
 
@@ -81,9 +115,20 @@ export default function App() {
   const userEmail = session?.user?.email ?? null;
 
   // ---------- Data ----------
+  // Strategi loading 2-stage:
+  //   1. quickStats — server-aggregated dari view `overview_stats` (~50ms).
+  //      Dipakai render headline Overview INSTAN sebelum raw data ke-load.
+  //   2. data + downloaderData — raw rows (paginated paralel ~3-5 detik).
+  //      Dipakai untuk filter, chart per-day, dan tab lain.
+  // UI bisa render Overview pakai quickStats sambil tunggu raw load di
+  // background. Tab lain (Target/Kalender/Paket) tampil skeleton sampai
+  // raw ready.
+  const [quickStats, setQuickStats] = useState<QuickOverviewStats | null>(null);
   const [data, setData] = useState<Transaction[]>([]);
   const [downloaderData, setDownloaderData] = useState<Downloader[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loadingHeadline, setLoadingHeadline] = useState(true);
+  const [loadingRawData, setLoadingRawData] = useState(true);
+  const [fetchProgress, setFetchProgress] = useState<{ tx: number; dl: number }>({ tx: 0, dl: 0 });
   const [error, setError] = useState<string | null>(null);
 
   const handleDataUpdate = useCallback(
@@ -106,7 +151,7 @@ export default function App() {
 
       // Logged in — SEMUA data di dashboard harus berasal dari Supabase.
       // Flow: upload ke Supabase → fetch ulang → render.
-      setLoadingData(true);
+      setLoadingRawData(true);
       setError(null);
       try {
         const replaceMode = !append;
@@ -136,53 +181,83 @@ export default function App() {
         // data yang sudah berhasil masuk DB. Dashboard tetap pakai state
         // sebelumnya (data DB lama).
       } finally {
-        setLoadingData(false);
+        setLoadingRawData(false);
       }
     },
     [userId],
   );
 
-  // Initial data load: try Supabase once user is authenticated.
+  // Initial data load — 2 stages:
+  //   Stage 1 (~50ms): fetch quickStats dari view, set loadingHeadline=false
+  //                    → Overview langsung render dengan headline cards.
+  //   Stage 2 (~3-5s): fetch raw transactions+downloaders di background,
+  //                    set loadingRawData=false → tab lain bisa dipakai.
   useEffect(() => {
     if (supabaseReady && !userId && !guestMode) {
-      setLoadingData(false);
+      setLoadingHeadline(false);
+      setLoadingRawData(false);
       return;
     }
     let active = true;
+
     const run = async () => {
-      setLoadingData(true);
+      setLoadingHeadline(true);
+      setLoadingRawData(true);
       setError(null);
+
+      if (!userId) {
+        setError('Mode lokal. Unggah file Excel di Settings untuk mulai.');
+        setLoadingHeadline(false);
+        setLoadingRawData(false);
+        return;
+      }
+
+      // Stage 1: quick stats (instant)
       try {
-        if (userId) {
-          logger.info('Load data for user:', userId);
-          const res = await fetchDataFromSupabase();
+        logger.info('Load quick stats for user:', userId);
+        const quick = await fetchOverviewStats();
+        if (!active) return;
+        if (quick) setQuickStats(quick);
+      } catch (err) {
+        logger.warn('Quick stats fetch failed (lanjut ke raw):', err);
+      } finally {
+        if (active) setLoadingHeadline(false);
+      }
+
+      // Stage 2: raw data (background, takes 3-5s)
+      try {
+        const res = await fetchDataFromSupabase((loaded, label) => {
           if (!active) return;
-          if (res) {
-            setData(res.transactions);
-            setDownloaderData(res.downloaders);
-            if (res.transactions.length === 0 && res.downloaders.length === 0) {
-              setError('Belum ada data di Supabase. Unggah file Excel di Settings.');
-            }
-          } else {
-            // Fetch returns null only if Supabase client tidak terkonfigurasi.
-            setError(
-              'Supabase tidak bisa diakses. Cek .env.local (VITE_SUPABASE_URL / ANON_KEY).',
-            );
+          setFetchProgress((prev) => ({
+            ...prev,
+            [label === 'transactions' ? 'tx' : 'dl']: loaded,
+          }));
+        });
+        if (!active) return;
+        if (res) {
+          setData(res.transactions);
+          setDownloaderData(res.downloaders);
+          if (res.transactions.length === 0 && res.downloaders.length === 0 && !quickStats) {
+            setError('Belum ada data di Supabase. Unggah file Excel di Settings.');
           }
         } else {
-          setError('Mode lokal. Unggah file Excel di Settings untuk mulai.');
+          setError(
+            'Supabase tidak bisa diakses. Cek .env.local (VITE_SUPABASE_URL / ANON_KEY).',
+          );
         }
       } catch (err) {
-        logger.error('Initial data load failed:', err);
+        logger.error('Raw data load failed:', err);
         setError('Gagal memuat data. Buka DevTools Console untuk detail errornya.');
       } finally {
-        if (active) setLoadingData(false);
+        if (active) setLoadingRawData(false);
       }
     };
-    run();
+
+    void run();
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseReady, userId, guestMode]);
 
   // ---------- UI state ----------
@@ -335,6 +410,34 @@ export default function App() {
   }, [availableOptions.source_apps]);
 
   const stats: DashboardStats = useMemo(() => {
+    // Fast path — raw data belum ke-load tapi quickStats dari view udah
+    // ada dan tidak ada filter aktif. Render headline langsung dari
+    // server-aggregated stats biar Overview tampil instan.
+    const noFilter =
+      filters.source_app === 'All' &&
+      filters.year === 'All' &&
+      filters.month === 'All' &&
+      filters.methode_name === 'All';
+    if (data.length === 0 && quickStats && noFilter) {
+      return {
+        totalRevenue: quickStats.totalRevenue,
+        totalTransactions: quickStats.totalTransactions,
+        aov: quickStats.aov,
+        uniqueBuyers: quickStats.uniqueBuyers,
+        totalPackagesSold: quickStats.totalTransactions,
+        totalTargetRevenue: 0,
+        totalTargetDownloader: 0,
+        totalTargetRepeatOrder: 0,
+        progressDownloader: 0,
+        progressSales: 0,
+        progressConversion: quickStats.konversiPct,
+        selisihSales: 0,
+        totalRealDownloader: quickStats.totalRealDownloader,
+        totalRealSales: quickStats.totalRevenue,
+        totalRepeatOrderUsers: quickStats.totalRepeatOrderUsers,
+      };
+    }
+
     const isMonthFiltered = filters.month !== 'All';
     const isYearFiltered = filters.year !== 'All';
     const monthKey = isYearFiltered && isMonthFiltered
@@ -497,7 +600,7 @@ export default function App() {
     });
 
     return result;
-  }, [filteredData, filteredDownloaderData, apps, filters, data.length]);
+  }, [filteredData, filteredDownloaderData, apps, filters, data.length, quickStats]);
 
   const trendData: TrendItem[] = useMemo(() => {
     const grouped: Record<string, TrendItem> = {};
@@ -680,12 +783,34 @@ export default function App() {
           />
 
           <main className="p-8 max-w-[1600px] mx-auto w-full">
-            {error && data.length === 0 && (
+            {error && data.length === 0 && !quickStats && (
               <div className="mb-8 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-[11px] font-bold text-amber-700">
                 {error}
               </div>
             )}
-            {loadingData ? (
+
+            {/* Banner halus saat raw data masih download di background.
+                Headline udah keliatan dari quickStats, jadi user gak perlu
+                tunggu raw selesai untuk lihat angka utama. */}
+            {loadingRawData && quickStats && (
+              <div className="mb-6 px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center gap-3">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full"
+                />
+                <p className="text-[11px] font-bold text-indigo-700">
+                  Memuat detail data di latar belakang…
+                  {fetchProgress.tx > 0 && (
+                    <span className="ml-2 text-indigo-500 font-medium">
+                      {fetchProgress.tx.toLocaleString('id-ID')} transaksi · {fetchProgress.dl.toLocaleString('id-ID')} downloader
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+
+            {loadingHeadline ? (
               <TabLoading />
             ) : (
               <Suspense fallback={<TabLoading />}>
@@ -703,53 +828,65 @@ export default function App() {
                     />
                   )}
                   {activeTab === 'optimasi' && (
-                    <motion.div
-                      key="optimasi"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-10"
-                    >
-                      <PriceSuggestion data={data} availableOptions={availableOptions} />
-                      <PricingComparison data={data} filters={filters} />
-                    </motion.div>
+                    loadingRawData ? (
+                      <RawDataSkeleton key="optimasi" label="Optimasi Harga" />
+                    ) : (
+                      <motion.div
+                        key="optimasi"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        className="space-y-10"
+                      >
+                        <PriceSuggestion data={data} availableOptions={availableOptions} />
+                        <PricingComparison data={data} filters={filters} />
+                      </motion.div>
+                    )
                   )}
                   {activeTab === 'target' && (
-                    <motion.div
-                      key="target"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                    >
-                      <TargetSection
-                        apps={apps}
-                        setApps={setApps}
-                        selectedAppId={selectedAppId}
-                        setSelectedAppId={setSelectedAppId}
-                        targetMonth={targetMonth}
-                        setTargetMonth={setTargetMonth}
-                        setActiveTab={setActiveTab}
-                        setCalendarFocusDate={setCalendarFocusDate}
-                        transactions={data}
-                        downloaders={downloaderData}
-                      />
-                    </motion.div>
+                    loadingRawData ? (
+                      <RawDataSkeleton key="target" label="Strategi & Target" />
+                    ) : (
+                      <motion.div
+                        key="target"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                      >
+                        <TargetSection
+                          apps={apps}
+                          setApps={setApps}
+                          selectedAppId={selectedAppId}
+                          setSelectedAppId={setSelectedAppId}
+                          targetMonth={targetMonth}
+                          setTargetMonth={setTargetMonth}
+                          setActiveTab={setActiveTab}
+                          setCalendarFocusDate={setCalendarFocusDate}
+                          transactions={data}
+                          downloaders={downloaderData}
+                        />
+                      </motion.div>
+                    )
                   )}
                   {activeTab === 'calendar' && (
-                    <motion.div
-                      key="calendar"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                    >
-                      <PackageCalendar
-                        data={data}
-                        downloaderData={downloaderData}
-                        availableOptions={availableOptions}
-                        apps={apps}
-                        focusDate={calendarFocusDate}
-                      />
-                    </motion.div>
+                    loadingRawData ? (
+                      <RawDataSkeleton key="calendar" label="Kalender Marsel" />
+                    ) : (
+                      <motion.div
+                        key="calendar"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                      >
+                        <PackageCalendar
+                          data={data}
+                          downloaderData={downloaderData}
+                          availableOptions={availableOptions}
+                          apps={apps}
+                          focusDate={calendarFocusDate}
+                        />
+                      </motion.div>
+                    )
                   )}
                   {activeTab === 'social' && (
                     <motion.div
@@ -767,13 +904,17 @@ export default function App() {
                     </motion.div>
                   )}
                   {activeTab === 'packages' && (
-                    <Packages
-                      key="packages"
-                      filters={filters}
-                      setFilters={setFilters}
-                      availableOptions={availableOptions}
-                      packagePerformance={packagePerformanceData}
-                    />
+                    loadingRawData ? (
+                      <RawDataSkeleton key="packages" label="Detail Paket" />
+                    ) : (
+                      <Packages
+                        key="packages"
+                        filters={filters}
+                        setFilters={setFilters}
+                        availableOptions={availableOptions}
+                        packagePerformance={packagePerformanceData}
+                      />
+                    )
                   )}
                   {activeTab === 'settings' && (
                     <motion.div
