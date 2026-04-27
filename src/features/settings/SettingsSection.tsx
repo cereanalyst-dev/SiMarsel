@@ -20,9 +20,14 @@ interface SettingsSectionProps {
     onProgress?: (p: UploadProgress) => void,
   ) => void | Promise<void>;
   detectedPlatforms?: string[];
+  onMarkazSyncComplete?: () => void | Promise<void>;
 }
 
-export const SettingsSection = ({ onDataUpdate, detectedPlatforms = [] }: SettingsSectionProps) => {
+export const SettingsSection = ({
+  onDataUpdate,
+  detectedPlatforms = [],
+  onMarkazSyncComplete,
+}: SettingsSectionProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -259,7 +264,10 @@ export const SettingsSection = ({ onDataUpdate, detectedPlatforms = [] }: Settin
         </div>
       </div>
 
-      <MarkazApiCard detectedPlatforms={detectedPlatforms} />
+      <MarkazApiCard
+        detectedPlatforms={detectedPlatforms}
+        onSyncComplete={onMarkazSyncComplete}
+      />
     </div>
   );
 };

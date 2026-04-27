@@ -24,6 +24,9 @@ interface SyncState {
 
 interface MarkazApiCardProps {
   detectedPlatforms?: string[];
+  // Dipanggil setelah sync sukses, biar dashboard di parent re-fetch
+  // data dari Supabase tanpa user perlu refresh manual.
+  onSyncComplete?: () => void | Promise<void>;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -31,7 +34,7 @@ const STATUS_COLORS: Record<string, string> = {
   error: 'text-rose-600 bg-rose-50 border-rose-100',
 };
 
-export const MarkazApiCard = ({ detectedPlatforms = [] }: MarkazApiCardProps) => {
+export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: MarkazApiCardProps) => {
   const supabase = getSupabase();
   const toast = useToast();
   const [rows, setRows] = useState<SyncState[]>([]);
@@ -179,7 +182,13 @@ export const MarkazApiCard = ({ detectedPlatforms = [] }: MarkazApiCardProps) =>
       'Sinkronisasi selesai',
       `${summary.successes} sukses • ${summary.errors} error dari ${summary.totalPlatforms} platform`,
     );
+    // Refresh sync_state (last_run timestamp dst)
     void refresh();
+    // Trigger parent untuk re-fetch transactions/downloaders dari DB
+    // supaya dashboard langsung tampilin data baru hasil sync.
+    if (onSyncComplete && summary.successes > 0) {
+      void onSyncComplete();
+    }
   };
 
   return (
