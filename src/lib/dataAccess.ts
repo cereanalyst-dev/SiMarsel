@@ -146,14 +146,21 @@ export interface DataSet {
 // distinct email turun padahal total rows match.
 const PAGE_SIZE = 1000;
 
+// Berapa request paralel sekaligus ke Supabase. Lebih besar = lebih cepat
+// tapi mendekati rate limit. 8 = sweet spot (285 page = ~36 batch ~3-5 detik
+// vs ~28 detik kalau sequential).
+const FETCH_CONCURRENCY = 8;
+
+export type FetchProgressCallback = (loaded: number, label: string) => void;
+
 async function fetchAllPages<T>(
   supabase: ReturnType<typeof getSupabase>,
   tableName: 'transactions' | 'downloaders',
   label: string,
+  onProgress?: FetchProgressCallback,
 ): Promise<T[]> {
   if (!supabase) return [];
   const rows: T[] = [];
-  let from = 0;
   const startedAt = performance.now();
 
   // Order column harus deterministik + indexed:
@@ -161,34 +168,54 @@ async function fetchAllPages<T>(
   //   downloaders:  date + source_app (composite PK)
   const orderColumn = tableName === 'transactions' ? 'id' : 'date';
 
-  while (true) {
-    const to = from + PAGE_SIZE - 1;
-    const query = supabase
-      .from(tableName)
-      .select('*')
-      .order(orderColumn, { ascending: true });
+  let nextPage = 0;
+  let done = false;
 
-    // Tambahan order secondary untuk downloaders supaya stabil kalau date
-    // sama (beda source_app).
-    if (tableName === 'downloaders') {
-      query.order('source_app', { ascending: true });
+  while (!done) {
+    // Build N request paralel sekaligus.
+    const batch = Array.from({ length: FETCH_CONCURRENCY }, (_, i) => {
+      const pageIdx = nextPage + i;
+      const query = supabase
+        .from(tableName)
+        .select('*')
+        .order(orderColumn, { ascending: true });
+
+      if (tableName === 'downloaders') {
+        query.order('source_app', { ascending: true });
+      }
+
+      const from = pageIdx * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      return query.range(from, to).then((res) => ({ pageIdx, res }));
+    });
+
+    const results = await Promise.all(batch);
+
+    // Sort by page index supaya append ke rows[] tetap urut sesuai order.
+    results.sort((a, b) => a.pageIdx - b.pageIdx);
+
+    for (const { pageIdx, res } of results) {
+      const { data, error } = res;
+      if (error) {
+        logger.error(
+          `❌ Gagal fetch ${label} (page ${pageIdx}):`,
+          error.message,
+          error,
+        );
+        done = true;
+        break;
+      }
+      if (!data) continue;
+      rows.push(...(data as T[]));
+      onProgress?.(rows.length, label);
+      // Page < PAGE_SIZE = halaman terakhir.
+      if (data.length < PAGE_SIZE) {
+        done = true;
+      }
     }
 
-    const { data, error } = await query.range(from, to);
+    nextPage += FETCH_CONCURRENCY;
 
-    if (error) {
-      logger.error(
-        `❌ Gagal fetch ${label} (range ${from}-${to}):`,
-        error.message,
-        error,
-      );
-      break;
-    }
-    if (!data || data.length === 0) break;
-    rows.push(...(data as T[]));
-    if (data.length < PAGE_SIZE) break; // sudah halaman terakhir
-
-    from += PAGE_SIZE;
     if (rows.length >= MAX_ROWS_PER_QUERY) {
       logger.warn(
         `⚠️ ${label} sudah mencapai batas MAX_ROWS_PER_QUERY (${MAX_ROWS_PER_QUERY}). Naikkan di config/app.config.ts kalau perlu.`,
@@ -198,22 +225,24 @@ async function fetchAllPages<T>(
   }
 
   const ms = Math.round(performance.now() - startedAt);
-  logger.info(`✅ ${label}: ${rows.length} baris (${ms}ms)`);
+  logger.info(`✅ ${label}: ${rows.length} baris (${ms}ms, parallel x${FETCH_CONCURRENCY})`);
   return rows;
 }
 
-export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
+export const fetchDataFromSupabase = async (
+  onProgress?: FetchProgressCallback,
+): Promise<DataSet | null> => {
   const supabase = getSupabase();
   if (!supabase) {
     logger.warn('Supabase client belum terkonfigurasi (VITE_SUPABASE_URL / ANON_KEY).');
     return null;
   }
 
-  logger.info('Fetching data dari Supabase (paginated)…');
+  logger.info('Fetching data dari Supabase (paginated paralel)…');
 
   const [txRows, dlRows] = await Promise.all([
-    fetchAllPages<unknown>(supabase, 'transactions', 'transactions'),
-    fetchAllPages<unknown>(supabase, 'downloaders', 'downloaders'),
+    fetchAllPages<unknown>(supabase, 'transactions', 'transactions', onProgress),
+    fetchAllPages<unknown>(supabase, 'downloaders', 'downloaders', onProgress),
   ]);
 
   const rawTx = txRows ?? [];
@@ -239,6 +268,54 @@ export const fetchDataFromSupabase = async (): Promise<DataSet | null> => {
   );
 
   return { transactions, downloaders };
+};
+
+// ---------- Quick overview stats (server-side aggregated) ----------
+//
+// View `overview_stats` mengembalikan single-row aggregate dari DB,
+// jadi instant (~50ms) tidak peduli ada 285K rows. Dipakai untuk render
+// headline cards di Overview tanpa harus tunggu raw data 285K rows
+// di-download dulu.
+
+export interface QuickOverviewStats {
+  totalRevenue: number;
+  totalTransactions: number;
+  aov: number;
+  uniqueBuyers: number;
+  totalRepeatOrderUsers: number;
+  totalRealDownloader: number;
+  konversiPct: number;
+}
+
+export const fetchOverviewStats = async (): Promise<QuickOverviewStats | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const startedAt = performance.now();
+  const { data, error } = await supabase
+    .from('overview_stats')
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    logger.warn('overview_stats fetch failed:', error.message);
+    return null;
+  }
+  if (!data) return null;
+
+  const ms = Math.round(performance.now() - startedAt);
+  logger.info(`⚡ overview_stats: ${ms}ms (server-side aggregated)`);
+
+  const r = data as Record<string, number | null>;
+  return {
+    totalRevenue: Number(r.total_revenue) || 0,
+    totalTransactions: Number(r.total_transaksi) || 0,
+    aov: Number(r.aov) || 0,
+    uniqueBuyers: Number(r.unique_buyers) || 0,
+    totalRepeatOrderUsers: Number(r.user_repeat_order) || 0,
+    totalRealDownloader: Number(r.total_downloader) || 0,
+    konversiPct: Number(r.konversi_pct) || 0,
+  };
 };
 
 export interface UploadProgress {
