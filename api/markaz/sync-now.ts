@@ -2,8 +2,8 @@
 // Auth: pakai Bearer access_token dari session Supabase user yang login.
 
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseAdmin } from '../_lib/supabaseAdmin';
-import { syncAllEnabled, todayWIB } from '../_lib/markazClient';
+import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { syncAllEnabled, todayWIB } from '../_lib/markazClient.js';
 
 export const config = { runtime: 'nodejs' };
 
