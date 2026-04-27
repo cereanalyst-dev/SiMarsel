@@ -38,6 +38,21 @@ const PackageCalendar = lazy(() => import('./features/calendar/PackageCalendar')
 const SocialMediaAnalysis = lazy(() => import('./features/social/SocialMediaAnalysis'));
 const SettingsSection = lazy(() => import('./features/settings/SettingsSection'));
 
+// Preload semua chunk tab setelah initial render selesai. Tujuannya:
+// pas user klik tab manapun, JS-nya sudah ada di memory (gak perlu nunggu
+// network round-trip + parse). Trade-off: total bytes downloaded sama,
+// tapi UX terasa instan setelah ~2 detik pertama.
+const preloadAllTabs = () => {
+  void import('./features/overview/Overview');
+  void import('./features/packages/Packages');
+  void import('./features/target/TargetSection');
+  void import('./features/pricing/PriceSuggestion');
+  void import('./features/pricing/PricingComparison');
+  void import('./features/calendar/PackageCalendar');
+  void import('./features/social/SocialMediaAnalysis');
+  void import('./features/settings/SettingsSection');
+};
+
 const TabLoading = () => (
   <div className="min-h-[60vh] flex items-center justify-center">
     <motion.div
@@ -377,6 +392,26 @@ export default function App() {
       logger.error('Refetch data gagal:', err);
     }
   }, [userId]);
+  // Preload semua chunk tab di background setelah ~1.5s.
+  // requestIdleCallback (kalau browser support) lebih aman karena cuma
+  // jalan saat browser idle. Fallback ke setTimeout untuk Safari.
+  useEffect(() => {
+    const ric = (window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+    }).requestIdleCallback;
+    if (ric) {
+      const handle = ric(preloadAllTabs, { timeout: 3000 });
+      return () => {
+        const cancel = (window as unknown as {
+          cancelIdleCallback?: (h: number) => void;
+        }).cancelIdleCallback;
+        if (cancel) cancel(handle);
+      };
+    }
+    const t = window.setTimeout(preloadAllTabs, 1500);
+    return () => window.clearTimeout(t);
+  }, []);
+
   // Data disimpan apa adanya di Supabase, tapi di dashboard kita samakan
   // (uppercase) supaya aggregasi lintas tabel tidak terpisah.
   const normApp = useCallback((s: string | null | undefined) => (s || '').toUpperCase(), []);
@@ -837,7 +872,10 @@ export default function App() {
               <TabLoading />
             ) : (
               <Suspense fallback={<TabLoading />}>
-                <AnimatePresence mode="wait">
+                {/* mode="wait" memastikan konten lama exit dulu sebelum konten
+                    baru masuk — supaya gak ada overlap antar tab. Duration
+                    pendek (150ms) bikin tetap terasa snappy. */}
+                <AnimatePresence mode="wait" initial={false}>
                   {activeTab === 'overview' && (
                     <Overview
                       key="overview"
@@ -914,9 +952,10 @@ export default function App() {
                   {activeTab === 'social' && (
                     <motion.div
                       key="social"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
                     >
                       <SocialMediaAnalysis
                         apps={apps}
@@ -942,9 +981,10 @@ export default function App() {
                   {activeTab === 'settings' && (
                     <motion.div
                       key="settings"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
                     >
                       <SettingsSection
                         onDataUpdate={handleDataUpdate}
