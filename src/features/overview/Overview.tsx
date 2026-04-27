@@ -26,7 +26,7 @@ interface Props {
   filteredData: { methode_name?: string; hour: number; revenue: number }[];
 }
 
-type ChartType = 'bar' | 'line' | 'area' | 'pie';
+type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'table';
 type Metric = 'revenue' | 'transactions' | 'downloader' | 'conversion';
 type Granularity = 'daily' | 'weekly' | 'monthly';
 
@@ -188,7 +188,7 @@ export const Overview = ({
               onChange={setChartMetric}
             />
             <TabGroup<ChartType>
-              options={['bar', 'line', 'area', 'pie']}
+              options={['bar', 'line', 'area', 'pie', 'table']}
               value={chartType}
               onChange={setChartType}
             />
@@ -201,14 +201,23 @@ export const Overview = ({
         </div>
 
         <div className="relative h-[500px] mb-8">
-          <FlexibleChart
-            data={trendData}
-            type={chartType}
-            metric={chartMetric}
-            appColors={appColors}
-            onDrillDown={setDrillDown}
-            hiddenApps={hiddenApps}
-          />
+          {chartType === 'table' ? (
+            <TrendTable
+              data={trendData}
+              metric={chartMetric}
+              hiddenApps={hiddenApps}
+              appColors={appColors}
+            />
+          ) : (
+            <FlexibleChart
+              data={trendData}
+              type={chartType}
+              metric={chartMetric}
+              appColors={appColors}
+              onDrillDown={setDrillDown}
+              hiddenApps={hiddenApps}
+            />
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-6 pt-8 border-t border-slate-50">
@@ -481,6 +490,153 @@ const ConversionCard = ({ value, transactions, downloader }: ConversionCardProps
     </motion.div>
   );
 };
+
+// ============ Trend Table — opsi alternatif chart, render data sebagai tabel ============
+// Cuma tampilin tanggal + nilai metric. Apps yang di-hide di legend juga dihormati.
+const METRIC_LABEL: Record<Metric, string> = {
+  revenue: 'Revenue',
+  transactions: 'Transaksi',
+  downloader: 'Downloader',
+  conversion: 'Konversi (%)',
+};
+
+function TrendTable({
+  data, metric, hiddenApps, appColors,
+}: {
+  data: TrendItem[];
+  metric: Metric;
+  hiddenApps: Set<string>;
+  appColors: Record<string, string>;
+}) {
+  const visibleApps = Object.keys(appColors).filter((a) => !hiddenApps.has(a));
+
+  // Untuk konversi total: butuh total transaksi & downloader supaya bisa hitung %
+  const valueFor = (item: TrendItem, app: string | null) => {
+    if (app) {
+      const breakdown = item.appBreakdown?.[app];
+      if (!breakdown) return 0;
+      if (metric === 'revenue') return breakdown.revenue;
+      if (metric === 'transactions') return breakdown.transactions;
+      if (metric === 'downloader') return breakdown.downloader;
+      if (metric === 'conversion') {
+        return breakdown.downloader > 0
+          ? (breakdown.transactions / breakdown.downloader) * 100
+          : 0;
+      }
+    }
+    if (metric === 'revenue') return item.revenue;
+    if (metric === 'transactions') return item.transactions;
+    if (metric === 'downloader') return item.downloader;
+    if (metric === 'conversion') return item.conversion;
+    return 0;
+  };
+
+  const fmt = (val: number) => {
+    if (metric === 'revenue') return formatCurrency(val);
+    if (metric === 'conversion') return `${val.toFixed(2)}%`;
+    return formatNumber(val);
+  };
+
+  // Hitung total kolom kanan (kalau visible apps > 0, baru tampilkan total)
+  const total = data.reduce((acc, item) => {
+    visibleApps.forEach((app) => {
+      acc += valueFor(item, app);
+    });
+    return acc;
+  }, 0);
+
+  return (
+    <div className="h-full overflow-auto custom-scrollbar rounded-2xl border border-slate-100">
+      <table className="w-full text-left border-collapse">
+        <thead className="sticky top-0 bg-white z-10">
+          <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+            <th className="py-3 px-4 bg-white">Tanggal</th>
+            {visibleApps.length > 0 ? (
+              visibleApps.map((app) => (
+                <th key={app} className="py-3 px-4 bg-white text-right">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: appColors[app] }}
+                    />
+                    {app}
+                  </span>
+                </th>
+              ))
+            ) : (
+              <th className="py-3 px-4 bg-white text-right">{METRIC_LABEL[metric]}</th>
+            )}
+            {visibleApps.length > 1 && (
+              <th className="py-3 px-4 bg-slate-50/50 text-right text-indigo-600">Total</th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((item, i) => {
+            const rowTotal = visibleApps.reduce((s, app) => s + valueFor(item, app), 0);
+            return (
+              <tr
+                key={i}
+                className={cn(
+                  'border-b border-slate-50 hover:bg-slate-50/50 transition-colors',
+                  i % 2 === 0 ? 'bg-white' : 'bg-slate-50/20',
+                )}
+              >
+                <td className="py-3 px-4 text-xs font-black text-slate-700">{item.name}</td>
+                {visibleApps.length > 0 ? (
+                  visibleApps.map((app) => {
+                    const val = valueFor(item, app);
+                    return (
+                      <td key={app} className="py-3 px-4 text-xs font-bold text-slate-600 text-right tabular-nums">
+                        {val > 0 || metric === 'conversion' ? fmt(val) : <span className="text-slate-300">–</span>}
+                      </td>
+                    );
+                  })
+                ) : (
+                  <td className="py-3 px-4 text-xs font-black text-indigo-600 text-right tabular-nums">
+                    {fmt(valueFor(item, null))}
+                  </td>
+                )}
+                {visibleApps.length > 1 && (
+                  <td className="py-3 px-4 text-xs font-black text-indigo-600 text-right tabular-nums bg-slate-50/30">
+                    {fmt(rowTotal)}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+          {data.length === 0 && (
+            <tr>
+              <td colSpan={Math.max(2, visibleApps.length + 2)} className="py-12 text-center text-xs font-bold text-slate-400">
+                Tidak ada data untuk filter ini.
+              </td>
+            </tr>
+          )}
+        </tbody>
+        {data.length > 0 && metric !== 'conversion' && visibleApps.length > 1 && (
+          <tfoot className="sticky bottom-0">
+            <tr className="bg-indigo-50 border-t-2 border-indigo-200">
+              <td className="py-3 px-4 text-[10px] font-black text-indigo-700 uppercase tracking-widest">
+                Total ({METRIC_LABEL[metric]})
+              </td>
+              {visibleApps.map((app) => {
+                const sum = data.reduce((s, item) => s + valueFor(item, app), 0);
+                return (
+                  <td key={app} className="py-3 px-4 text-xs font-black text-indigo-700 text-right tabular-nums">
+                    {fmt(sum)}
+                  </td>
+                );
+              })}
+              <td className="py-3 px-4 text-xs font-black text-indigo-700 text-right tabular-nums bg-indigo-100/50">
+                {fmt(total)}
+              </td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
+  );
+}
 
 function TabGroup<T extends string>({
   options, value, onChange,

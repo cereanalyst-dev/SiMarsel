@@ -9,6 +9,84 @@ import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import type { AppData, Downloader, Transaction } from '../../types';
 
+// ==============================================================
+// Klasifikasi promo_code → kategori (Sales/Marketing/Aplikasi/Live/
+// Artikel/Lainnya/Tanpa Kode). Aturan diadaptasi dari rumus Sheets
+// per platform yang user kasih.
+//
+// Order rules: Sales > Marketing > Artikel > Aplikasi > Live > Lainnya
+// (cek dari atas, first match menang). Order penting karena Marketing
+// pattern bisa overlap dengan Sales (mis. CEREBRUM ada di
+// ADMINCEREBRUM yang seharusnya Sales).
+// ==============================================================
+type PromoCategory = 'Sales' | 'Marketing' | 'Artikel' | 'Aplikasi' | 'Live' | 'Lainnya' | 'Tanpa Kode';
+
+const PROMO_RULES: Record<string, Array<{ category: PromoCategory; pattern: RegExp }>> = {
+  cerebrum: [
+    { category: 'Sales',     pattern: /(ADMINCEREBRUM|LOLOSUTBK|MEMBERCEREBRUM|TELEGRAMCEREBRUM|PROMOCEREBRUM|DISKONCEREBRUM)/ },
+    { category: 'Marketing', pattern: /(CEREBRUM|TIKTOKCEREBRUM)/ },
+    { category: 'Artikel',   pattern: /(SIAPSNBT)/ },
+    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOCEREBRUM|POTONGAN 5\.000|POTONGAN 2\.000)/ },
+    { category: 'Live',      pattern: /(KEBUTSNBT|GASSNBT|GOSNBT|TEMBUSSNBT|HEBATSNBT|PASTISNBT|TARGETSNBT|MANTAPSNBT)/ },
+  ],
+  jadiasn: [
+    { category: 'Sales',     pattern: /(ADMINJADIASN|LOLOSASN|MEMBERASN|TELEGRAMASN|PROMOASN|DISKONASN|PROMOTELEGRAM|SIAPCPNS)/ },
+    { category: 'Marketing', pattern: /(JADIASN|TIKTOKJADIASN)/ },
+    { category: 'Artikel',   pattern: /(BIMBELCPNS)/ },
+    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOASN|POTONGAN 5\.000|POTONGAN 2\.000)/ },
+    { category: 'Live',      pattern: /(KEBUTCPNS|GASCPNS|GOCPNS|TEMBUSCPNS|PASTICPNS)/ },
+  ],
+  jadibumn: [
+    { category: 'Sales',     pattern: /(ADMINDINA|LOLOSBUMN|MEMBERBUMN|TELEGRAMBUMN|PROMOBUMN|DISKONBUMN|ADMINSOFI)/ },
+    { category: 'Marketing', pattern: /(JADIBUMN|TIKTOKJADIBUMN)/ },
+    { category: 'Artikel',   pattern: /(BIMBELBUMN)/ },
+    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOASN|POTONGAN 5\.000|POTONGAN 2\.000)/ },
+    { category: 'Live',      pattern: /(PASTIBUMN|MANTAPBUMN)/ },
+  ],
+  jadipolisi: [
+    { category: 'Sales',     pattern: /(ADMINJADIPOLISI|LOLOSPOLISI|MEMBERPOLISI|TELEGRAMPOLISI|PROMOPOLISI|DISKONPOLISI)/ },
+    { category: 'Marketing', pattern: /(JADIPOLISI|TIKTOKJADIPOLISI)/ },
+    { category: 'Artikel',   pattern: /(BIMBELPOLRI)/ },
+    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOPOLISI|POTONGAN 5\.000|POTONGAN 2\.000)/ },
+    { category: 'Live',      pattern: /(PASTIPOLISI|MANTAPPOLISI)/ },
+  ],
+  jadiprajurit: [
+    { category: 'Sales',     pattern: /(ADMINJADIPRAJURIT|LOLOSPRAJURIT|MEMBERPRAJURIT|TELEGRAMPRAJURIT|PROMOPRAJURIT|DISKONPRAJURIT)/ },
+    { category: 'Marketing', pattern: /(JADIPRAJURIT|TIKTOKJADIPRAJURIT)/ },
+    { category: 'Artikel',   pattern: /(BIMBELTNI)/ },
+    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOPRAJURIT|POTONGAN 5\.000|POTONGAN 2\.000)/ },
+  ],
+  jadisekdin: [
+    { category: 'Sales',     pattern: /(ADMINJADISEKDIN|LOLOSSEKDIN|MEMBERSEKDIN|TELEGRAMSEKDIN|PROMOSEKDIN|DISKONSEKDIN)/ },
+    { category: 'Marketing', pattern: /(JADISEKDIN|TIKTOKJADISEKDIN)/ },
+    { category: 'Artikel',   pattern: /(BIMBELSEKDIN)/ },
+    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOSEKDIN|POTONGAN 5\.000|POTONGAN 2\.000)/ },
+  ],
+};
+
+function classifyPromo(rawCode: string | null | undefined, platformKey: string): PromoCategory {
+  // "Tanpa Kode" untuk null, undefined, empty string, atau "[]"
+  if (rawCode == null) return 'Tanpa Kode';
+  const trimmed = String(rawCode).trim();
+  if (!trimmed || trimmed === '[]' || trimmed === 'null' || trimmed === 'NULL') {
+    return 'Tanpa Kode';
+  }
+  const platform = platformKey.toLowerCase();
+  const rules = PROMO_RULES[platform];
+  if (!rules) return 'Lainnya';
+  const upper = trimmed.toUpperCase();
+  for (const rule of rules) {
+    if (rule.pattern.test(upper)) return rule.category;
+  }
+  return 'Lainnya';
+}
+
+// Helper: parse "1.000" / "1,000" / "1000" → 1000.
+const parseFormattedNumber = (s: string): number => {
+  const cleaned = s.replace(/[^\d]/g, '');
+  return cleaned ? Number(cleaned) : 0;
+};
+
 interface TargetSectionProps {
   apps: AppData[];
   setApps: (a: AppData[]) => void;
@@ -96,9 +174,18 @@ export const TargetSection = ({
   // Dipakai oleh: operational sheet, summary, globalSummary, recap.
   // User tidak perlu isi Real manual — semua auto dari DB.
   // ==============================================================
-  type ActualRow = { downloader: number; sales: number; trxIds: Set<string> };
+  type ActualRow = {
+    downloader: number;
+    sales: number;
+    trxIds: Set<string>;
+    promo: Record<PromoCategory, number>;
+  };
   const actualsByAppByDate = useMemo(() => {
     const outer = new Map<string, Map<string, ActualRow>>();
+    const emptyPromo = (): Record<PromoCategory, number> => ({
+      'Sales': 0, 'Marketing': 0, 'Aplikasi': 0, 'Live': 0,
+      'Lainnya': 0, 'Artikel': 0, 'Tanpa Kode': 0,
+    });
     const ensure = (appKey: string, dateKey: string): ActualRow => {
       let inner = outer.get(appKey);
       if (!inner) {
@@ -107,7 +194,7 @@ export const TargetSection = ({
       }
       let row = inner.get(dateKey);
       if (!row) {
-        row = { downloader: 0, sales: 0, trxIds: new Set() };
+        row = { downloader: 0, sales: 0, trxIds: new Set(), promo: emptyPromo() };
         inner.set(dateKey, row);
       }
       return row;
@@ -127,7 +214,8 @@ export const TargetSection = ({
     });
 
     transactions.forEach((t) => {
-      const appKey = (t.source_app ?? '').trim().toUpperCase();
+      const appName = (t.source_app ?? '').trim();
+      const appKey = appName.toUpperCase();
       if (!appKey) return;
       const dateKey = t.parsed_payment_date instanceof Date
         ? format(t.parsed_payment_date, 'yyyy-MM-dd')
@@ -139,17 +227,29 @@ export const TargetSection = ({
       row.sales += Number(t.revenue) || 0;
       const trxId = (t.trx_id ?? '').trim();
       if (trxId) row.trxIds.add(trxId);
+      // Klasifikasi promo per transaksi → tally ke kategori-nya
+      const category = classifyPromo(t.promo_code, appName);
+      row.promo[category] += 1;
     });
 
     return outer;
   }, [transactions, downloaders]);
 
   // Helper untuk ambil actuals per app+date
+  const emptyPromoCount = (): Record<PromoCategory, number> => ({
+    'Sales': 0, 'Marketing': 0, 'Aplikasi': 0, 'Live': 0,
+    'Lainnya': 0, 'Artikel': 0, 'Tanpa Kode': 0,
+  });
   const getActual = (appName: string | undefined, dateKey: string) => {
-    if (!appName) return { downloader: 0, sales: 0, premium: 0 };
+    if (!appName) return { downloader: 0, sales: 0, premium: 0, promo: emptyPromoCount() };
     const row = actualsByAppByDate.get(appName.trim().toUpperCase())?.get(dateKey);
-    if (!row) return { downloader: 0, sales: 0, premium: 0 };
-    return { downloader: row.downloader, sales: row.sales, premium: row.trxIds.size };
+    if (!row) return { downloader: 0, sales: 0, premium: 0, promo: emptyPromoCount() };
+    return {
+      downloader: row.downloader,
+      sales: row.sales,
+      premium: row.trxIds.size,
+      promo: row.promo,
+    };
   };
 
   const handleGenerateSheet = () => {
@@ -649,7 +749,7 @@ export const TargetSection = ({
                     {app.name}
                   </h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-5">
-                    Auto dari DB · klik untuk atur target
+                    Klik untuk atur target
                   </p>
 
                   <div
@@ -892,13 +992,14 @@ export const TargetSection = ({
               </div>
             </div>
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[2200px] border-spacing-0">
+              <table className="w-full text-left border-collapse min-w-[2900px] border-spacing-0">
                 <thead>
                   <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-100/50">
                     <th colSpan={2} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-slate-200/20">Waktu</th>
                     <th colSpan={2} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-indigo-100/20">Downloader</th>
                     <th colSpan={3} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-violet-100/20 text-xs font-black uppercase tracking-widest text-violet-700">User Premium</th>
                     <th colSpan={4} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-emerald-100/20">Sales & Revenue</th>
+                    <th colSpan={7} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-amber-100/30 text-xs font-black uppercase tracking-widest text-amber-700">Sebaran Kode Promo</th>
                     <th colSpan={4} className="py-2 px-4 border-r border-b border-slate-200 text-center bg-slate-100/50">Strategi</th>
                     <th colSpan={4} className="py-2 px-4 border-b border-slate-200 text-center bg-slate-200/50">Aktivitas</th>
                   </tr>
@@ -914,6 +1015,13 @@ export const TargetSection = ({
                     <th className="py-4 px-4 border-r border-slate-200 bg-emerald-50/30">Real</th>
                     <th className="py-4 px-4 border-r border-slate-200">Status</th>
                     <th className="py-4 px-4 border-r border-slate-200">Keterangan</th>
+                    <th className="py-4 px-4 border-r border-slate-200 bg-amber-50/30">Sales</th>
+                    <th className="py-4 px-4 border-r border-slate-200 bg-amber-50/30">Marketing</th>
+                    <th className="py-4 px-4 border-r border-slate-200 bg-amber-50/30">Aplikasi</th>
+                    <th className="py-4 px-4 border-r border-slate-200 bg-amber-50/30">Live</th>
+                    <th className="py-4 px-4 border-r border-slate-200 bg-amber-50/30">Lainnya</th>
+                    <th className="py-4 px-4 border-r border-slate-200 bg-amber-50/30">Artikel</th>
+                    <th className="py-4 px-4 border-r border-slate-200 bg-amber-50/30">Tanpa Kode</th>
                     <th className="py-4 px-4 border-r border-slate-200">User Premium</th>
                     <th className="py-4 px-4 border-r border-slate-200">Benefit</th>
                     <th className="py-4 px-4 border-r border-slate-200">Event</th>
@@ -1024,11 +1132,13 @@ export const TargetSection = ({
                           {format(new Date(date), 'EEE')}
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="number" 
-                            value={dayData.manualTargetDownloader || Math.round(displayTargetDownloader)} 
-                            onChange={(e) => updateDailyValue(date, 'manualTargetDownloader', Number(e.target.value))}
-                            className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors"
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={formatNumber(dayData.manualTargetDownloader || Math.round(displayTargetDownloader))}
+                            onChange={(e) => updateDailyValue(date, 'manualTargetDownloader', parseFormattedNumber(e.target.value))}
+                            aria-label={`Target downloader ${date}`}
+                            className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors tabular-nums"
                           />
                         </td>
                         {/* Actual Downloader — AUTO dari DB (read-only) */}
@@ -1039,11 +1149,12 @@ export const TargetSection = ({
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20">
                           <input
-                            type="number"
-                            value={dayData.manualTargetRepeatOrder || Math.round(displayTargetRepeatOrder)}
-                            onChange={(e) => updateDailyValue(date, 'manualTargetRepeatOrder', Number(e.target.value))}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatNumber(dayData.manualTargetRepeatOrder || Math.round(displayTargetRepeatOrder))}
+                            onChange={(e) => updateDailyValue(date, 'manualTargetRepeatOrder', parseFormattedNumber(e.target.value))}
                             aria-label={`Target user premium ${date}`}
-                            className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors"
+                            className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors tabular-nums"
                           />
                         </td>
                         {/* Actual User Premium — AUTO dari DB (read-only) */}
@@ -1057,11 +1168,12 @@ export const TargetSection = ({
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100 bg-emerald-50/20">
                           <input
-                            type="number"
-                            value={dayData.manualTargetSales || Math.round(displayTargetSales)}
-                            onChange={(e) => updateDailyValue(date, 'manualTargetSales', Number(e.target.value))}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatNumber(dayData.manualTargetSales || Math.round(displayTargetSales))}
+                            onChange={(e) => updateDailyValue(date, 'manualTargetSales', parseFormattedNumber(e.target.value))}
                             aria-label={`Target sales ${date}`}
-                            className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-emerald-600 transition-colors"
+                            className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-emerald-600 transition-colors tabular-nums"
                           />
                         </td>
                         {/* Actual Sales/Revenue — AUTO dari DB (read-only) */}
@@ -1080,6 +1192,20 @@ export const TargetSection = ({
                             {keteranganText}
                           </div>
                         </td>
+                        {/* Sebaran Kode Promo — auto dari DB, klasifikasi via regex per platform */}
+                        {(['Sales', 'Marketing', 'Aplikasi', 'Live', 'Lainnya', 'Artikel', 'Tanpa Kode'] as PromoCategory[]).map((cat) => {
+                          const count = actualToday.promo[cat] || 0;
+                          return (
+                            <td key={cat} className="py-3 px-4 border-r border-slate-100 bg-amber-50/10 text-center">
+                              <span className={cn(
+                                "text-[10px] font-black tabular-nums",
+                                count > 0 ? "text-amber-700" : "text-slate-300",
+                              )}>
+                                {count > 0 ? formatNumber(count) : '–'}
+                              </span>
+                            </td>
+                          );
+                        })}
                         <td className="py-3 px-4 border-r border-slate-100">
                           <input 
                             type="text" 
