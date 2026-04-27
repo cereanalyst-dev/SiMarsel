@@ -7,7 +7,7 @@
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { syncAllEnabled, todayWIB } from '../_lib/markazClient.js';
 
-export const config = { runtime: 'nodejs' };
+export const config = { runtime: 'edge' };
 
 export default async function handler(req: Request): Promise<Response> {
   // ---------- Auth check ----------
