@@ -872,10 +872,10 @@ export default function App() {
               <TabLoading />
             ) : (
               <Suspense fallback={<TabLoading />}>
-                {/* AnimatePresence tanpa mode — entries dan exits berjalan paralel,
-                    bukan menunggu exit selesai dulu. Ini bikin tab switch terasa
-                    jauh lebih instan (gak ada delay 300ms exit). */}
-                <AnimatePresence initial={false}>
+                {/* mode="wait" memastikan konten lama exit dulu sebelum konten
+                    baru masuk — supaya gak ada overlap antar tab. Duration
+                    pendek (150ms) bikin tetap terasa snappy. */}
+                <AnimatePresence mode="wait" initial={false}>
                   {activeTab === 'overview' && (
                     <Overview
                       key="overview"
