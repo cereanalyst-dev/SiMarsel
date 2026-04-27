@@ -118,8 +118,8 @@ export async function syncPlatform(opts: {
 
   try {
     // ---------- 1) Transactions ----------
-    const txRes = await markazGet<TransactionResponse>('/api/transactions', { date, platform });
-    if (!txRes.status) throw new Error(`API /api/transactions status=false: ${txRes.message}`);
+    const txRes = await markazGet<TransactionResponse>('/api/transaction', { date, platform });
+    if (!txRes.status) throw new Error(`API /api/transaction status=false: ${txRes.message}`);
     const allTx = Array.isArray(txRes.data) ? txRes.data : [];
     out.txFetched = allTx.length;
 
