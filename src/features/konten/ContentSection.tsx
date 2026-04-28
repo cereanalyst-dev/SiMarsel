@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
-  Edit2, FileText, Film, Image as ImageIcon, Layers, Plus, Search,
+  Check, ChevronDown, Edit2, FileText, Film, Image as ImageIcon, Layers, Plus, Search,
   Smartphone, Trash2,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -44,15 +44,28 @@ const QC_OPTIONS = ['revisi', 'done', 'cancel'] as const;
 
 const TONE_BY_VALUE: Record<string, { bg: string; text: string }> = {
   // status workflow
-  'progress':      { bg: 'bg-amber-50',   text: 'text-amber-700' },
-  'editing':       { bg: 'bg-amber-50',   text: 'text-amber-700' },
-  'analisis':      { bg: 'bg-amber-50',   text: 'text-amber-700' },
-  'take':          { bg: 'bg-cyan-50',    text: 'text-cyan-700' },
-  'skrip ready':   { bg: 'bg-yellow-50',  text: 'text-yellow-700' },
-  'skrip urgent':  { bg: 'bg-rose-50',    text: 'text-rose-700' },
-  'revisi':        { bg: 'bg-orange-50',  text: 'text-orange-700' },
-  'done':          { bg: 'bg-emerald-50', text: 'text-emerald-700' },
-  'cancel':        { bg: 'bg-slate-100',  text: 'text-slate-500' },
+  'progress':      { bg: 'bg-amber-100',   text: 'text-amber-800' },
+  'editing':       { bg: 'bg-amber-100',   text: 'text-amber-800' },
+  'analisis':      { bg: 'bg-amber-100',   text: 'text-amber-800' },
+  'take':          { bg: 'bg-cyan-100',    text: 'text-cyan-800' },
+  'skrip ready':   { bg: 'bg-yellow-100',  text: 'text-yellow-800' },
+  'skrip urgent':  { bg: 'bg-rose-100',    text: 'text-rose-800' },
+  'revisi':        { bg: 'bg-orange-100',  text: 'text-orange-800' },
+  'done':          { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+  'cancel':        { bg: 'bg-slate-200',   text: 'text-slate-600' },
+};
+
+// Border ring per nilai — bikin badge berasa solid kayak chip Material
+const TONE_RING: Record<string, string> = {
+  'progress':      'border-amber-300',
+  'editing':       'border-amber-300',
+  'analisis':      'border-amber-300',
+  'take':          'border-cyan-300',
+  'skrip ready':   'border-yellow-300',
+  'skrip urgent':  'border-rose-300',
+  'revisi':        'border-orange-300',
+  'done':          'border-emerald-300',
+  'cancel':        'border-slate-300',
 };
 
 export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
@@ -526,23 +539,127 @@ function DropdownCell({ value, options, onChange }: {
   options: readonly string[];
   onChange: (v: string | null) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Tutup popover kalau klik di luar
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('keydown', escHandler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', escHandler);
+    };
+  }, [open]);
+
   const tone = value ? TONE_BY_VALUE[value.toLowerCase()] : null;
+  const ring = value ? TONE_RING[value.toLowerCase()] : null;
+  const displayValue = value ? value.toUpperCase() : '—';
+
   return (
-    <td className={cn('p-0 align-middle border-r border-slate-100')}>
-      <select
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value || null)}
-        className={cn(
-          'sheet-cell font-black uppercase tracking-widest text-[10px] text-center',
-          tone ? `${tone.bg} ${tone.text}` : '',
-        )}
-      >
-        <option value="">—</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o.toUpperCase()}</option>
-        ))}
-      </select>
+    <td className="p-0 align-middle border-r border-slate-100 relative">
+      <div ref={containerRef} className="relative w-full p-1.5">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className={cn(
+            'w-full px-2.5 py-1.5 inline-flex items-center justify-between gap-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+            'border',
+            tone
+              ? `${tone.bg} ${tone.text} ${ring ?? 'border-transparent'} hover:shadow-md`
+              : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100',
+            open && 'ring-2 ring-rose-400/40',
+          )}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <span className="truncate">{displayValue}</span>
+          <ChevronDown
+            className={cn('w-3 h-3 opacity-70 transition-transform flex-shrink-0', open && 'rotate-180')}
+          />
+        </button>
+
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.96 }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
+              className="absolute left-1.5 right-1.5 top-full mt-1 z-50 bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden p-1"
+              role="listbox"
+            >
+              {/* Clear option */}
+              <DropdownOption
+                label="—"
+                tone={null}
+                ring={null}
+                selected={!value}
+                onClick={() => { onChange(null); setOpen(false); }}
+                showCheck={false}
+              />
+
+              {options.map((opt) => {
+                const t = TONE_BY_VALUE[opt.toLowerCase()];
+                const r = TONE_RING[opt.toLowerCase()];
+                const isSelected = value === opt;
+                return (
+                  <DropdownOption
+                    key={opt}
+                    label={opt.toUpperCase()}
+                    tone={t}
+                    ring={r}
+                    selected={isSelected}
+                    showCheck
+                    onClick={() => { onChange(opt); setOpen(false); }}
+                  />
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </td>
+  );
+}
+
+function DropdownOption({
+  label, tone, ring, selected, onClick, showCheck,
+}: {
+  label: string;
+  tone: { bg: string; text: string } | null | undefined;
+  ring: string | null | undefined;
+  selected: boolean;
+  onClick: () => void;
+  showCheck: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      role="option"
+      aria-selected={selected}
+      className={cn(
+        'w-full px-2.5 py-1.5 my-0.5 inline-flex items-center justify-between gap-2 rounded-lg text-[10px] font-black uppercase tracking-widest text-left transition-all',
+        tone
+          ? `${tone.bg} ${tone.text} ${ring ?? ''} border`
+          : 'text-slate-400 hover:bg-slate-50 border border-transparent',
+        selected && 'ring-2 ring-rose-400/60 ring-inset',
+        'hover:scale-[1.02] hover:shadow-sm active:scale-[0.99]',
+      )}
+    >
+      <span className="truncate">{label}</span>
+      {showCheck && selected && <Check className="w-3 h-3 opacity-70 flex-shrink-0" />}
+    </button>
   );
 }
 
