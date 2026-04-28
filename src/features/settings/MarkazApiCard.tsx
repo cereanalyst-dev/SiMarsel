@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-  CheckCircle2, Clock, Plus, RefreshCw, Trash2, Wifi, XCircle,
+  Calendar, CheckCircle2, Clock, Plus, RefreshCw, Trash2, Wifi, XCircle,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
@@ -14,7 +14,8 @@ interface SyncState {
   user_id: string;
   platform: string;
   enabled: boolean;
-  last_run_at: string | null;
+  last_run_at: string | null;          // kapan fetch dijalankan (timestamp)
+  last_synced_date: string | null;     // TANGGAL DATA yg di-fetch (date param ke API Markaz)
   last_status: string | null;
   last_error: string | null;
   last_tx_inserted: number;
@@ -353,12 +354,24 @@ export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: Markaz
                           <XCircle className="w-3.5 h-3.5 text-rose-500" />
                         )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-slate-400">
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] font-bold text-slate-400">
+                        {/* Tanggal DATA terakhir yang di-fetch (parameter date ke Markaz) */}
                         <span className="inline-flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-indigo-500" />
+                          <span className="text-slate-300">Data terakhir:</span>
+                          <span className="text-slate-700">
+                            {row.last_synced_date
+                              ? format(new Date(row.last_synced_date), 'dd MMM yyyy')
+                              : 'Belum pernah'}
+                          </span>
+                        </span>
+                        {/* Kapan fetch terakhir dijalankan */}
+                        <span className="text-slate-300">·</span>
+                        <span className="inline-flex items-center gap-1" title="Kapan fetch dijalankan">
                           <Clock className="w-3 h-3" />
                           {row.last_run_at
-                            ? format(new Date(row.last_run_at), 'dd MMM yyyy, HH:mm')
-                            : 'Belum pernah run'}
+                            ? format(new Date(row.last_run_at), 'dd MMM, HH:mm')
+                            : '–'}
                         </span>
                         {row.last_status && (
                           <span
