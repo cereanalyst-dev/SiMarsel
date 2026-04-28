@@ -270,19 +270,19 @@ export const ContentEditorDrawer = ({
                         <option value="single_post">Single Post</option>
                       </select>
                     </SheetRow>
+                    <SheetRow label="TANGGAL BUAT">
+                      <input
+                        type="date"
+                        value={tglTay}
+                        onChange={(e) => setTglTay(e.target.value)}
+                        className="sheet-cell"
+                      />
+                    </SheetRow>
                     <SheetRow label="TANGGAL UPLOAD">
                       <input
                         type="date"
                         value={scheduledDate}
                         onChange={(e) => setScheduledDate(e.target.value)}
-                        className="sheet-cell"
-                      />
-                    </SheetRow>
-                    <SheetRow label="TGL TAYANG">
-                      <input
-                        type="date"
-                        value={tglTay}
-                        onChange={(e) => setTglTay(e.target.value)}
                         className="sheet-cell"
                       />
                     </SheetRow>
