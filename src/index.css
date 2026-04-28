@@ -11,6 +11,32 @@
   }
 }
 
+/* Konten editor — input style shared */
+.form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border: 1px solid rgb(226 232 240);
+  border-radius: 0.75rem;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(15 23 42);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.form-input:focus {
+  border-color: rgb(244 63 94);
+  box-shadow: 0 0 0 3px rgb(244 63 94 / 0.1);
+}
+.form-input::placeholder {
+  color: rgb(203 213 225);
+  font-weight: 400;
+}
+textarea.form-input {
+  resize: vertical;
+  font-family: inherit;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
