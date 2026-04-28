@@ -37,6 +37,41 @@ textarea.form-input {
   font-family: inherit;
 }
 
+/* Spreadsheet-style cell — buat tampilan editor mirip Google Sheets:
+   bg putih, border tipis, focus halo lembut, gak ada padding berlebih. */
+.sheet-cell {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(15 23 42);
+  outline: none;
+  transition: background-color 0.15s, border-color 0.15s;
+  min-height: 36px;
+}
+.sheet-cell:hover {
+  background-color: rgb(248 250 252);
+}
+.sheet-cell:focus {
+  background-color: white;
+  border-color: rgb(244 63 94);
+  box-shadow: inset 0 0 0 1px rgb(244 63 94 / 0.4);
+}
+.sheet-cell::placeholder {
+  color: rgb(203 213 225);
+  font-weight: 400;
+  font-style: italic;
+}
+textarea.sheet-cell {
+  resize: vertical;
+  font-family: inherit;
+  min-height: 60px;
+  line-height: 1.5;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }

@@ -40,8 +40,9 @@ export const ContentEditorDrawer = ({
   const [tglTay, setTglTay] = useState<string>('');
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<ContentStatus>('draft');
-  const [assignedTo, setAssignedTo] = useState('');
   const [infoSkrip, setInfoSkrip] = useState('');
+  const [talent, setTalent] = useState('');
+  const [editor, setEditor] = useState('');
   const [poster, setPoster] = useState('');
   const [creative, setCreative] = useState('');
   const [linkVideo, setLinkVideo] = useState('');
@@ -71,8 +72,9 @@ export const ContentEditorDrawer = ({
       setTglTay(existing.tgl_tay ?? '');
       setTitle(existing.title ?? '');
       setStatus(existing.status);
-      setAssignedTo(existing.assigned_to ?? '');
       setInfoSkrip(existing.info_skrip ?? '');
+      setTalent(existing.talent ?? '');
+      setEditor(existing.editor ?? '');
       setPoster(existing.poster ?? '');
       setCreative(existing.creative ?? '');
       setLinkVideo(existing.link_video ?? '');
@@ -104,8 +106,9 @@ export const ContentEditorDrawer = ({
       setTglTay('');
       setTitle('');
       setStatus('draft');
-      setAssignedTo('');
       setInfoSkrip('');
+      setTalent('');
+      setEditor('');
       setPoster('');
       setCreative('');
       setLinkVideo('');
@@ -163,8 +166,10 @@ export const ContentEditorDrawer = ({
       tgl_tay: tglTay || null,
       title: title || null,
       status,
-      assigned_to: assignedTo || null,
+      assigned_to: null,
       info_skrip: infoSkrip || null,
+      talent: talent || null,
+      editor: editor || null,
       poster: poster || null,
       creative: creative || null,
       link_video: linkVideo || null,
@@ -229,7 +234,7 @@ export const ContentEditorDrawer = ({
                 )} />
                 <div>
                   <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em]">
-                    {isNew ? 'Skrip Baru' : 'Edit Skrip'}
+                    {isNew ? 'Buat Skrip Baru' : 'Lihat / Edit Skrip'}
                   </p>
                   <h3 className="text-base font-black text-slate-900 tracking-tight">
                     {title || 'Tanpa Judul'}
@@ -247,128 +252,147 @@ export const ContentEditorDrawer = ({
             </div>
 
             <div className="p-6 space-y-6">
-              {/* META: platform, type, dates, status, assigned */}
-              <Section label="Metadata">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Platform">
-                    <input
-                      value={platform}
-                      onChange={(e) => setPlatform(e.target.value.toLowerCase())}
-                      placeholder="jadiasn"
-                      className="form-input"
-                    />
-                  </Field>
-                  <Field label="Tipe Konten">
-                    <select
-                      value={type}
-                      onChange={(e) => handleTypeChange(e.target.value as ContentType)}
-                      className="form-input"
-                    >
-                      <option value="video">Video</option>
-                      <option value="carousel">Carousel</option>
-                      <option value="single_post">Single Post</option>
-                    </select>
-                  </Field>
-                  <Field label="Tanggal Upload">
-                    <input
-                      type="date"
-                      value={scheduledDate}
-                      onChange={(e) => setScheduledDate(e.target.value)}
-                      className="form-input"
-                    />
-                  </Field>
-                  <Field label="Tanggal Tayang">
-                    <input
-                      type="date"
-                      value={tglTay}
-                      onChange={(e) => setTglTay(e.target.value)}
-                      className="form-input"
-                    />
-                  </Field>
-                  <Field label="Status" wide>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as ContentStatus)}
-                      className="form-input"
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>{s.toUpperCase()}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Assigned To" wide>
-                    <input
-                      value={assignedTo}
-                      onChange={(e) => setAssignedTo(e.target.value)}
-                      placeholder="email rekan tim..."
-                      className="form-input"
-                    />
-                  </Field>
-                </div>
-              </Section>
+              {/* SHEET 1: METADATA UTAMA — sama dengan kolom paling kiri di Sheets list */}
+              <SheetSection label="Metadata Utama">
+                <table className="w-full border-collapse table-fixed">
+                  <tbody>
+                    <SheetRow label="PLATFORM">
+                      <input
+                        value={platform}
+                        onChange={(e) => setPlatform(e.target.value.toLowerCase())}
+                        placeholder="jadiasn, cerebrum, jadibumn..."
+                        className="sheet-cell"
+                      />
+                    </SheetRow>
+                    <SheetRow label="TIPE KONTEN">
+                      <select
+                        value={type}
+                        onChange={(e) => handleTypeChange(e.target.value as ContentType)}
+                        className="sheet-cell"
+                      >
+                        <option value="video">Video</option>
+                        <option value="carousel">Carousel</option>
+                        <option value="single_post">Single Post</option>
+                      </select>
+                    </SheetRow>
+                    <SheetRow label="TANGGAL BUAT">
+                      <input
+                        type="date"
+                        value={tglTay}
+                        onChange={(e) => setTglTay(e.target.value)}
+                        className="sheet-cell"
+                      />
+                    </SheetRow>
+                    <SheetRow label="TANGGAL UPLOAD">
+                      <input
+                        type="date"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        className="sheet-cell"
+                      />
+                    </SheetRow>
+                    <SheetRow label="JUDUL">
+                      <input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Try Out CPNS — Live IG..."
+                        className="sheet-cell"
+                      />
+                    </SheetRow>
+                    <SheetRow label="STATUS">
+                      <select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as ContentStatus)}
+                        className="sheet-cell"
+                      >
+                        {STATUS_OPTIONS.map((s) => (
+                          <option key={s} value={s}>{s.toUpperCase()}</option>
+                        ))}
+                      </select>
+                    </SheetRow>
+                  </tbody>
+                </table>
+              </SheetSection>
 
-              <Section label="Info Operasional">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Judul / Keyword Utama" wide>
-                    <input
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Try Out CPNS — Live IG"
-                      className="form-input"
-                    />
-                  </Field>
-                  <Field label="Info Skrip" wide>
-                    <input
-                      value={infoSkrip}
-                      onChange={(e) => setInfoSkrip(e.target.value)}
-                      className="form-input"
-                    />
-                  </Field>
-                  <Field label="Poster (URL/Catatan)">
-                    <input value={poster} onChange={(e) => setPoster(e.target.value)} className="form-input" />
-                  </Field>
-                  <Field label="Creative">
-                    <input value={creative} onChange={(e) => setCreative(e.target.value)} className="form-input" />
-                  </Field>
-                  <Field label="Link Video">
-                    <input value={linkVideo} onChange={(e) => setLinkVideo(e.target.value)} className="form-input" placeholder="https://..." />
-                  </Field>
-                  <Field label="Link Canva">
-                    <input value={linkCanva} onChange={(e) => setLinkCanva(e.target.value)} className="form-input" placeholder="https://..." />
-                  </Field>
-                  <Field label="CC / Catatan Internal">
-                    <input value={cc} onChange={(e) => setCc(e.target.value)} className="form-input" />
-                  </Field>
-                  <Field label="Upload Status">
-                    <input value={uploadStatus} onChange={(e) => setUploadStatus(e.target.value)} className="form-input" placeholder="DONE, PROGRESS..." />
-                  </Field>
-                  <Field label="Link Konten Final" wide>
-                    <input value={linkKonten} onChange={(e) => setLinkKonten(e.target.value)} className="form-input" placeholder="https://..." />
-                  </Field>
-                  <Field label="Keterangan" wide>
-                    <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} className="form-input min-h-[60px]" />
-                  </Field>
-                  <Field label="Catatan" wide>
-                    <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} className="form-input min-h-[60px]" />
-                  </Field>
-                </div>
-              </Section>
+              {/* SHEET 2: INFO OPERASIONAL */}
+              <SheetSection label="Info Operasional">
+                <table className="w-full border-collapse table-fixed">
+                  <tbody>
+                    <SheetRow label="INFO SKRIP">
+                      <select value={infoSkrip} onChange={(e) => setInfoSkrip(e.target.value)} className="sheet-cell">
+                        <option value="">—</option>
+                        <option value="progress">PROGRESS</option>
+                        <option value="skrip ready">SKRIP READY</option>
+                        <option value="skrip urgent">SKRIP URGENT</option>
+                      </select>
+                    </SheetRow>
+                    <SheetRow label="TALENT">
+                      <select value={talent} onChange={(e) => setTalent(e.target.value)} className="sheet-cell">
+                        <option value="">—</option>
+                        <option value="analisis">ANALISIS</option>
+                        <option value="take">TAKE</option>
+                        <option value="done">DONE</option>
+                      </select>
+                    </SheetRow>
+                    <SheetRow label="EDITOR">
+                      <input value={editor} onChange={(e) => setEditor(e.target.value)} className="sheet-cell" placeholder="Nama editor..." />
+                    </SheetRow>
+                    <SheetRow label="POSTER">
+                      <input value={poster} onChange={(e) => setPoster(e.target.value)} className="sheet-cell" placeholder="URL atau deskripsi..." />
+                    </SheetRow>
+                    <SheetRow label="CREATIVE">
+                      <select value={creative} onChange={(e) => setCreative(e.target.value)} className="sheet-cell">
+                        <option value="">—</option>
+                        <option value="progress">PROGRESS</option>
+                        <option value="editing">EDITING</option>
+                        <option value="done">DONE</option>
+                      </select>
+                    </SheetRow>
+                    <SheetRow label="LINK VIDEO">
+                      <input value={linkVideo} onChange={(e) => setLinkVideo(e.target.value)} className="sheet-cell" placeholder="https://..." />
+                    </SheetRow>
+                    <SheetRow label="LINK CANVA">
+                      <input value={linkCanva} onChange={(e) => setLinkCanva(e.target.value)} className="sheet-cell" placeholder="https://..." />
+                    </SheetRow>
+                    <SheetRow label="QC">
+                      <select value={cc} onChange={(e) => setCc(e.target.value)} className="sheet-cell">
+                        <option value="">—</option>
+                        <option value="revisi">REVISI</option>
+                        <option value="done">DONE</option>
+                        <option value="cancel">CANCEL</option>
+                      </select>
+                    </SheetRow>
+                    <SheetRow label="UPLOAD STATUS">
+                      <input value={uploadStatus} onChange={(e) => setUploadStatus(e.target.value)} className="sheet-cell" placeholder="DONE, PROGRESS..." />
+                    </SheetRow>
+                    <SheetRow label="LINK KONTEN">
+                      <input value={linkKonten} onChange={(e) => setLinkKonten(e.target.value)} className="sheet-cell" placeholder="https://..." />
+                    </SheetRow>
+                    <SheetRow label="KETERANGAN">
+                      <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} className="sheet-cell" />
+                    </SheetRow>
+                    <SheetRow label="CATATAN">
+                      <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} className="sheet-cell" />
+                    </SheetRow>
+                  </tbody>
+                </table>
+              </SheetSection>
 
-              {/* Type-specific section */}
+              {/* SHEET 3: TEMPLATE SKRIP per type */}
               {type === 'video' && (
-                <Section label="Skrip Video (4 Tahapan)">
+                <SheetSection label={`Skrip Video — ${platform.toUpperCase()}`}>
                   <VideoForm value={videoContent} onChange={setVideoContent} />
-                </Section>
+                </SheetSection>
               )}
               {type === 'carousel' && (
-                <Section label="Skrip Carousel (Slides Dinamis)">
+                <SheetSection label={`Skrip Carousel — ${platform.toUpperCase()}`}>
                   <CarouselForm value={carouselContent} onChange={setCarouselContent} />
-                </Section>
+                </SheetSection>
               )}
               {type === 'single_post' && (
-                <Section label="Skrip Single Post">
+                <SheetSection label={`Skrip Single Post — ${platform.toUpperCase()}`}>
                   <SinglePostForm value={singlePostContent} onChange={setSinglePostContent} />
-                </Section>
+                </SheetSection>
               )}
 
               {/* Action buttons */}
@@ -403,29 +427,30 @@ export const ContentEditorDrawer = ({
 };
 
 // ============================================================
-// Helper subcomponents
+// Helper subcomponents — spreadsheet-style
 // ============================================================
 
-const Section = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div className="bg-white rounded-2xl border border-slate-100 p-5">
-    <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-4">
-      {label}
-    </p>
+const SheetSection = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div>
+    <div className="flex items-center gap-2 mb-2 px-1">
+      <span className="w-1 h-4 rounded-full bg-rose-500" />
+      <p className="text-[11px] font-black text-rose-600 uppercase tracking-[0.2em]">
+        {label}
+      </p>
+    </div>
     {children}
   </div>
 );
 
-const Field = ({ label, children, wide }: {
-  label: string;
-  children: React.ReactNode;
-  wide?: boolean;
-}) => (
-  <label className={cn('flex flex-col gap-1', wide && 'col-span-2')}>
-    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+const SheetRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <tr className="border-b border-slate-100 last:border-b-0 bg-white">
+    <td className="text-[10px] font-black text-slate-700 uppercase tracking-widest px-4 py-2 align-top w-[180px] border-r border-slate-100 bg-slate-50/40 border border-slate-200">
       {label}
-    </span>
-    {children}
-  </label>
+    </td>
+    <td className="p-0 align-top border border-slate-200">
+      {children}
+    </td>
+  </tr>
 );
 
 export default ContentEditorDrawer;

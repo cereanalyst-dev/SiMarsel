@@ -6,6 +6,11 @@ interface Props {
   onChange: (next: CarouselContent) => void;
 }
 
+// Layout spreadsheet horizontal — kayak Sheets:
+// header: SLIDE | TEMA | SKRIP | KPT
+// rows: setiap slide (1, 2, 3, ...)
+// caption umum di bawah (full-width baris terpisah)
+
 export const CarouselForm = ({ value, onChange }: Props) => {
   const slides = value.slides ?? [];
 
@@ -46,70 +51,93 @@ export const CarouselForm = ({ value, onChange }: Props) => {
         </button>
       </div>
 
-      <div className="space-y-3">
-        {slides.map((s, idx) => (
-          <div
-            key={idx}
-            className="bg-slate-50 border border-slate-100 rounded-2xl p-4 relative group"
-          >
-            {/* Slide header */}
-            <div className="flex items-center justify-between mb-3">
-              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-violet-100 text-violet-700 text-[11px] font-black tabular-nums">
-                {idx + 1}
-              </span>
-              <button
-                type="button"
-                onClick={() => removeSlide(idx)}
-                disabled={slides.length <= 1}
-                aria-label={`Hapus slide ${idx + 1}`}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex flex-col gap-1">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Tema</span>
-                <input
-                  value={s.tema ?? ''}
-                  onChange={(e) => updateSlide(idx, { tema: e.target.value })}
-                  placeholder="Tema/judul slide..."
-                  className="form-input"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Skrip</span>
-                <textarea
-                  value={s.skrip ?? ''}
-                  onChange={(e) => updateSlide(idx, { skrip: e.target.value })}
-                  placeholder="Isi/copy slide..."
-                  className="form-input min-h-[80px]"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">KPT (Visual / Catatan)</span>
-                <textarea
-                  value={s.kpt ?? ''}
-                  onChange={(e) => updateSlide(idx, { kpt: e.target.value })}
-                  className="form-input min-h-[60px]"
-                />
-              </label>
-            </div>
-          </div>
-        ))}
+      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+        <table className="w-full border-collapse table-fixed">
+          <thead>
+            <tr className="bg-slate-50 border-b-2 border-slate-200">
+              <th className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 py-3 text-left w-[80px] border-r border-slate-200">
+                Slide
+              </th>
+              <th className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4 py-3 text-left w-[200px] border-r border-slate-200">
+                Tema
+              </th>
+              <th className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4 py-3 text-left border-r border-slate-200">
+                Skrip
+              </th>
+              <th className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4 py-3 text-left w-[200px] border-r border-slate-200">
+                KPT
+              </th>
+              <th className="w-[40px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {slides.map((s, idx) => (
+              <tr key={idx} className="border-b border-slate-100 last:border-b-0">
+                <td className="text-[11px] font-black text-violet-700 px-3 py-2 align-top text-center border-r border-slate-100 bg-violet-50/40 tabular-nums">
+                  {idx + 1}
+                </td>
+                <td className="p-0 align-top border-r border-slate-100">
+                  <input
+                    value={s.tema ?? ''}
+                    onChange={(e) => updateSlide(idx, { tema: e.target.value })}
+                    placeholder="Tema/judul slide..."
+                    className="sheet-cell"
+                  />
+                </td>
+                <td className="p-0 align-top border-r border-slate-100">
+                  <textarea
+                    value={s.skrip ?? ''}
+                    onChange={(e) => updateSlide(idx, { skrip: e.target.value })}
+                    placeholder="Isi/copy slide..."
+                    className="sheet-cell"
+                  />
+                </td>
+                <td className="p-0 align-top border-r border-slate-100">
+                  <textarea
+                    value={s.kpt ?? ''}
+                    onChange={(e) => updateSlide(idx, { kpt: e.target.value })}
+                    placeholder="Visual / catatan..."
+                    className="sheet-cell"
+                  />
+                </td>
+                <td className="px-1 py-2 align-top text-center">
+                  <button
+                    type="button"
+                    onClick={() => removeSlide(idx)}
+                    disabled={slides.length <= 1}
+                    aria-label={`Hapus slide ${idx + 1}`}
+                    className="p-1 rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      <label className="flex flex-col gap-1 pt-2">
-        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-          Caption (Untuk Postingan)
-        </span>
-        <textarea
-          value={value.caption ?? ''}
-          onChange={(e) => onChange({ ...value, caption: e.target.value })}
-          className="form-input min-h-[100px]"
-        />
-      </label>
+      {/* Caption row terpisah — full width */}
+      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+        <table className="w-full border-collapse table-fixed">
+          <tbody>
+            <tr>
+              <td className="text-[10px] font-black text-slate-700 uppercase tracking-widest px-4 py-2 align-top w-[200px] border-r border-slate-100 bg-slate-50/40">
+                CAPTION
+              </td>
+              <td className="p-0 align-top">
+                <textarea
+                  value={value.caption ?? ''}
+                  onChange={(e) => onChange({ ...value, caption: e.target.value })}
+                  placeholder="Caption untuk postingan..."
+                  className="sheet-cell"
+                  style={{ minHeight: 100 }}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

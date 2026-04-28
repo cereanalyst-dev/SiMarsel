@@ -199,9 +199,11 @@ export interface ContentScript {
   title: string | null;
   status: ContentStatus;
   assigned_to: string | null;
-  info_skrip: string | null;
+  info_skrip: string | null;     // dropdown: progress, skrip ready, skrip urgent
+  talent: string | null;         // dropdown: analisis, take, done
+  editor: string | null;         // manual text (nama editor)
   poster: string | null;
-  creative: string | null;
+  creative: string | null;       // dropdown: progress, editing, done
   link_video: string | null;
   link_canva: string | null;
   cc: string | null;
