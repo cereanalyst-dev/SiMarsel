@@ -10,7 +10,7 @@
  * Nilai yang perlu secret (URL/key Supabase) tetap di .env.local.
  */
 import {
-  Calendar, LayoutDashboard, MessageSquare, Package, Settings,
+  Calendar, FileText, LayoutDashboard, MessageSquare, Package, Settings,
   Target, TrendingUp, type LucideIcon,
 } from 'lucide-react';
 
@@ -62,6 +62,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: 'packages', icon: Package,         label: 'Performa Produk',      group: 'main' },
   { id: 'calendar', icon: Calendar,        label: 'Kalender Marsel',      group: 'main' },
   { id: 'social',   icon: MessageSquare,   label: 'Analisa Sosial Media', group: 'main' },
+  { id: 'konten',   icon: FileText,        label: 'Manajemen Konten',     group: 'main' },
   { id: 'settings', icon: Settings,        label: 'Settings',             group: 'system' },
 ];
 
