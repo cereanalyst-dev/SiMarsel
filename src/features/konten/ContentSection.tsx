@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Check, ChevronDown, Edit2, FileText, Film, Image as ImageIcon, Layers, Plus, Search,
@@ -10,7 +11,6 @@ import {
   createContentScript,
   deleteContentScript,
   fetchContentScripts,
-  updateContentScript,
 } from '../../lib/dataAccess';
 import { getSupabase } from '../../lib/supabase';
 import type {
@@ -124,9 +124,34 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
   // Optimistic update + save
   const updateRow = async (id: string, patch: Partial<ContentScript>) => {
     setScripts((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-    const result = await updateContentScript(id, patch as Partial<NewContentScript>);
-    if (!result) {
-      toast.error('Gagal simpan', 'Perubahan tidak tersimpan, refresh halaman.');
+
+    // Pakai supabase langsung biar bisa baca pesan error spesifik
+    // (CRUD helper di dataAccess kembalikan null kalau error, nutupin pesan)
+    const supabase = getSupabase();
+    if (!supabase) {
+      toast.error('Supabase belum terkonfigurasi');
+      return;
+    }
+    const { error } = await supabase
+      .from('content_scripts')
+      .update(patch)
+      .eq('id', id);
+
+    if (error) {
+      // Common: "column 'talent' of relation 'content_scripts' does not exist"
+      // → user belum run schema migration
+      const msg = error.message;
+      if (/column .* does not exist/i.test(msg)) {
+        toast.error(
+          'Kolom belum ada di DB',
+          'Run schema.sql terbaru di Supabase SQL Editor (kolom talent/editor/last_synced_date).',
+        );
+      } else if (/permission|policy|denied/i.test(msg)) {
+        toast.error('Akses ditolak (RLS)', msg);
+      } else {
+        toast.error('Gagal simpan', msg);
+      }
+      // Revert optimistic update
       void refresh();
     }
   };
@@ -540,35 +565,61 @@ function DropdownCell({ value, options, onChange }: {
   onChange: (v: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number }>({
+    top: 0, left: 0, width: 0,
+  });
 
-  // Tutup popover kalau klik di luar
+  // Hitung posisi popover (fixed) berdasarkan rect tombol trigger
+  const computePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: Math.max(rect.width, 140),
+    });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
+    computePosition();
+
+    // Tutup popover kalau scroll / resize / klik luar / Escape
+    const closeOnScroll = () => setOpen(false);
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        popoverRef.current?.contains(target)
+      ) return;
+      setOpen(false);
     };
     const escHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
+    window.addEventListener('scroll', closeOnScroll, true);
+    window.addEventListener('resize', closeOnScroll);
     document.addEventListener('mousedown', handler);
     document.addEventListener('keydown', escHandler);
     return () => {
+      window.removeEventListener('scroll', closeOnScroll, true);
+      window.removeEventListener('resize', closeOnScroll);
       document.removeEventListener('mousedown', handler);
       document.removeEventListener('keydown', escHandler);
     };
-  }, [open]);
+  }, [open, computePosition]);
 
   const tone = value ? TONE_BY_VALUE[value.toLowerCase()] : null;
   const ring = value ? TONE_RING[value.toLowerCase()] : null;
   const displayValue = value ? value.toUpperCase() : '—';
 
   return (
-    <td className="p-0 align-middle border-r border-slate-100 relative">
-      <div ref={containerRef} className="relative w-full p-1.5">
+    <td className="p-0 align-middle border-r border-slate-100">
+      <div className="w-full p-1.5">
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setOpen((o) => !o)}
           className={cn(
@@ -588,45 +639,55 @@ function DropdownCell({ value, options, onChange }: {
           />
         </button>
 
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              initial={{ opacity: 0, y: -6, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.96 }}
-              transition={{ duration: 0.12, ease: 'easeOut' }}
-              className="absolute left-1.5 right-1.5 top-full mt-1 z-50 bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden p-1"
-              role="listbox"
-            >
-              {/* Clear option */}
-              <DropdownOption
-                label="—"
-                tone={null}
-                ring={null}
-                selected={!value}
-                onClick={() => { onChange(null); setOpen(false); }}
-                showCheck={false}
-              />
-
-              {options.map((opt) => {
-                const t = TONE_BY_VALUE[opt.toLowerCase()];
-                const r = TONE_RING[opt.toLowerCase()];
-                const isSelected = value === opt;
-                return (
-                  <DropdownOption
-                    key={opt}
-                    label={opt.toUpperCase()}
-                    tone={t}
-                    ring={r}
-                    selected={isSelected}
-                    showCheck
-                    onClick={() => { onChange(opt); setOpen(false); }}
-                  />
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Popover di-portal ke document.body biar gak ke-clip overflow parent */}
+        {createPortal(
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                ref={popoverRef}
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
+                style={{
+                  position: 'fixed',
+                  top: pos.top,
+                  left: pos.left,
+                  width: pos.width,
+                  zIndex: 9999,
+                }}
+                className="bg-white rounded-xl border border-slate-200 shadow-2xl p-1"
+                role="listbox"
+              >
+                <DropdownOption
+                  label="—"
+                  tone={null}
+                  ring={null}
+                  selected={!value}
+                  onClick={() => { onChange(null); setOpen(false); }}
+                  showCheck={false}
+                />
+                {options.map((opt) => {
+                  const t = TONE_BY_VALUE[opt.toLowerCase()];
+                  const r = TONE_RING[opt.toLowerCase()];
+                  const isSelected = value === opt;
+                  return (
+                    <DropdownOption
+                      key={opt}
+                      label={opt.toUpperCase()}
+                      tone={t}
+                      ring={r}
+                      selected={isSelected}
+                      showCheck
+                      onClick={() => { onChange(opt); setOpen(false); }}
+                    />
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
       </div>
     </td>
   );
