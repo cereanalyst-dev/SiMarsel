@@ -13,6 +13,7 @@ import {
 } from '../../lib/dataAccess';
 import type { ContentScript, ContentStatus, ContentType } from '../../types';
 import ContentEditorDrawer from './ContentEditorDrawer';
+import ImportExportButtons from './ImportExportButtons';
 
 interface Props {
   detectedPlatforms?: string[];
@@ -139,14 +140,17 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleNew}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-rose-100 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Buat Skrip
-        </button>
+        <div className="flex items-center gap-2">
+          <ImportExportButtons platform={platform} onImported={() => void refresh()} />
+          <button
+            type="button"
+            onClick={handleNew}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-rose-100 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Buat Skrip
+          </button>
+        </div>
       </div>
 
       {/* Top toolbar: platform + type tabs + status + search */}
