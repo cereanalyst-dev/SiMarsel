@@ -235,12 +235,14 @@ create table if not exists public.content_scripts (
   assigned_to     text,                                         -- email user
 
   -- Operational fields umum
-  info_skrip      text,
+  info_skrip      text,                                         -- dropdown: progress, skrip ready, skrip urgent
+  talent          text,                                         -- dropdown: analisis, take, done
+  editor          text,                                         -- manual text (nama editor)
   poster          text,                                         -- URL atau deskripsi
-  creative        text,                                         -- URL atau deskripsi
+  creative        text,                                         -- dropdown: progress, editing, done
   link_video      text,                                         -- URL hasil
   link_canva      text,                                         -- URL Canva
-  cc              text,                                         -- creative concept / catatan
+  cc              text,                                         -- dropdown QC: revisi, done, cancel
   upload_status   text,                                         -- DONE, PROGRESS, etc.
   link_konten     text,                                         -- URL konten final
   keterangan      text,
@@ -263,6 +265,11 @@ create index if not exists idx_content_scripts_type       on public.content_scri
 create index if not exists idx_content_scripts_status     on public.content_scripts (status);
 create index if not exists idx_content_scripts_scheduled  on public.content_scripts (scheduled_date);
 create index if not exists idx_content_scripts_assigned   on public.content_scripts (assigned_to);
+
+-- Migration safety: tambah kolom talent + editor kalau belum ada
+-- (untuk DB yang sudah punya tabel content_scripts dari versi awal).
+alter table public.content_scripts add column if not exists talent text;
+alter table public.content_scripts add column if not exists editor text;
 
 drop trigger if exists trg_content_scripts_touch on public.content_scripts;
 create trigger trg_content_scripts_touch

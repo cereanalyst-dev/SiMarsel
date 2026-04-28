@@ -68,12 +68,14 @@ function rowToScript(
   const scheduledDate = pickDate(row, ['tanggal upload', 'tgl upload', 'tanggal']);
   const tglTay = pickDate(row, ['tgl tay', 'tanggal tayang', 'tgltayang']);
 
-  const infoSkrip = pick(row, ['info skrip', 'info', 'keterangan info']);
+  const infoSkrip = pick(row, ['info skrip', 'info']);
+  const talent = pick(row, ['talent']);
+  const editor = pick(row, ['editor', 'editor']);
   const poster = pick(row, ['poster']);
   const creative = pick(row, ['creative', 'creator']);
   const linkVideo = pick(row, ['link video', 'linkvideo', 'url video']);
   const linkCanva = pick(row, ['link canva', 'linkcanva', 'url canva']);
-  const cc = pick(row, ['cc']);
+  const cc = pick(row, ['qc', 'cc']);
   const uploadStatus = pick(row, ['upload', 'upload status', 'status upload']);
   const linkKonten = pick(row, ['link konten', 'urlkonten', 'url konten']);
   const keterangan = pick(row, ['keterangan']);
@@ -122,6 +124,8 @@ function rowToScript(
     status: 'draft',                         // import default Draft
     assigned_to: null,
     info_skrip: infoSkrip || null,
+    talent: talent || null,
+    editor: editor || null,
     poster: poster || null,
     creative: creative || null,
     link_video: linkVideo || null,
@@ -221,18 +225,19 @@ async function handleExport(platform: string, toast: ReturnType<typeof useToast>
   const flattenVideo = (s: ContentScript) => {
     const c = s.content as VideoContent;
     return {
-      'No': s.id.slice(0, 8),
+      'No Skrip': s.id.slice(0, 8),
+      'Tanggal Buat': s.tgl_tay ?? '',
       'Tanggal Upload': s.scheduled_date ?? '',
-      'Tgl Tayang': s.tgl_tay ?? '',
-      'Judul': s.title ?? '',
+      'USP/Keyword': s.title ?? '',
       'Status': s.status,
-      'Assigned': s.assigned_to ?? '',
       'Info Skrip': s.info_skrip ?? '',
+      'Talent': s.talent ?? '',
+      'Editor': s.editor ?? '',
       'Poster': s.poster ?? '',
       'Creative': s.creative ?? '',
       'Link Video': s.link_video ?? '',
       'Link Canva': s.link_canva ?? '',
-      'CC': s.cc ?? '',
+      'QC': s.cc ?? '',
       'Upload Status': s.upload_status ?? '',
       'Link Konten': s.link_konten ?? '',
       'Keterangan': s.keterangan ?? '',

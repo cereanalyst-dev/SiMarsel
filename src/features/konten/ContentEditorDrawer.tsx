@@ -40,8 +40,9 @@ export const ContentEditorDrawer = ({
   const [tglTay, setTglTay] = useState<string>('');
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<ContentStatus>('draft');
-  const [assignedTo, setAssignedTo] = useState('');
   const [infoSkrip, setInfoSkrip] = useState('');
+  const [talent, setTalent] = useState('');
+  const [editor, setEditor] = useState('');
   const [poster, setPoster] = useState('');
   const [creative, setCreative] = useState('');
   const [linkVideo, setLinkVideo] = useState('');
@@ -71,8 +72,9 @@ export const ContentEditorDrawer = ({
       setTglTay(existing.tgl_tay ?? '');
       setTitle(existing.title ?? '');
       setStatus(existing.status);
-      setAssignedTo(existing.assigned_to ?? '');
       setInfoSkrip(existing.info_skrip ?? '');
+      setTalent(existing.talent ?? '');
+      setEditor(existing.editor ?? '');
       setPoster(existing.poster ?? '');
       setCreative(existing.creative ?? '');
       setLinkVideo(existing.link_video ?? '');
@@ -104,8 +106,9 @@ export const ContentEditorDrawer = ({
       setTglTay('');
       setTitle('');
       setStatus('draft');
-      setAssignedTo('');
       setInfoSkrip('');
+      setTalent('');
+      setEditor('');
       setPoster('');
       setCreative('');
       setLinkVideo('');
@@ -163,8 +166,10 @@ export const ContentEditorDrawer = ({
       tgl_tay: tglTay || null,
       title: title || null,
       status,
-      assigned_to: assignedTo || null,
+      assigned_to: null,
       info_skrip: infoSkrip || null,
+      talent: talent || null,
+      editor: editor || null,
       poster: poster || null,
       creative: creative || null,
       link_video: linkVideo || null,
@@ -305,30 +310,43 @@ export const ContentEditorDrawer = ({
                         ))}
                       </select>
                     </SheetRow>
-                    <SheetRow label="ASSIGNED TO">
-                      <input
-                        value={assignedTo}
-                        onChange={(e) => setAssignedTo(e.target.value)}
-                        placeholder="email rekan tim..."
-                        className="sheet-cell"
-                      />
-                    </SheetRow>
                   </tbody>
                 </table>
               </SheetSection>
 
-              {/* SHEET 2: INFO OPERASIONAL — kolom 5-13 di Sheets */}
+              {/* SHEET 2: INFO OPERASIONAL */}
               <SheetSection label="Info Operasional">
                 <table className="w-full border-collapse table-fixed">
                   <tbody>
                     <SheetRow label="INFO SKRIP">
-                      <input value={infoSkrip} onChange={(e) => setInfoSkrip(e.target.value)} className="sheet-cell" />
+                      <select value={infoSkrip} onChange={(e) => setInfoSkrip(e.target.value)} className="sheet-cell">
+                        <option value="">—</option>
+                        <option value="progress">PROGRESS</option>
+                        <option value="skrip ready">SKRIP READY</option>
+                        <option value="skrip urgent">SKRIP URGENT</option>
+                      </select>
+                    </SheetRow>
+                    <SheetRow label="TALENT">
+                      <select value={talent} onChange={(e) => setTalent(e.target.value)} className="sheet-cell">
+                        <option value="">—</option>
+                        <option value="analisis">ANALISIS</option>
+                        <option value="take">TAKE</option>
+                        <option value="done">DONE</option>
+                      </select>
+                    </SheetRow>
+                    <SheetRow label="EDITOR">
+                      <input value={editor} onChange={(e) => setEditor(e.target.value)} className="sheet-cell" placeholder="Nama editor..." />
                     </SheetRow>
                     <SheetRow label="POSTER">
                       <input value={poster} onChange={(e) => setPoster(e.target.value)} className="sheet-cell" placeholder="URL atau deskripsi..." />
                     </SheetRow>
                     <SheetRow label="CREATIVE">
-                      <input value={creative} onChange={(e) => setCreative(e.target.value)} className="sheet-cell" />
+                      <select value={creative} onChange={(e) => setCreative(e.target.value)} className="sheet-cell">
+                        <option value="">—</option>
+                        <option value="progress">PROGRESS</option>
+                        <option value="editing">EDITING</option>
+                        <option value="done">DONE</option>
+                      </select>
                     </SheetRow>
                     <SheetRow label="LINK VIDEO">
                       <input value={linkVideo} onChange={(e) => setLinkVideo(e.target.value)} className="sheet-cell" placeholder="https://..." />
@@ -336,10 +354,15 @@ export const ContentEditorDrawer = ({
                     <SheetRow label="LINK CANVA">
                       <input value={linkCanva} onChange={(e) => setLinkCanva(e.target.value)} className="sheet-cell" placeholder="https://..." />
                     </SheetRow>
-                    <SheetRow label="CC">
-                      <input value={cc} onChange={(e) => setCc(e.target.value)} className="sheet-cell" />
+                    <SheetRow label="QC">
+                      <select value={cc} onChange={(e) => setCc(e.target.value)} className="sheet-cell">
+                        <option value="">—</option>
+                        <option value="revisi">REVISI</option>
+                        <option value="done">DONE</option>
+                        <option value="cancel">CANCEL</option>
+                      </select>
                     </SheetRow>
-                    <SheetRow label="UPLOAD">
+                    <SheetRow label="UPLOAD STATUS">
                       <input value={uploadStatus} onChange={(e) => setUploadStatus(e.target.value)} className="sheet-cell" placeholder="DONE, PROGRESS..." />
                     </SheetRow>
                     <SheetRow label="LINK KONTEN">
