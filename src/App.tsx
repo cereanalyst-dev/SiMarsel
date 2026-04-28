@@ -36,6 +36,7 @@ const PriceSuggestion = lazy(() => import('./features/pricing/PriceSuggestion'))
 const PricingComparison = lazy(() => import('./features/pricing/PricingComparison'));
 const PackageCalendar = lazy(() => import('./features/calendar/PackageCalendar'));
 const SocialMediaAnalysis = lazy(() => import('./features/social/SocialMediaAnalysis'));
+const ContentSection = lazy(() => import('./features/konten/ContentSection'));
 const SettingsSection = lazy(() => import('./features/settings/SettingsSection'));
 
 // Preload semua chunk tab setelah initial render selesai. Tujuannya:
@@ -50,6 +51,7 @@ const preloadAllTabs = () => {
   void import('./features/pricing/PricingComparison');
   void import('./features/calendar/PackageCalendar');
   void import('./features/social/SocialMediaAnalysis');
+  void import('./features/konten/ContentSection');
   void import('./features/settings/SettingsSection');
 };
 
@@ -963,6 +965,17 @@ export default function App() {
                         setActiveTab={setActiveTab}
                         setCalendarFocusDate={setCalendarFocusDate}
                       />
+                    </motion.div>
+                  )}
+                  {activeTab === 'konten' && (
+                    <motion.div
+                      key="konten"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <ContentSection detectedPlatforms={availableOptions.source_apps} />
                     </motion.div>
                   )}
                   {activeTab === 'packages' && (

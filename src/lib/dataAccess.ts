@@ -1,6 +1,10 @@
 import type {
   AppData,
+  ContentScript,
+  ContentStatus,
+  ContentType,
   Downloader,
+  NewContentScript,
   Transaction,
 } from '../types';
 import { getSupabase, isSupabaseConfigured } from './supabase';
@@ -497,6 +501,114 @@ export const clearAllTransactionsInSupabase = async (): Promise<void> => {
   if (!supabase) return;
   await supabase.from('transactions').delete().not('id', 'is', null);
   await supabase.from('downloaders').delete().not('source_app', 'is', null);
+};
+
+// ============================================================
+// Content Scripts (Manajemen Konten)
+// ============================================================
+
+export interface ContentListFilter {
+  platform?: string;
+  type?: ContentType;
+  status?: ContentStatus;
+}
+
+export const fetchContentScripts = async (
+  filter: ContentListFilter = {},
+): Promise<ContentScript[]> => {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from('content_scripts')
+    .select('*')
+    .order('scheduled_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (filter.platform) query = query.eq('platform', filter.platform);
+  if (filter.type) query = query.eq('type', filter.type);
+  if (filter.status) query = query.eq('status', filter.status);
+
+  const { data, error } = await query;
+  if (error) {
+    logger.error('Fetch content_scripts gagal:', error.message);
+    return [];
+  }
+  return (data ?? []) as ContentScript[];
+};
+
+export const createContentScript = async (
+  payload: NewContentScript,
+): Promise<ContentScript | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('content_scripts')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Create content_script gagal:', error.message);
+    return null;
+  }
+  return data as ContentScript;
+};
+
+export const updateContentScript = async (
+  id: string,
+  patch: Partial<NewContentScript>,
+): Promise<ContentScript | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('content_scripts')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Update content_script gagal:', error.message);
+    return null;
+  }
+  return data as ContentScript;
+};
+
+export const deleteContentScript = async (id: string): Promise<boolean> => {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('content_scripts')
+    .delete()
+    .eq('id', id);
+  if (error) {
+    logger.error('Delete content_script gagal:', error.message);
+    return false;
+  }
+  return true;
+};
+
+// Bulk insert untuk import dari Excel.
+export const bulkInsertContentScripts = async (
+  rows: NewContentScript[],
+): Promise<{ inserted: number; failed: number }> => {
+  const supabase = getSupabase();
+  if (!supabase || rows.length === 0) return { inserted: 0, failed: 0 };
+
+  // Chunk biar gak kebanyakan dalam 1 request.
+  const chunkSize = 200;
+  let inserted = 0;
+  let failed = 0;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await supabase.from('content_scripts').insert(chunk);
+    if (error) {
+      logger.error(`Bulk insert content_scripts chunk ${i / chunkSize + 1} gagal:`, error.message);
+      failed += chunk.length;
+    } else {
+      inserted += chunk.length;
+    }
+  }
+  return { inserted, failed };
 };
 
 export { isSupabaseConfigured };
