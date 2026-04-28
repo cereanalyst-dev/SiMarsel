@@ -5,91 +5,89 @@ interface Props {
   onChange: (next: VideoContent) => void;
 }
 
-const set = <K extends keyof VideoContent>(
-  prev: VideoContent,
-  key: K,
-  v: VideoContent[K],
-): VideoContent => ({ ...prev, [key]: v });
+// Layout spreadsheet 2-kolom: Field di kiri, value di kanan.
+// Terminologi mengikuti Sheets asli (KATA KUNCI, ADS GRUP, TAHAPAN, dll).
+
+interface RowDef {
+  key: keyof VideoContent;
+  label: string;
+  multiline?: boolean;
+  placeholder?: string;
+  highlight?: 'tahapan' | 'caption';
+}
+
+const ROWS: RowDef[] = [
+  { key: 'kata_kunci',         label: 'KATA KUNCI',          placeholder: 'Try out, latihan, CPNS...' },
+  { key: 'ad_grup',            label: 'ADS GRUP' },
+  { key: 'link_contoh_video',  label: 'LINK CONTOH VIDEO',   placeholder: 'https://...' },
+  { key: 'visual_hook',        label: 'VISUAL HOOK',         multiline: true, placeholder: 'Visual ide menarik di awal...' },
+  { key: 'hook',               label: 'HOOK',                multiline: true },
+  { key: 'tahapan_1',          label: 'TAHAPAN 1',           multiline: true, highlight: 'tahapan' },
+  { key: 'tahapan_2',          label: 'TAHAPAN 2',           multiline: true, highlight: 'tahapan' },
+  { key: 'tahapan_3',          label: 'TAHAPAN 3',           multiline: true, highlight: 'tahapan' },
+  { key: 'tahapan_4_cta',      label: 'TAHAPAN 4 (CTA)',     multiline: true, highlight: 'tahapan', placeholder: 'Call-to-action di akhir video...' },
+  { key: 'footage',            label: 'FOOTAGE',             multiline: true },
+  { key: 'keterangan_skrip',   label: 'KETERANGAN',          multiline: true },
+  { key: 'caption_tiktok',     label: 'CAPTION TIKTOK',      multiline: true, highlight: 'caption' },
+  { key: 'caption_instagram',  label: 'CAPTION INSTAGRAM',   multiline: true, highlight: 'caption' },
+];
+
+const HIGHLIGHT_BG: Record<string, string> = {
+  tahapan: 'bg-rose-50/30',
+  caption: 'bg-amber-50/30',
+};
 
 export const VideoForm = ({ value, onChange }: Props) => {
   const update = <K extends keyof VideoContent>(key: K, v: VideoContent[K]) => {
-    onChange(set(value, key, v));
+    onChange({ ...value, [key]: v });
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <FormField label="Kata Kunci" wide>
-          <input value={value.kata_kunci ?? ''} onChange={(e) => update('kata_kunci', e.target.value)} className="form-input" placeholder="Try out, latihan, CPNS..." />
-        </FormField>
-        <FormField label="Ad Group">
-          <input value={value.ad_grup ?? ''} onChange={(e) => update('ad_grup', e.target.value)} className="form-input" />
-        </FormField>
-        <FormField label="Link Contoh Video">
-          <input value={value.link_contoh_video ?? ''} onChange={(e) => update('link_contoh_video', e.target.value)} className="form-input" placeholder="https://..." />
-        </FormField>
-        <FormField label="Visual Hook" wide>
-          <textarea value={value.visual_hook ?? ''} onChange={(e) => update('visual_hook', e.target.value)} className="form-input min-h-[60px]" placeholder="Visual ide yang menarik di awal..." />
-        </FormField>
-        <FormField label="Hook (Kalimat Pembuka)" wide>
-          <textarea value={value.hook ?? ''} onChange={(e) => update('hook', e.target.value)} className="form-input min-h-[60px]" />
-        </FormField>
-      </div>
-
-      {/* 4 Tahapan */}
-      <div className="space-y-3 pt-2">
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-          Skrip — 4 Tahapan
-        </p>
-        <FormField label="Tahapan 1">
-          <textarea value={value.tahapan_1 ?? ''} onChange={(e) => update('tahapan_1', e.target.value)} className="form-input min-h-[80px]" />
-        </FormField>
-        <FormField label="Tahapan 2">
-          <textarea value={value.tahapan_2 ?? ''} onChange={(e) => update('tahapan_2', e.target.value)} className="form-input min-h-[80px]" />
-        </FormField>
-        <FormField label="Tahapan 3">
-          <textarea value={value.tahapan_3 ?? ''} onChange={(e) => update('tahapan_3', e.target.value)} className="form-input min-h-[80px]" />
-        </FormField>
-        <FormField label="Tahapan 4 (CTA)">
-          <textarea value={value.tahapan_4_cta ?? ''} onChange={(e) => update('tahapan_4_cta', e.target.value)} className="form-input min-h-[80px]" placeholder="Call-to-action di akhir video..." />
-        </FormField>
-      </div>
-
-      {/* Bagian footage + caption */}
-      <div className="space-y-3 pt-2">
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-          Footage &amp; Caption
-        </p>
-        <FormField label="Footage / Visual">
-          <textarea value={value.footage ?? ''} onChange={(e) => update('footage', e.target.value)} className="form-input min-h-[60px]" />
-        </FormField>
-        <FormField label="Keterangan Skrip">
-          <textarea value={value.keterangan_skrip ?? ''} onChange={(e) => update('keterangan_skrip', e.target.value)} className="form-input min-h-[60px]" />
-        </FormField>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Caption TikTok" wide>
-            <textarea value={value.caption_tiktok ?? ''} onChange={(e) => update('caption_tiktok', e.target.value)} className="form-input min-h-[80px]" />
-          </FormField>
-          <FormField label="Caption Instagram" wide>
-            <textarea value={value.caption_instagram ?? ''} onChange={(e) => update('caption_instagram', e.target.value)} className="form-input min-h-[80px]" />
-          </FormField>
-        </div>
-      </div>
+    <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+      <table className="w-full border-collapse table-fixed">
+        <thead>
+          <tr className="bg-slate-50 border-b-2 border-slate-200">
+            <th className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4 py-3 text-left w-[200px] border-r border-slate-200">
+              Field
+            </th>
+            <th className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-4 py-3 text-left">
+              Skrip 1
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {ROWS.map((row) => (
+            <tr
+              key={row.key}
+              className={`border-b border-slate-100 last:border-b-0 ${row.highlight ? HIGHLIGHT_BG[row.highlight] : ''}`}
+            >
+              <td className="text-[10px] font-black text-slate-700 uppercase tracking-widest px-4 py-2 align-top border-r border-slate-100 bg-slate-50/40">
+                {row.label}
+              </td>
+              <td className="p-0 align-top">
+                {row.multiline ? (
+                  <textarea
+                    value={(value[row.key] as string) ?? ''}
+                    onChange={(e) => update(row.key, e.target.value)}
+                    placeholder={row.placeholder ?? '—'}
+                    className="sheet-cell"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={(value[row.key] as string) ?? ''}
+                    onChange={(e) => update(row.key, e.target.value)}
+                    placeholder={row.placeholder ?? '—'}
+                    className="sheet-cell"
+                  />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };
-
-const FormField = ({ label, children, wide }: {
-  label: string;
-  children: React.ReactNode;
-  wide?: boolean;
-}) => (
-  <label className={`flex flex-col gap-1 ${wide ? 'col-span-2' : ''}`}>
-    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-      {label}
-    </span>
-    {children}
-  </label>
-);
 
 export default VideoForm;

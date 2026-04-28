@@ -135,8 +135,9 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
             Manajemen Konten
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
-            Kelola skrip video, carousel &amp; single post per platform — kolaborasi tim
-            dengan workflow status (Draft → Review → Approved → Published).
+            Kelola skrip video, carousel &amp; single post per platform — kolaborasi
+            tim dengan alur status (Draft → Review → Approved → Published).
+            Klik baris untuk buka skrip dalam tampilan sheet, edit langsung di sel.
           </p>
         </div>
 
@@ -241,13 +242,13 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead className="bg-slate-50/60 sticky top-0">
                 <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">
-                  <th className="py-4 px-5 w-12">#</th>
-                  <th className="py-4 px-5">Judul / Keyword</th>
-                  <th className="py-4 px-5 w-32">Tgl Upload</th>
+                  <th className="py-4 px-5 w-12">No Skrip</th>
+                  <th className="py-4 px-5">Judul</th>
+                  <th className="py-4 px-5 w-32">Tanggal Upload</th>
                   <th className="py-4 px-5 w-28">Status</th>
-                  <th className="py-4 px-5 w-44">Assigned To</th>
-                  <th className="py-4 px-5 w-32">Update</th>
-                  <th className="py-4 px-5 w-28 text-right">Action</th>
+                  <th className="py-4 px-5 w-44">Assigned</th>
+                  <th className="py-4 px-5 w-32">Diperbarui</th>
+                  <th className="py-4 px-5 w-28 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
