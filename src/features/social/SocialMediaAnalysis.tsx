@@ -1,14 +1,18 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { logger } from '../../lib/logger';
 import { motion } from 'motion/react';
 import { format, parse } from 'date-fns';
 import * as XLSX from 'xlsx';
-import { Calendar, Download, FileSpreadsheet, Plus, Search, Smartphone, Trash2, Upload } from 'lucide-react';
+import { Calendar, Download, FileSpreadsheet, Layers, Plus, Search, Smartphone, Trash2, Upload } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatters';
 import { excelDateToJSDate } from '../../lib/excelDate';
 import { useToast } from '../../components/Toast';
-import type { AppData, SocialMediaContent } from '../../types';
+import { fetchContentScripts } from '../../lib/dataAccess';
+import type {
+  AppData, CarouselContent, ContentScript, SinglePostContent,
+  SocialMediaContent, VideoContent,
+} from '../../types';
 
 interface Props {
   apps: AppData[];
@@ -46,21 +50,85 @@ export const SocialMediaAnalysis = ({
   const [platformFilter, setPlatformFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // Konten dari Manajemen Konten yang sudah status='published'.
+  // Auto-load on mount + auto-refresh.
+  const [publishedKonten, setPublishedKonten] = useState<ContentScript[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const rows = await fetchContentScripts({ status: 'published' });
+      if (active) setPublishedKonten(rows);
+    };
+    void load();
+    return () => { active = false; };
+  }, []);
+
+  // Konversi ContentScript → shape yang sama dengan socialContent legacy
+  // supaya bisa di-merge ke listing & filter yang sama.
+  const kontenAsSocialContent = useMemo(() => {
+    return publishedKonten.map((s) => {
+      const dateStr = s.scheduled_date ?? format(new Date(s.updated_at), 'yyyy-MM-dd');
+      const c = s.content as VideoContent & CarouselContent & SinglePostContent;
+      const typeLabel =
+        s.type === 'video' ? 'Video' :
+        s.type === 'carousel' ? 'Carousel' : 'Single Post';
+
+      // Caption: prioritas caption_instagram → caption_tiktok → caption umum
+      const caption =
+        (c?.caption_instagram as string | undefined) ||
+        (c?.caption_tiktok as string | undefined) ||
+        (c?.caption as string | undefined) ||
+        '';
+
+      return {
+        // shape mirroring SocialMediaContent + identification
+        platform: s.platform.toUpperCase(),
+        postingTime: '—',
+        contentType: typeLabel,
+        title: s.title ?? '(Tanpa judul)',
+        caption,
+        cta:
+          (c?.tahapan_4_cta as string | undefined) ||
+          (c?.cta as string | undefined) ||
+          '',
+        topic: '',
+        reach: 0,
+        engagement: 0,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        hook: (c?.hook as string | undefined) ?? '',
+        link: s.link_konten ?? s.link_video ?? '',
+        objective: '',
+        date: dateStr,
+        appId: `konten:${s.id}`,
+        appName: s.platform.toUpperCase(),
+        contentIndex: 0,
+        // Marker biar UI tau ini dari Manajemen Konten
+        _fromKonten: true,
+        _scriptId: s.id,
+      };
+    });
+  }, [publishedKonten]);
+
   const allContent = useMemo(() => {
-    return apps
-      .flatMap((app) =>
-        Object.entries(app.dailyData || {}).flatMap(([date, dayData]) =>
-          (dayData.socialContent || []).map((content, idx) => ({
-            ...content,
-            date,
-            appId: app.id,
-            appName: app.name,
-            contentIndex: idx,
-          })),
-        ),
-      )
+    const fromLegacy = apps.flatMap((app) =>
+      Object.entries(app.dailyData || {}).flatMap(([date, dayData]) =>
+        (dayData.socialContent || []).map((content, idx) => ({
+          ...content,
+          date,
+          appId: app.id,
+          appName: app.name,
+          contentIndex: idx,
+          _fromKonten: false as const,
+        })),
+      ),
+    );
+    return [...kontenAsSocialContent, ...fromLegacy]
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [apps]);
+  }, [apps, kontenAsSocialContent]);
 
   const handleDateClick = (dateStr: string) => {
     const date = parse(dateStr, 'yyyy-MM-dd', new Date());
@@ -420,12 +488,24 @@ export const SocialMediaAnalysis = ({
               <tbody className="divide-y divide-slate-50">
                 {filteredContent.map((item, i) => {
                   const er = item.reach > 0 ? (item.engagement / item.reach) * 100 : 0;
+                  const fromKonten = '_fromKonten' in item && item._fromKonten;
                   return (
                     <tr key={`${item.appId}-${item.date}-${item.contentIndex}-${i}`} className="hover:bg-rose-50/20 transition-colors group">
                       <td className="py-5 px-4">
-                        <span className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-full uppercase tracking-wider">
-                          {item.platform}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-full uppercase tracking-wider">
+                            {item.platform}
+                          </span>
+                          {fromKonten && (
+                            <span
+                              title="Disinkronisasi dari Manajemen Konten (status published)"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[8px] font-black rounded-md uppercase tracking-widest border border-indigo-100"
+                            >
+                              <Layers className="w-2.5 h-2.5" />
+                              Konten
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-5 px-4 text-[10px] font-bold text-slate-500 uppercase">
                         {item.appName}
@@ -472,13 +552,23 @@ export const SocialMediaAnalysis = ({
                           >
                             <Calendar className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(item.appId, item.date, item.contentIndex)}
-                            className="p-2 hover:bg-rose-50 rounded-lg transition-colors text-slate-400 hover:text-rose-600"
-                            title="Hapus konten"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {fromKonten ? (
+                            <button
+                              onClick={() => setActiveTab('konten')}
+                              className="p-2 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
+                              title="Edit di Manajemen Konten"
+                            >
+                              <Layers className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDelete(item.appId, item.date, item.contentIndex)}
+                              className="p-2 hover:bg-rose-50 rounded-lg transition-colors text-slate-400 hover:text-rose-600"
+                              title="Hapus konten"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

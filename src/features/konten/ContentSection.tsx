@@ -8,13 +8,12 @@ import {
 import { cn } from '../../lib/utils';
 import { useToast } from '../../components/Toast';
 import {
-  createContentScript,
   deleteContentScript,
   fetchContentScripts,
 } from '../../lib/dataAccess';
 import { getSupabase } from '../../lib/supabase';
 import type {
-  CarouselContent, ContentScript, ContentStatus, ContentType, NewContentScript,
+  ContentScript, ContentStatus, ContentType,
 } from '../../types';
 import ContentEditorDrawer from './ContentEditorDrawer';
 import ImportExportButtons from './ImportExportButtons';
@@ -161,51 +160,10 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
     setEditorOpen(true);
   };
 
-  const handleNewRow = async () => {
-    // Bikin row baru langsung di DB dengan default minimal,
-    // user lalu edit cell-nya inline.
-    const supabase = getSupabase();
-    let userId: string | null = null;
-    if (supabase) {
-      const { data } = await supabase.auth.getUser();
-      userId = data?.user?.id ?? null;
-    }
-
-    const emptyContent = typeTab === 'carousel'
-      ? ({ slides: [{ tema: '', skrip: '', kpt: '' }], caption: '' } as CarouselContent)
-      : {};
-
-    const payload: NewContentScript = {
-      user_id: userId,
-      platform,
-      type: typeTab,
-      scheduled_date: null,
-      tgl_tay: null,
-      title: '',
-      status: 'draft',
-      assigned_to: null,
-      info_skrip: null,
-      talent: null,
-      editor: null,
-      poster: null,
-      creative: null,
-      link_video: null,
-      link_canva: null,
-      cc: null,
-      upload_status: null,
-      link_konten: null,
-      keterangan: null,
-      catatan: null,
-      content: emptyContent,
-    };
-
-    const result = await createContentScript(payload);
-    if (result) {
-      setScripts((prev) => [result, ...prev]);
-      toast.success('Baris baru ditambahkan', 'Klik cell untuk mulai mengisi.');
-    } else {
-      toast.error('Gagal tambah baris');
-    }
+  // Tambah Skrip → buka drawer kosong (auto-save aktif di drawer)
+  const handleNewSkrip = () => {
+    setEditingScript(null);
+    setEditorOpen(true);
   };
 
   const handleDelete = async (s: ContentScript) => {
@@ -247,11 +205,11 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
           <ImportExportButtons platform={platform} onImported={() => void refresh()} />
           <button
             type="button"
-            onClick={() => void handleNewRow()}
+            onClick={handleNewSkrip}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-rose-100 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Tambah Baris
+            Buat Skrip
           </button>
         </div>
       </div>
@@ -328,7 +286,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
             Memuat skrip…
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState onCreate={() => void handleNewRow()} />
+          <EmptyState onCreate={() => void handleNewSkrip()} />
         ) : (
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse min-w-[1900px]">
@@ -368,7 +326,9 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
       <ContentEditorDrawer
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
-        onSaved={() => { setEditorOpen(false); void refresh(); }}
+        // onSaved cuma refresh list — gak nutup drawer (auto-save di drawer
+        // bisa fire berkali-kali sambil user terus ngedit)
+        onSaved={() => void refresh()}
         existing={editingScript}
         defaultPlatform={platform}
         defaultType={typeTab}
@@ -394,9 +354,16 @@ function Row({ s, idx, onUpdate, onEdit, onDelete }: {
       transition={{ delay: idx * 0.01 }}
       className="border-b border-slate-100 hover:bg-amber-50/20 group"
     >
-      {/* No skrip */}
-      <td className="py-2 px-3 text-xs font-black text-slate-400 tabular-nums sticky left-0 bg-white group-hover:bg-amber-50/40 z-10 border-r border-slate-100">
-        {String(idx + 1).padStart(2, '0')}
+      {/* No skrip — klik buka drawer detail */}
+      <td className="p-0 sticky left-0 bg-white group-hover:bg-amber-50/40 z-10 border-r border-slate-100">
+        <button
+          type="button"
+          onClick={() => onEdit(s)}
+          title="Buka detail skrip"
+          className="w-full h-full px-3 py-2 text-xs font-black text-rose-600 tabular-nums hover:bg-rose-50 hover:text-rose-700 transition-colors text-left underline-offset-2 hover:underline cursor-pointer"
+        >
+          {String(idx + 1).padStart(2, '0')}
+        </button>
       </td>
 
       {/* Tanggal Buat */}
@@ -734,7 +701,7 @@ const EmptyState = ({ onCreate }: { onCreate: () => void }) => (
     </div>
     <h4 className="text-sm font-black text-slate-700 mb-1">Belum ada skrip</h4>
     <p className="text-xs text-slate-400 font-medium mb-6">
-      Mulai dengan menambah baris pertama untuk platform ini.
+      Mulai dengan membuat skrip pertama untuk platform ini.
     </p>
     <button
       type="button"
@@ -742,7 +709,7 @@ const EmptyState = ({ onCreate }: { onCreate: () => void }) => (
       className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all"
     >
       <Plus className="w-3.5 h-3.5" />
-      Tambah Baris Pertama
+      Buat Skrip Pertama
     </button>
   </div>
 );

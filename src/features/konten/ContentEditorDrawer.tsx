@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Save, X } from 'lucide-react';
+import { Check, Loader2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { useToast } from '../../components/Toast';
 import { getSupabase } from '../../lib/supabase';
 import {
   createContentScript,
@@ -30,7 +29,6 @@ const STATUS_OPTIONS: ContentStatus[] = ['draft', 'review', 'approved', 'publish
 export const ContentEditorDrawer = ({
   open, onClose, onSaved, existing, defaultPlatform, defaultType,
 }: Props) => {
-  const toast = useToast();
   const isNew = !existing;
 
   // Form state
@@ -61,7 +59,12 @@ export const ContentEditorDrawer = ({
   });
   const [singlePostContent, setSinglePostContent] = useState<SinglePostContent>({});
 
+  // Auto-save state
+  const [currentId, setCurrentId] = useState<string | null>(existing?.id ?? null);
   const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string>('');
+  const initRef = useRef(false);
 
   // Reset form pas existing/defaults berubah
   useEffect(() => {
@@ -138,19 +141,48 @@ export const ContentEditorDrawer = ({
     }
   };
 
-  const handleSave = async () => {
-    if (!platform.trim()) {
-      toast.error('Platform wajib diisi');
-      return;
+  // Snapshot state saat ini buat dibandingkan ke last saved
+  const formSnapshot = useMemo(() => JSON.stringify({
+    platform, type, scheduledDate, tglTay, title, status,
+    infoSkrip, talent, editor, poster, creative,
+    linkVideo, linkCanva, cc, uploadStatus, linkKonten,
+    keterangan, catatan,
+    videoContent, carouselContent, singlePostContent,
+  }), [
+    platform, type, scheduledDate, tglTay, title, status,
+    infoSkrip, talent, editor, poster, creative,
+    linkVideo, linkCanva, cc, uploadStatus, linkKonten,
+    keterangan, catatan,
+    videoContent, carouselContent, singlePostContent,
+  ]);
+
+  // Sinkronisasi currentId + initial snapshot saat drawer open
+  useEffect(() => {
+    if (open) {
+      setCurrentId(existing?.id ?? null);
+      setSavedAt(null);
+      // Set initial snapshot SETELAH state populated dari existing.
+      // Pakai setTimeout 0 agar dieksekusi setelah useEffect populate state.
+      const t = window.setTimeout(() => {
+        initRef.current = true;
+      }, 0);
+      return () => {
+        window.clearTimeout(t);
+        initRef.current = false;
+      };
     }
-    setSaving(true);
+  }, [open, existing?.id]);
+
+  // Build payload dari state
+  const buildPayload = useCallback(async (): Promise<NewContentScript | null> => {
+    const cleanPlatform = platform.trim().toLowerCase();
+    if (!cleanPlatform) return null; // Tidak save kalau platform kosong
 
     let contentPayload: VideoContent | CarouselContent | SinglePostContent;
     if (type === 'video') contentPayload = videoContent;
     else if (type === 'carousel') contentPayload = carouselContent;
     else contentPayload = singlePostContent;
 
-    // Get current user_id (kalau ada session)
     const supabase = getSupabase();
     let userId: string | null = null;
     if (supabase) {
@@ -158,9 +190,9 @@ export const ContentEditorDrawer = ({
       userId = data?.user?.id ?? null;
     }
 
-    const payload: NewContentScript = {
+    return {
       user_id: userId,
-      platform: platform.trim().toLowerCase(),
+      platform: cleanPlatform,
       type,
       scheduled_date: scheduledDate || null,
       tgl_tay: tglTay || null,
@@ -181,21 +213,57 @@ export const ContentEditorDrawer = ({
       catatan: catatan || null,
       content: contentPayload,
     };
+  }, [
+    platform, type, scheduledDate, tglTay, title, status,
+    infoSkrip, talent, editor, poster, creative,
+    linkVideo, linkCanva, cc, uploadStatus, linkKonten,
+    keterangan, catatan,
+    videoContent, carouselContent, singlePostContent,
+  ]);
 
+  // Auto-save ke DB. Pertama-time = INSERT, subsequent = UPDATE.
+  const performSave = useCallback(async (): Promise<boolean> => {
+    const payload = await buildPayload();
+    if (!payload) return false;
+
+    setSaving(true);
     try {
-      const result = isNew
-        ? await createContentScript(payload)
-        : await updateContentScript(existing!.id, payload);
-
-      if (result) {
-        toast.success(isNew ? 'Skrip dibuat' : 'Skrip diperbarui');
-        onSaved();
+      if (currentId) {
+        const result = await updateContentScript(currentId, payload);
+        if (!result) return false;
       } else {
-        toast.error('Gagal simpan skrip');
+        const result = await createContentScript(payload);
+        if (!result) return false;
+        setCurrentId(result.id);
       }
+      setSavedAt(new Date());
+      onSaved();        // refresh list di parent
+      return true;
     } finally {
       setSaving(false);
     }
+  }, [buildPayload, currentId, onSaved]);
+
+  // Debounced auto-save: setiap kali snapshot beda dari last saved,
+  // jadwalkan save 800ms kemudian (reset timer kalau user terus ngetik).
+  useEffect(() => {
+    if (!open) return;
+    if (!initRef.current) return;
+    if (formSnapshot === lastSavedSnapshot) return;
+
+    const timer = window.setTimeout(async () => {
+      const ok = await performSave();
+      if (ok) setLastSavedSnapshot(formSnapshot);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [formSnapshot, lastSavedSnapshot, open, performSave]);
+
+  // Selesai: save yang masih pending lalu close
+  const handleClose = async () => {
+    if (formSnapshot !== lastSavedSnapshot && initRef.current) {
+      await performSave();
+    }
+    onClose();
   };
 
   return (
@@ -210,11 +278,11 @@ export const ContentEditorDrawer = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
         >
-          {/* Backdrop */}
+          {/* Backdrop — klik close + flush pending auto-save */}
           <button
             type="button"
             className="flex-1 bg-slate-900/40 backdrop-blur-sm"
-            onClick={onClose}
+            onClick={() => void handleClose()}
             aria-label="Tutup editor"
           />
 
@@ -241,14 +309,28 @@ export const ContentEditorDrawer = ({
                   </h3>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Tutup"
-                className="p-2 rounded-xl hover:bg-slate-100 text-slate-500"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                {/* Indicator auto-save */}
+                {saving ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Menyimpan
+                  </span>
+                ) : savedAt ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest">
+                    <Check className="w-3 h-3" />
+                    Tersimpan
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void handleClose()}
+                  aria-label="Tutup"
+                  className="p-2 rounded-xl hover:bg-slate-100 text-slate-500"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-6">
@@ -395,27 +477,28 @@ export const ContentEditorDrawer = ({
                 </SheetSection>
               )}
 
-              {/* Action buttons */}
-              <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-end gap-3 mt-8">
+              {/* Action button — auto-save aktif, jadi cukup tombol Selesai
+                  yang sekedar nutup drawer (save pending dijalankan dulu) */}
+              <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-between gap-3 mt-8">
+                <p className="text-[10px] font-bold text-slate-400">
+                  {!platform.trim()
+                    ? 'Isi platform untuk mulai save otomatis'
+                    : saving
+                      ? 'Menyimpan…'
+                      : savedAt
+                        ? `Tersimpan otomatis · ${savedAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+                        : 'Auto-save aktif — perubahan tersimpan otomatis'}
+                </p>
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
+                  onClick={() => void handleClose()}
                   className={cn(
                     'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-white transition-all',
                     'bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-100',
-                    'disabled:bg-slate-300 disabled:shadow-none disabled:cursor-not-allowed',
                   )}
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  {saving ? 'Menyimpan…' : isNew ? 'Buat Skrip' : 'Simpan Perubahan'}
+                  <Check className="w-3.5 h-3.5" />
+                  Selesai
                 </button>
               </div>
             </div>
