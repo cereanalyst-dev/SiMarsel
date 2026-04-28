@@ -169,7 +169,8 @@ create table if not exists public.api_sync_state (
   user_id             uuid         not null references auth.users(id) on delete cascade,
   platform            text         not null,                  -- lowercase: jadibumn, jadipolisi, ...
   enabled             boolean      not null default true,
-  last_run_at         timestamptz,
+  last_run_at         timestamptz,                            -- kapan cron/manual fetch dijalankan
+  last_synced_date    date,                                   -- TANGGAL DATA terakhir yang di-fetch (parameter date ke API)
   last_status         text,                                   -- 'success' | 'error'
   last_error          text,
   last_tx_inserted    integer      not null default 0,
@@ -178,6 +179,9 @@ create table if not exists public.api_sync_state (
   updated_at          timestamptz  not null default now(),
   unique (user_id, platform)
 );
+
+-- Migration safety untuk DB yang udah ada
+alter table public.api_sync_state add column if not exists last_synced_date date;
 
 create index if not exists idx_api_sync_state_user_enabled
   on public.api_sync_state (user_id, enabled);

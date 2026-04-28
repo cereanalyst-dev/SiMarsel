@@ -161,6 +161,7 @@ export async function syncPlatform(opts: {
       .from('api_sync_state')
       .update({
         last_run_at: new Date().toISOString(),
+        last_synced_date: date,            // tanggal DATA yang di-fetch (bukan kapan cron jalan)
         last_status: 'success',
         last_error: null,
         last_tx_inserted: out.txInsertedEst,
@@ -176,6 +177,7 @@ export async function syncPlatform(opts: {
         .from('api_sync_state')
         .update({
           last_run_at: new Date().toISOString(),
+          last_synced_date: date,
           last_status: 'error',
           last_error: out.error,
         })

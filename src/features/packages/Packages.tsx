@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { ChevronDown, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileSpreadsheet, Search } from 'lucide-react';
 import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
@@ -66,16 +66,25 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
     );
   };
   const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(packagePerformance.length / ITEMS_PER_PAGE));
+  const [search, setSearch] = useState('');
+
+  // Filter berdasar search keyword (cocokin nama paket case-insensitive)
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return packagePerformance;
+    return packagePerformance.filter((p) => p.name.toLowerCase().includes(q));
+  }, [packagePerformance, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
 
   useEffect(() => {
     setPage(1);
-  }, [packagePerformance]);
+  }, [packagePerformance, search]);
 
   const paginated = useMemo(() => {
     const start = (page - 1) * ITEMS_PER_PAGE;
-    return packagePerformance.slice(start, start + ITEMS_PER_PAGE);
-  }, [packagePerformance, page]);
+    return filtered.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered, page]);
 
   return (
     <motion.div
@@ -164,9 +173,31 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
       </div>
 
       <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-        <div className="flex items-center justify-between mb-10 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
           <h3 className="text-xl font-black text-slate-900 tracking-tight">Detail Performa Paket</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-1 md:flex-initial items-center gap-2 flex-wrap md:flex-nowrap md:justify-end">
+            {/* Search box */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 min-w-[260px] flex-1 md:flex-initial">
+              <Search className="w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari nama paket..."
+                aria-label="Cari nama paket"
+                className="flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-400 min-w-0"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear search"
+                  className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <button
               onClick={() => handleExport('csv')}
               aria-label="Export ke CSV"
@@ -204,6 +235,15 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
+              {paginated.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-xs font-bold text-slate-400">
+                    {search
+                      ? `Tidak ada paket yang cocok dengan "${search}"`
+                      : 'Belum ada paket di periode/filter ini'}
+                  </td>
+                </tr>
+              )}
               {paginated.map((pkg) => (
                 <tr key={pkg.name} className="group hover:bg-slate-50/50 transition-all duration-200">
                   <td className="py-6 px-4 font-bold text-slate-700 text-sm sticky left-0 bg-white group-hover:bg-slate-50/50 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
@@ -228,9 +268,14 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
 
         <div className="flex flex-col sm:flex-row items-center justify-between mt-10 pt-6 border-t border-slate-100 gap-4">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-            Showing {(page - 1) * ITEMS_PER_PAGE + 1} to{' '}
-            {Math.min(page * ITEMS_PER_PAGE, packagePerformance.length)} of {packagePerformance.length}{' '}
+            Showing {filtered.length === 0 ? 0 : (page - 1) * ITEMS_PER_PAGE + 1} to{' '}
+            {Math.min(page * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}{' '}
             packages
+            {search && (
+              <span className="text-rose-500 ml-1 normal-case">
+                · filter: "{search}"
+              </span>
+            )}
           </p>
           <div className="flex items-center gap-2">
             <button

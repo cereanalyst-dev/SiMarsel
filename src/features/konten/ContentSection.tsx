@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Check, ChevronDown, Edit2, FileText, Film, Image as ImageIcon, Layers, Plus, Search,
@@ -7,14 +8,12 @@ import {
 import { cn } from '../../lib/utils';
 import { useToast } from '../../components/Toast';
 import {
-  createContentScript,
   deleteContentScript,
   fetchContentScripts,
-  updateContentScript,
 } from '../../lib/dataAccess';
 import { getSupabase } from '../../lib/supabase';
 import type {
-  CarouselContent, ContentScript, ContentStatus, ContentType, NewContentScript,
+  ContentScript, ContentStatus, ContentType,
 } from '../../types';
 import ContentEditorDrawer from './ContentEditorDrawer';
 import ImportExportButtons from './ImportExportButtons';
@@ -124,9 +123,34 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
   // Optimistic update + save
   const updateRow = async (id: string, patch: Partial<ContentScript>) => {
     setScripts((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-    const result = await updateContentScript(id, patch as Partial<NewContentScript>);
-    if (!result) {
-      toast.error('Gagal simpan', 'Perubahan tidak tersimpan, refresh halaman.');
+
+    // Pakai supabase langsung biar bisa baca pesan error spesifik
+    // (CRUD helper di dataAccess kembalikan null kalau error, nutupin pesan)
+    const supabase = getSupabase();
+    if (!supabase) {
+      toast.error('Supabase belum terkonfigurasi');
+      return;
+    }
+    const { error } = await supabase
+      .from('content_scripts')
+      .update(patch)
+      .eq('id', id);
+
+    if (error) {
+      // Common: "column 'talent' of relation 'content_scripts' does not exist"
+      // → user belum run schema migration
+      const msg = error.message;
+      if (/column .* does not exist/i.test(msg)) {
+        toast.error(
+          'Kolom belum ada di DB',
+          'Run schema.sql terbaru di Supabase SQL Editor (kolom talent/editor/last_synced_date).',
+        );
+      } else if (/permission|policy|denied/i.test(msg)) {
+        toast.error('Akses ditolak (RLS)', msg);
+      } else {
+        toast.error('Gagal simpan', msg);
+      }
+      // Revert optimistic update
       void refresh();
     }
   };
@@ -136,51 +160,10 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
     setEditorOpen(true);
   };
 
-  const handleNewRow = async () => {
-    // Bikin row baru langsung di DB dengan default minimal,
-    // user lalu edit cell-nya inline.
-    const supabase = getSupabase();
-    let userId: string | null = null;
-    if (supabase) {
-      const { data } = await supabase.auth.getUser();
-      userId = data?.user?.id ?? null;
-    }
-
-    const emptyContent = typeTab === 'carousel'
-      ? ({ slides: [{ tema: '', skrip: '', kpt: '' }], caption: '' } as CarouselContent)
-      : {};
-
-    const payload: NewContentScript = {
-      user_id: userId,
-      platform,
-      type: typeTab,
-      scheduled_date: null,
-      tgl_tay: null,
-      title: '',
-      status: 'draft',
-      assigned_to: null,
-      info_skrip: null,
-      talent: null,
-      editor: null,
-      poster: null,
-      creative: null,
-      link_video: null,
-      link_canva: null,
-      cc: null,
-      upload_status: null,
-      link_konten: null,
-      keterangan: null,
-      catatan: null,
-      content: emptyContent,
-    };
-
-    const result = await createContentScript(payload);
-    if (result) {
-      setScripts((prev) => [result, ...prev]);
-      toast.success('Baris baru ditambahkan', 'Klik cell untuk mulai mengisi.');
-    } else {
-      toast.error('Gagal tambah baris');
-    }
+  // Tambah Skrip → buka drawer kosong (auto-save aktif di drawer)
+  const handleNewSkrip = () => {
+    setEditingScript(null);
+    setEditorOpen(true);
   };
 
   const handleDelete = async (s: ContentScript) => {
@@ -222,11 +205,11 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
           <ImportExportButtons platform={platform} onImported={() => void refresh()} />
           <button
             type="button"
-            onClick={() => void handleNewRow()}
+            onClick={handleNewSkrip}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-rose-100 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Tambah Baris
+            Buat Skrip
           </button>
         </div>
       </div>
@@ -303,7 +286,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
             Memuat skrip…
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState onCreate={() => void handleNewRow()} />
+          <EmptyState onCreate={() => void handleNewSkrip()} />
         ) : (
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse min-w-[1900px]">
@@ -343,7 +326,9 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
       <ContentEditorDrawer
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
-        onSaved={() => { setEditorOpen(false); void refresh(); }}
+        // onSaved cuma refresh list — gak nutup drawer (auto-save di drawer
+        // bisa fire berkali-kali sambil user terus ngedit)
+        onSaved={() => void refresh()}
         existing={editingScript}
         defaultPlatform={platform}
         defaultType={typeTab}
@@ -369,9 +354,16 @@ function Row({ s, idx, onUpdate, onEdit, onDelete }: {
       transition={{ delay: idx * 0.01 }}
       className="border-b border-slate-100 hover:bg-amber-50/20 group"
     >
-      {/* No skrip */}
-      <td className="py-2 px-3 text-xs font-black text-slate-400 tabular-nums sticky left-0 bg-white group-hover:bg-amber-50/40 z-10 border-r border-slate-100">
-        {String(idx + 1).padStart(2, '0')}
+      {/* No skrip — klik buka drawer detail */}
+      <td className="p-0 sticky left-0 bg-white group-hover:bg-amber-50/40 z-10 border-r border-slate-100">
+        <button
+          type="button"
+          onClick={() => onEdit(s)}
+          title="Buka detail skrip"
+          className="w-full h-full px-3 py-2 text-xs font-black text-rose-600 tabular-nums hover:bg-rose-50 hover:text-rose-700 transition-colors text-left underline-offset-2 hover:underline cursor-pointer"
+        >
+          {String(idx + 1).padStart(2, '0')}
+        </button>
       </td>
 
       {/* Tanggal Buat */}
@@ -540,35 +532,61 @@ function DropdownCell({ value, options, onChange }: {
   onChange: (v: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number }>({
+    top: 0, left: 0, width: 0,
+  });
 
-  // Tutup popover kalau klik di luar
+  // Hitung posisi popover (fixed) berdasarkan rect tombol trigger
+  const computePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: Math.max(rect.width, 140),
+    });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
+    computePosition();
+
+    // Tutup popover kalau scroll / resize / klik luar / Escape
+    const closeOnScroll = () => setOpen(false);
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        popoverRef.current?.contains(target)
+      ) return;
+      setOpen(false);
     };
     const escHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
+    window.addEventListener('scroll', closeOnScroll, true);
+    window.addEventListener('resize', closeOnScroll);
     document.addEventListener('mousedown', handler);
     document.addEventListener('keydown', escHandler);
     return () => {
+      window.removeEventListener('scroll', closeOnScroll, true);
+      window.removeEventListener('resize', closeOnScroll);
       document.removeEventListener('mousedown', handler);
       document.removeEventListener('keydown', escHandler);
     };
-  }, [open]);
+  }, [open, computePosition]);
 
   const tone = value ? TONE_BY_VALUE[value.toLowerCase()] : null;
   const ring = value ? TONE_RING[value.toLowerCase()] : null;
   const displayValue = value ? value.toUpperCase() : '—';
 
   return (
-    <td className="p-0 align-middle border-r border-slate-100 relative">
-      <div ref={containerRef} className="relative w-full p-1.5">
+    <td className="p-0 align-middle border-r border-slate-100">
+      <div className="w-full p-1.5">
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setOpen((o) => !o)}
           className={cn(
@@ -588,45 +606,55 @@ function DropdownCell({ value, options, onChange }: {
           />
         </button>
 
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              initial={{ opacity: 0, y: -6, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.96 }}
-              transition={{ duration: 0.12, ease: 'easeOut' }}
-              className="absolute left-1.5 right-1.5 top-full mt-1 z-50 bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden p-1"
-              role="listbox"
-            >
-              {/* Clear option */}
-              <DropdownOption
-                label="—"
-                tone={null}
-                ring={null}
-                selected={!value}
-                onClick={() => { onChange(null); setOpen(false); }}
-                showCheck={false}
-              />
-
-              {options.map((opt) => {
-                const t = TONE_BY_VALUE[opt.toLowerCase()];
-                const r = TONE_RING[opt.toLowerCase()];
-                const isSelected = value === opt;
-                return (
-                  <DropdownOption
-                    key={opt}
-                    label={opt.toUpperCase()}
-                    tone={t}
-                    ring={r}
-                    selected={isSelected}
-                    showCheck
-                    onClick={() => { onChange(opt); setOpen(false); }}
-                  />
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Popover di-portal ke document.body biar gak ke-clip overflow parent */}
+        {createPortal(
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                ref={popoverRef}
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
+                style={{
+                  position: 'fixed',
+                  top: pos.top,
+                  left: pos.left,
+                  width: pos.width,
+                  zIndex: 9999,
+                }}
+                className="bg-white rounded-xl border border-slate-200 shadow-2xl p-1"
+                role="listbox"
+              >
+                <DropdownOption
+                  label="—"
+                  tone={null}
+                  ring={null}
+                  selected={!value}
+                  onClick={() => { onChange(null); setOpen(false); }}
+                  showCheck={false}
+                />
+                {options.map((opt) => {
+                  const t = TONE_BY_VALUE[opt.toLowerCase()];
+                  const r = TONE_RING[opt.toLowerCase()];
+                  const isSelected = value === opt;
+                  return (
+                    <DropdownOption
+                      key={opt}
+                      label={opt.toUpperCase()}
+                      tone={t}
+                      ring={r}
+                      selected={isSelected}
+                      showCheck
+                      onClick={() => { onChange(opt); setOpen(false); }}
+                    />
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
       </div>
     </td>
   );
@@ -673,7 +701,7 @@ const EmptyState = ({ onCreate }: { onCreate: () => void }) => (
     </div>
     <h4 className="text-sm font-black text-slate-700 mb-1">Belum ada skrip</h4>
     <p className="text-xs text-slate-400 font-medium mb-6">
-      Mulai dengan menambah baris pertama untuk platform ini.
+      Mulai dengan membuat skrip pertama untuk platform ini.
     </p>
     <button
       type="button"
@@ -681,7 +709,7 @@ const EmptyState = ({ onCreate }: { onCreate: () => void }) => (
       className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all"
     >
       <Plus className="w-3.5 h-3.5" />
-      Tambah Baris Pertama
+      Buat Skrip Pertama
     </button>
   </div>
 );
