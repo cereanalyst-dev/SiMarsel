@@ -139,3 +139,79 @@ export interface AvailableOptions {
   years: number[];
   methods: string[];
 }
+
+// ============================================================
+// Content Scripts (Manajemen Konten)
+// ============================================================
+
+export type ContentType = 'video' | 'carousel' | 'single_post';
+export type ContentStatus = 'draft' | 'review' | 'approved' | 'published';
+
+// Field-field per tipe konten — disimpan di kolom JSONB `content`.
+// Setiap interface adalah subset fields untuk satu type.
+
+export interface VideoContent {
+  kata_kunci?: string;
+  ad_grup?: string;
+  link_contoh_video?: string;
+  visual_hook?: string;
+  hook?: string;
+  tahapan_1?: string;
+  tahapan_2?: string;
+  tahapan_3?: string;
+  tahapan_4_cta?: string;
+  footage?: string;
+  keterangan_skrip?: string;
+  caption_tiktok?: string;
+  caption_instagram?: string;
+}
+
+export interface CarouselSlide {
+  tema?: string;
+  skrip?: string;
+  kpt?: string;
+}
+
+export interface CarouselContent {
+  slides: CarouselSlide[];
+  caption?: string;
+}
+
+export interface SinglePostContent {
+  title_judul?: string;
+  sumber?: string;
+  image_ilustrasi?: string;
+  isi?: string;
+  cta?: string;
+  keterangan?: string;
+  caption?: string;
+}
+
+export type ContentTypeData = VideoContent | CarouselContent | SinglePostContent;
+
+export interface ContentScript {
+  id: string;
+  user_id: string | null;
+  platform: string;            // jadiasn, cerebrum, dll. (lowercase)
+  type: ContentType;
+  scheduled_date: string | null;
+  tgl_tay: string | null;
+  title: string | null;
+  status: ContentStatus;
+  assigned_to: string | null;
+  info_skrip: string | null;
+  poster: string | null;
+  creative: string | null;
+  link_video: string | null;
+  link_canva: string | null;
+  cc: string | null;
+  upload_status: string | null;
+  link_konten: string | null;
+  keterangan: string | null;
+  catatan: string | null;
+  content: ContentTypeData;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewContentScript = Omit<ContentScript, 'id' | 'created_at' | 'updated_at'>;

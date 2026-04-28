@@ -215,6 +215,80 @@ create policy "api_sync_state_delete_own"
   using (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------
+-- 5) content_scripts : skrip konten (video/carousel/single post) per platform
+--    Multi-user collaboration: creator + assigned_to + status workflow.
+--    Field umum di kolom; field type-specific (per video/carousel/post) di
+--    JSONB `content` supaya fleksibel.
+-- ---------------------------------------------------------------------------
+create table if not exists public.content_scripts (
+  id              uuid         primary key default uuid_generate_v4(),
+  user_id         uuid         references auth.users(id) on delete set null,
+
+  platform        text         not null,                       -- jadiasn, cerebrum, jadibumn, ...
+  type            text         not null check (type in ('video', 'carousel', 'single_post')),
+  scheduled_date  date,                                         -- tanggal upload yang direncanakan
+  tgl_tay         date,                                         -- tanggal tayang aktual
+
+  title           text,                                         -- judul/keyword utama
+  status          text         not null default 'draft'
+                  check (status in ('draft', 'review', 'approved', 'published')),
+  assigned_to     text,                                         -- email user
+
+  -- Operational fields umum
+  info_skrip      text,
+  poster          text,                                         -- URL atau deskripsi
+  creative        text,                                         -- URL atau deskripsi
+  link_video      text,                                         -- URL hasil
+  link_canva      text,                                         -- URL Canva
+  cc              text,                                         -- creative concept / catatan
+  upload_status   text,                                         -- DONE, PROGRESS, etc.
+  link_konten     text,                                         -- URL konten final
+  keterangan      text,
+  catatan         text,
+
+  -- Type-specific (JSONB)
+  -- video:        { kata_kunci, ad_grup, link_contoh_video, visual_hook, hook,
+  --                 tahapan_1, tahapan_2, tahapan_3, tahapan_4_cta,
+  --                 footage, keterangan_skrip, caption_tiktok, caption_instagram }
+  -- carousel:     { tema, slides: [{ skrip, kpt }, ...], caption }
+  -- single_post:  { title_judul, sumber, image_ilustrasi, isi, cta, keterangan, caption }
+  content         jsonb        not null default '{}'::jsonb,
+
+  created_at      timestamptz  not null default now(),
+  updated_at      timestamptz  not null default now()
+);
+
+create index if not exists idx_content_scripts_platform   on public.content_scripts (platform);
+create index if not exists idx_content_scripts_type       on public.content_scripts (type);
+create index if not exists idx_content_scripts_status     on public.content_scripts (status);
+create index if not exists idx_content_scripts_scheduled  on public.content_scripts (scheduled_date);
+create index if not exists idx_content_scripts_assigned   on public.content_scripts (assigned_to);
+
+drop trigger if exists trg_content_scripts_touch on public.content_scripts;
+create trigger trg_content_scripts_touch
+  before update on public.content_scripts
+  for each row execute function public.touch_updated_at();
+
+alter table public.content_scripts enable row level security;
+
+-- Multi-user collaboration: semua authenticated user bisa read & write semua
+-- skrip. Workflow protection (status, assigned_to) di-enforce di app, bukan
+-- DB. Cocok untuk team kecil yang saling percaya. Kalau perlu fine-grained
+-- per-user lock, bisa diubah ke per-row policy.
+drop policy if exists "content_scripts_read_auth" on public.content_scripts;
+create policy "content_scripts_read_auth"
+  on public.content_scripts for select
+  to authenticated
+  using (true);
+
+drop policy if exists "content_scripts_write_auth" on public.content_scripts;
+create policy "content_scripts_write_auth"
+  on public.content_scripts for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- ---------------------------------------------------------------------------
 -- Helper views (opsional — membantu eksplorasi di SQL editor)
 -- ---------------------------------------------------------------------------
 
