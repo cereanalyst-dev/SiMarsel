@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
-  Activity, ChevronLeft, ChevronRight, Crown, Flame,
-  MessageSquare, Package, ShoppingBag, Smartphone, TrendingUp, Zap,
+  Activity, ChevronLeft, ChevronRight, Crown, Film, Flame,
+  Image as ImageIcon, Layers, MessageSquare, Package,
+  ShoppingBag, Smartphone, TrendingUp, Zap,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import { generateDailyInsight } from '../../lib/dailyInsight';
-import type { AppData, AvailableOptions, Downloader, Transaction } from '../../types';
+import { fetchContentScripts } from '../../lib/dataAccess';
+import type {
+  AppData, AvailableOptions, ContentScript, ContentType, Downloader, Transaction,
+} from '../../types';
 
 const compactRp = (v: number) => {
   if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}M`;
@@ -31,6 +35,40 @@ export const PackageCalendar = ({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedApp, setSelectedApp] = useState('');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  // Konten dari Manajemen Konten yang upload_status === 'published'
+  // → tampil di kalender pada scheduled_date masing-masing.
+  const [publishedKonten, setPublishedKonten] = useState<ContentScript[]>([]);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      // Ambil semua konten + filter di client supaya match 2 kondisi:
+      // status='published' (workflow) ATAU upload_status='published'.
+      // Lebih lenient — setiap konten yg user "tandai sebagai published"
+      // dengan 2 cara berbeda akan muncul di kalender.
+      const all = await fetchContentScripts();
+      if (!active) return;
+      const filtered = all.filter(
+        (s) => s.status === 'published' || s.upload_status === 'published',
+      );
+      setPublishedKonten(filtered);
+    };
+    void load();
+    return () => { active = false; };
+  }, []);
+
+  // Index by tanggal (scheduled_date) buat lookup cepat per cell
+  const kontenByDate = useMemo(() => {
+    const map = new Map<string, ContentScript[]>();
+    publishedKonten.forEach((s) => {
+      if (!s.scheduled_date) return;
+      const key = s.scheduled_date.slice(0, 10);
+      const arr = map.get(key) ?? [];
+      arr.push(s);
+      map.set(key, arr);
+    });
+    return map;
+  }, [publishedKonten]);
 
   useEffect(() => {
     if (focusDate) {
@@ -345,6 +383,7 @@ export const PackageCalendar = ({
             const packages = activePackagesByDay[dateStr]?.packages || [];
             const hasActivity = packages.length > 0;
             const isSelected = selectedDay === dateStr;
+            const kontenCount = kontenByDate.get(dateStr)?.length ?? 0;
             const isToday = dateStr === todayKey;
             const isTop = dateStr === topDay;
             const dow = day.getDay();
@@ -384,7 +423,7 @@ export const PackageCalendar = ({
             return (
               <div
                 key={dateStr}
-                onClick={() => hasActivity && setSelectedDay(isSelected ? null : dateStr)}
+                onClick={() => (hasActivity || kontenCount > 0) && setSelectedDay(isSelected ? null : dateStr)}
                 className={cn(
                   'aspect-square relative group',
                   hasActivity && 'cursor-pointer',
@@ -438,6 +477,19 @@ export const PackageCalendar = ({
                     {isToday && (
                       <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow">
                         Ini
+                      </span>
+                    )}
+
+                    {/* Indicator: ada konten Manajemen Konten yg published di tanggal ini */}
+                    {kontenCount > 0 && (
+                      <span
+                        title={`${kontenCount} konten terjadwal published`}
+                        className={cn(
+                          'absolute bottom-1 left-1 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm text-[8px] font-black tabular-nums',
+                          tier >= 4 ? 'bg-rose-300 text-rose-900' : 'bg-rose-500 text-white',
+                        )}
+                      >
+                        {kontenCount > 9 ? '9+' : kontenCount}
                       </span>
                     )}
                   </div>
@@ -735,6 +787,28 @@ export const PackageCalendar = ({
           )}
         </AnimatePresence>
 
+        {/* === Konten Terjadwal (dari Manajemen Konten, status published) ===
+            Render terpisah dari AnimatePresence di atas — supaya tetap muncul
+            walau tanggal yg dipilih TIDAK ada transaksi (konten-only). */}
+        {selectedDay && (kontenByDate.get(selectedDay)?.length ?? 0) > 0 && (
+          <div className={cn(!activePackagesByDay[selectedDay] && 'pt-8 border-t border-slate-100')}>
+            <KontenTerjadwalCard
+              items={kontenByDate.get(selectedDay) ?? []}
+              date={selectedDay}
+            />
+            {!activePackagesByDay[selectedDay] && (
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => setSelectedDay(null)}
+                  className="text-[10px] font-black text-slate-400 uppercase hover:text-rose-500 transition-colors"
+                >
+                  Tutup
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {!selectedDay && (
           <div className="pt-8 border-t border-slate-100">
           <h4 className="text-sm font-black text-slate-900 mb-6 flex items-center gap-2">
@@ -784,5 +858,87 @@ export const PackageCalendar = ({
   </div>
   );
 };
+
+// ============================================================
+// Konten Terjadwal Card — list content_scripts published di tanggal aktif.
+// Connect dari Manajemen Konten → Kalender Marsel.
+// ============================================================
+const TYPE_ICON: Record<ContentType, typeof Film> = {
+  video: Film,
+  carousel: Layers,
+  single_post: ImageIcon,
+};
+
+const TYPE_LABEL: Record<ContentType, string> = {
+  video: 'Video',
+  carousel: 'Carousel',
+  single_post: 'Single Post',
+};
+
+function KontenTerjadwalCard({ items, date }: { items: ContentScript[]; date: string }) {
+  return (
+    <div className="bg-gradient-to-br from-rose-50 via-white to-rose-50/30 rounded-2xl p-6 border border-rose-100 mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <h5 className="text-[10px] font-black text-rose-700 uppercase tracking-widest flex items-center gap-2">
+          <Layers className="w-3 h-3" />
+          Konten Terjadwal · {format(new Date(date), 'dd MMM yyyy')}
+        </h5>
+        <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 bg-white px-2 py-1 rounded-md border border-rose-100">
+          {items.length} konten
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-[11px] font-bold text-slate-400 italic text-center py-4">
+          Belum ada konten Manajemen Konten yang terjadwal published di tanggal ini.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {items.map((s) => {
+            const Icon = TYPE_ICON[s.type];
+            return (
+              <div
+                key={s.id}
+                className="bg-white p-4 rounded-xl border border-slate-100 hover:border-rose-200 hover:shadow-md transition-all"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                      {TYPE_LABEL[s.type]}
+                    </span>
+                  </div>
+                  <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 flex-shrink-0">
+                    Published
+                  </span>
+                </div>
+
+                <p className="text-[12px] font-black text-slate-900 leading-tight mb-1 line-clamp-2">
+                  {s.title || 'Tanpa Judul'}
+                </p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  {s.platform.toUpperCase()}
+                </p>
+
+                {s.link_konten && (
+                  <a
+                    href={s.link_konten}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-bold text-indigo-600 underline-offset-2 hover:underline mt-2 inline-block truncate max-w-full"
+                  >
+                    {s.link_konten}
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default PackageCalendar;

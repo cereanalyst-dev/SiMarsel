@@ -17,6 +17,7 @@ import type {
 } from '../../types';
 import ContentEditorDrawer from './ContentEditorDrawer';
 import ImportExportButtons from './ImportExportButtons';
+import SkripPopup from './SkripPopup';
 
 interface Props {
   detectedPlatforms?: string[];
@@ -40,6 +41,7 @@ const INFO_SKRIP_OPTIONS = ['progress', 'skrip ready', 'skrip urgent'] as const;
 const TALENT_OPTIONS = ['analisis', 'take', 'done'] as const;
 const CREATIVE_OPTIONS = ['progress', 'editing', 'done'] as const;
 const QC_OPTIONS = ['revisi', 'done', 'cancel'] as const;
+const UPLOAD_STATUS_OPTIONS = ['published', 'unpublish'] as const;
 
 const TONE_BY_VALUE: Record<string, { bg: string; text: string }> = {
   // status workflow
@@ -52,9 +54,11 @@ const TONE_BY_VALUE: Record<string, { bg: string; text: string }> = {
   'revisi':        { bg: 'bg-orange-100',  text: 'text-orange-800' },
   'done':          { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   'cancel':        { bg: 'bg-slate-200',   text: 'text-slate-600' },
+  // upload status
+  'published':     { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+  'unpublish':     { bg: 'bg-slate-200',   text: 'text-slate-600' },
 };
 
-// Border ring per nilai — bikin badge berasa solid kayak chip Material
 const TONE_RING: Record<string, string> = {
   'progress':      'border-amber-300',
   'editing':       'border-amber-300',
@@ -65,6 +69,8 @@ const TONE_RING: Record<string, string> = {
   'revisi':        'border-orange-300',
   'done':          'border-emerald-300',
   'cancel':        'border-slate-300',
+  'published':     'border-emerald-300',
+  'unpublish':     'border-slate-300',
 };
 
 export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
@@ -80,6 +86,9 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
   // Drawer (untuk skrip lengkap: TAHAPAN, CAPTION, dll)
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingScript, setEditingScript] = useState<ContentScript | null>(null);
+
+  // Popup ringkas — preview skrip read-only saat klik No Skrip
+  const [previewScript, setPreviewScript] = useState<ContentScript | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -158,6 +167,11 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
   const handleEditDeep = (s: ContentScript) => {
     setEditingScript(s);
     setEditorOpen(true);
+  };
+
+  // Klik No Skrip → preview ringkas (popup)
+  const handlePreview = (s: ContentScript) => {
+    setPreviewScript(s);
   };
 
   // Tambah Skrip → buka drawer kosong (auto-save aktif di drawer)
@@ -301,6 +315,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
                   <Th w="120px">Creative</Th>
                   <Th w="220px">Link Video</Th>
                   <Th w="100px">QC</Th>
+                  <Th w="130px">Status Upload</Th>
                   <Th w="120px">Upload</Th>
                   <Th w="220px">Link Konten</Th>
                   <Th w="200px">Catatan</Th>
@@ -314,6 +329,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
                     idx={idx}
                     onUpdate={updateRow}
                     onEdit={handleEditDeep}
+                    onPreview={handlePreview}
                     onDelete={handleDelete}
                   />
                 ))}
@@ -333,6 +349,16 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
         defaultPlatform={platform}
         defaultType={typeTab}
       />
+
+      <SkripPopup
+        open={!!previewScript}
+        onClose={() => setPreviewScript(null)}
+        script={previewScript}
+        onEdit={(s) => {
+          setPreviewScript(null);
+          handleEditDeep(s);
+        }}
+      />
     </div>
   );
 };
@@ -340,11 +366,12 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
 // ============================================================
 // Row component — semua cell editable inline
 // ============================================================
-function Row({ s, idx, onUpdate, onEdit, onDelete }: {
+function Row({ s, idx, onUpdate, onEdit, onPreview, onDelete }: {
   s: ContentScript;
   idx: number;
   onUpdate: (id: string, patch: Partial<ContentScript>) => void | Promise<void>;
   onEdit: (s: ContentScript) => void;
+  onPreview: (s: ContentScript) => void;
   onDelete: (s: ContentScript) => void | Promise<void>;
 }) {
   return (
@@ -354,12 +381,12 @@ function Row({ s, idx, onUpdate, onEdit, onDelete }: {
       transition={{ delay: idx * 0.01 }}
       className="border-b border-slate-100 hover:bg-amber-50/20 group"
     >
-      {/* No skrip — klik buka drawer detail */}
+      {/* No skrip — klik buka popup ringkas (preview skrip aja) */}
       <td className="p-0 sticky left-0 bg-white group-hover:bg-amber-50/40 z-10 border-r border-slate-100">
         <button
           type="button"
-          onClick={() => onEdit(s)}
-          title="Buka detail skrip"
+          onClick={() => onPreview(s)}
+          title="Preview skrip"
           className="w-full h-full px-3 py-2 text-xs font-black text-rose-600 tabular-nums hover:bg-rose-50 hover:text-rose-700 transition-colors text-left underline-offset-2 hover:underline cursor-pointer"
         >
           {String(idx + 1).padStart(2, '0')}
@@ -404,6 +431,14 @@ function Row({ s, idx, onUpdate, onEdit, onDelete }: {
         value={s.cc}
         options={QC_OPTIONS}
         onChange={(v) => onUpdate(s.id, { cc: v })}
+      />
+
+      {/* Status Upload (upload_status column) — published/unpublish.
+          'published' = sudah tayang di sosial media → muncul di Kalender Marsel + Analisa Sosmed */}
+      <DropdownCell
+        value={s.upload_status}
+        options={UPLOAD_STATUS_OPTIONS}
+        onChange={(v) => onUpdate(s.id, { upload_status: v })}
       />
 
       {/* Upload (scheduled_date) */}
