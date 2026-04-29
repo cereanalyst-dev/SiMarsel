@@ -37,6 +37,8 @@ const PricingComparison = lazy(() => import('./features/pricing/PricingCompariso
 const PackageCalendar = lazy(() => import('./features/calendar/PackageCalendar'));
 const SocialMediaAnalysis = lazy(() => import('./features/social/SocialMediaAnalysis'));
 const ContentSection = lazy(() => import('./features/konten/ContentSection'));
+const PromoSection = lazy(() => import('./features/promo/PromoSection'));
+const BulananSection = lazy(() => import('./features/bulanan/BulananSection'));
 const SettingsSection = lazy(() => import('./features/settings/SettingsSection'));
 
 // Preload semua chunk tab setelah initial render selesai. Tujuannya:
@@ -52,6 +54,8 @@ const preloadAllTabs = () => {
   void import('./features/calendar/PackageCalendar');
   void import('./features/social/SocialMediaAnalysis');
   void import('./features/konten/ContentSection');
+  void import('./features/promo/PromoSection');
+  void import('./features/bulanan/BulananSection');
   void import('./features/settings/SettingsSection');
 };
 
@@ -968,6 +972,16 @@ export default function App() {
                         packagePerformance={packagePerformanceData}
                       />
                     )
+                  )}
+                  {activeTab === 'kode-promo' && (
+                    loadingRawData ? (
+                      <RawDataSkeleton key="kode-promo" label="Performa Kode Promo" />
+                    ) : (
+                      <PromoSection key="kode-promo" data={data} />
+                    )
+                  )}
+                  {activeTab === 'bulanan' && (
+                    <BulananSection key="bulanan" />
                   )}
                   {activeTab === 'settings' && (
                     <motion.div

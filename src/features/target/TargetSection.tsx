@@ -9,77 +9,7 @@ import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import type { AppData, Downloader, Transaction } from '../../types';
 
-// ==============================================================
-// Klasifikasi promo_code → kategori (Sales/Marketing/Aplikasi/Live/
-// Artikel/Lainnya/Tanpa Kode). Aturan diadaptasi dari rumus Sheets
-// per platform yang user kasih.
-//
-// Order rules: Sales > Marketing > Artikel > Aplikasi > Live > Lainnya
-// (cek dari atas, first match menang). Order penting karena Marketing
-// pattern bisa overlap dengan Sales (mis. CEREBRUM ada di
-// ADMINCEREBRUM yang seharusnya Sales).
-// ==============================================================
-type PromoCategory = 'Sales' | 'Marketing' | 'Artikel' | 'Aplikasi' | 'Live' | 'Lainnya' | 'Tanpa Kode';
-
-const PROMO_RULES: Record<string, Array<{ category: PromoCategory; pattern: RegExp }>> = {
-  cerebrum: [
-    { category: 'Sales',     pattern: /(ADMINCEREBRUM|LOLOSUTBK|MEMBERCEREBRUM|TELEGRAMCEREBRUM|PROMOCEREBRUM|DISKONCEREBRUM)/ },
-    { category: 'Marketing', pattern: /(CEREBRUM|TIKTOKCEREBRUM)/ },
-    { category: 'Artikel',   pattern: /(SIAPSNBT)/ },
-    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOCEREBRUM|POTONGAN 5\.000|POTONGAN 2\.000)/ },
-    { category: 'Live',      pattern: /(KEBUTSNBT|GASSNBT|GOSNBT|TEMBUSSNBT|HEBATSNBT|PASTISNBT|TARGETSNBT|MANTAPSNBT)/ },
-  ],
-  jadiasn: [
-    { category: 'Sales',     pattern: /(ADMINJADIASN|LOLOSASN|MEMBERASN|TELEGRAMASN|PROMOASN|DISKONASN|PROMOTELEGRAM|SIAPCPNS)/ },
-    { category: 'Marketing', pattern: /(JADIASN|TIKTOKJADIASN)/ },
-    { category: 'Artikel',   pattern: /(BIMBELCPNS)/ },
-    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOASN|POTONGAN 5\.000|POTONGAN 2\.000)/ },
-    { category: 'Live',      pattern: /(KEBUTCPNS|GASCPNS|GOCPNS|TEMBUSCPNS|PASTICPNS)/ },
-  ],
-  jadibumn: [
-    { category: 'Sales',     pattern: /(ADMINDINA|LOLOSBUMN|MEMBERBUMN|TELEGRAMBUMN|PROMOBUMN|DISKONBUMN|ADMINSOFI|ADMINJADIBUMN)/ },
-    { category: 'Marketing', pattern: /(JADIBUMN|TIKTOKJADIBUMN)/ },
-    { category: 'Artikel',   pattern: /(BIMBELBUMN)/ },
-    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOASN|POTONGAN 5\.000|POTONGAN 2\.000)/ },
-    { category: 'Live',      pattern: /(PASTIBUMN|MANTAPBUMN)/ },
-  ],
-  jadipolisi: [
-    { category: 'Sales',     pattern: /(ADMINJADIPOLISI|LOLOSPOLISI|MEMBERPOLISI|TELEGRAMPOLISI|PROMOPOLISI|DISKONPOLISI)/ },
-    { category: 'Marketing', pattern: /(JADIPOLISI|TIKTOKJADIPOLISI)/ },
-    { category: 'Artikel',   pattern: /(BIMBELPOLRI)/ },
-    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOPOLISI|POTONGAN 5\.000|POTONGAN 2\.000)/ },
-    { category: 'Live',      pattern: /(PASTIPOLISI|MANTAPPOLISI)/ },
-  ],
-  jadiprajurit: [
-    { category: 'Sales',     pattern: /(ADMINJADIPRAJURIT|LOLOSPRAJURIT|MEMBERPRAJURIT|TELEGRAMPRAJURIT|PROMOPRAJURIT|DISKONPRAJURIT)/ },
-    { category: 'Marketing', pattern: /(JADIPRAJURIT|TIKTOKJADIPRAJURIT)/ },
-    { category: 'Artikel',   pattern: /(BIMBELTNI)/ },
-    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOPRAJURIT|POTONGAN 5\.000|POTONGAN 2\.000)/ },
-  ],
-  jadisekdin: [
-    { category: 'Sales',     pattern: /(ADMINJADISEKDIN|LOLOSSEKDIN|MEMBERSEKDIN|TELEGRAMSEKDIN|PROMOSEKDIN|DISKONSEKDIN)/ },
-    { category: 'Marketing', pattern: /(JADISEKDIN|TIKTOKJADISEKDIN)/ },
-    { category: 'Artikel',   pattern: /(BIMBELSEKDIN)/ },
-    { category: 'Aplikasi',  pattern: /(DISKONAPK|TOSEKDIN|POTONGAN 5\.000|POTONGAN 2\.000)/ },
-  ],
-};
-
-function classifyPromo(rawCode: string | null | undefined, platformKey: string): PromoCategory {
-  // "Tanpa Kode" untuk null, undefined, empty string, atau "[]"
-  if (rawCode == null) return 'Tanpa Kode';
-  const trimmed = String(rawCode).trim();
-  if (!trimmed || trimmed === '[]' || trimmed === 'null' || trimmed === 'NULL') {
-    return 'Tanpa Kode';
-  }
-  const platform = platformKey.toLowerCase();
-  const rules = PROMO_RULES[platform];
-  if (!rules) return 'Lainnya';
-  const upper = trimmed.toUpperCase();
-  for (const rule of rules) {
-    if (rule.pattern.test(upper)) return rule.category;
-  }
-  return 'Lainnya';
-}
+import { classifyPromo, type PromoCategory } from '../../lib/promoRules';
 
 // Helper: parse "1.000" / "1,000" / "1000" → 1000.
 const parseFormattedNumber = (s: string): number => {

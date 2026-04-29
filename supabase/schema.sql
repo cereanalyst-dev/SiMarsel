@@ -300,6 +300,53 @@ create policy "content_scripts_write_auth"
   with check (true);
 
 -- ---------------------------------------------------------------------------
+-- 6) monthly_performance : snapshot rekap bulanan per app.
+--    User upload Excel, sistem cleanse + aggregate per app, simpan
+--    snapshot ini (raw transactions di Excel TIDAK disimpan).
+-- ---------------------------------------------------------------------------
+create table if not exists public.monthly_performance (
+  id                uuid         primary key default uuid_generate_v4(),
+  user_id           uuid         not null references auth.users(id) on delete cascade,
+  year_month        text         not null,                -- '2026-04'
+  source_app        text         not null,                -- jadiasn, jadibumn, dll
+  status_filter     text         not null default 'all',  -- 'all' / 'berhasil' / 'pending' / 'cancel'
+  total_transaksi   integer      not null default 0,
+  total_berhasil    integer      not null default 0,
+  total_pending     integer      not null default 0,
+  total_expired     integer      not null default 0,
+  total_dibatalkan  integer      not null default 0,
+  conversion_rate   numeric      not null default 0,      -- berhasil / total × 100
+  total_sales       numeric      not null default 0,
+  harga_rata_rata   numeric      not null default 0,
+  created_at        timestamptz  not null default now(),
+  updated_at        timestamptz  not null default now(),
+  unique (user_id, year_month, source_app, status_filter)
+);
+
+create index if not exists idx_monthly_perf_user_month
+  on public.monthly_performance (user_id, year_month);
+
+drop trigger if exists trg_monthly_perf_touch on public.monthly_performance;
+create trigger trg_monthly_perf_touch
+  before update on public.monthly_performance
+  for each row execute function public.touch_updated_at();
+
+alter table public.monthly_performance enable row level security;
+
+drop policy if exists "monthly_perf_select_own" on public.monthly_performance;
+create policy "monthly_perf_select_own"
+  on public.monthly_performance for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "monthly_perf_write_own" on public.monthly_performance;
+create policy "monthly_perf_write_own"
+  on public.monthly_performance for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
 -- Helper views (opsional — membantu eksplorasi di SQL editor)
 -- ---------------------------------------------------------------------------
 

@@ -217,3 +217,28 @@ export interface ContentScript {
 }
 
 export type NewContentScript = Omit<ContentScript, 'id' | 'created_at' | 'updated_at'>;
+
+// ============================================================
+// Monthly Performance — snapshot rekap bulanan per app dari upload Excel
+// ============================================================
+export type MonthlyStatusFilter = 'all' | 'berhasil' | 'pending' | 'cancel';
+
+export interface MonthlyPerformance {
+  id: string;
+  user_id: string;
+  year_month: string;        // '2026-04'
+  source_app: string;
+  status_filter: MonthlyStatusFilter;
+  total_transaksi: number;
+  total_berhasil: number;
+  total_pending: number;
+  total_expired: number;
+  total_dibatalkan: number;
+  conversion_rate: number;   // %
+  total_sales: number;
+  harga_rata_rata: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewMonthlyPerformance = Omit<MonthlyPerformance, 'id' | 'created_at' | 'updated_at'>;

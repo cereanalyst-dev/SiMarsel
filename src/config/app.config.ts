@@ -10,8 +10,8 @@
  * Nilai yang perlu secret (URL/key Supabase) tetap di .env.local.
  */
 import {
-  Calendar, FileText, LayoutDashboard, MessageSquare, Package, Settings,
-  Target, TrendingUp, type LucideIcon,
+  BarChart3, Calendar, FileText, LayoutDashboard, MessageSquare, Package,
+  Settings, Tag, Target, TrendingUp, type LucideIcon,
 } from 'lucide-react';
 
 // ---------- Branding ----------
@@ -56,14 +56,16 @@ export interface MenuItem {
 }
 
 export const MENU_ITEMS: MenuItem[] = [
-  { id: 'overview', icon: LayoutDashboard, label: 'Ringkasan Performa',  group: 'main' },
-  { id: 'optimasi', icon: TrendingUp,      label: 'Optimasi Harga',       group: 'main' },
-  { id: 'target',   icon: Target,          label: 'Strategi & Target',    group: 'main' },
-  { id: 'packages', icon: Package,         label: 'Performa Produk',      group: 'main' },
-  { id: 'calendar', icon: Calendar,        label: 'Kalender Marsel',      group: 'main' },
-  { id: 'social',   icon: MessageSquare,   label: 'Analisa Sosial Media', group: 'main' },
-  { id: 'konten',   icon: FileText,        label: 'Manajemen Konten',     group: 'main' },
-  { id: 'settings', icon: Settings,        label: 'Settings',             group: 'system' },
+  { id: 'overview',   icon: LayoutDashboard, label: 'Ringkasan Performa',  group: 'main' },
+  { id: 'optimasi',   icon: TrendingUp,      label: 'Optimasi Harga',       group: 'main' },
+  { id: 'target',     icon: Target,          label: 'Strategi & Target',    group: 'main' },
+  { id: 'packages',   icon: Package,         label: 'Performa Produk',      group: 'main' },
+  { id: 'kode-promo', icon: Tag,             label: 'Performa Kode Promo',  group: 'main' },
+  { id: 'bulanan',    icon: BarChart3,       label: 'Performa Bulanan',     group: 'main' },
+  { id: 'calendar',   icon: Calendar,        label: 'Kalender Marsel',      group: 'main' },
+  { id: 'social',     icon: MessageSquare,   label: 'Analisa Sosial Media', group: 'main' },
+  { id: 'konten',     icon: FileText,        label: 'Manajemen Konten',     group: 'main' },
+  { id: 'settings',   icon: Settings,        label: 'Settings',             group: 'system' },
 ];
 
 // Tab yang dipilih saat pertama kali buka dashboard.
