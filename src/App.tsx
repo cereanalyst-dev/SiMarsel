@@ -560,9 +560,9 @@ export default function App() {
     let totalTargetRevenue = 0;
     let totalTargetDownloader = 0;
     let totalTargetRepeatOrder = 0;
-    // selisihSales = actualSales - expectedSoFar (signed)
-    //   negatif → "Hutang Sales" (belum mencapai target)
-    //   positif → "Kelebihan Sales" (sudah melebihi target)
+    // selisihSales = totalRealSales - totalTargetRevenue (formula sederhana)
+    //   negatif → Kekurangan (real < target)
+    //   positif → Kelebihan (real > target)
     let totalSelisihSales = 0;
 
     relevantApps.forEach((app) => {
@@ -572,32 +572,6 @@ export default function App() {
           totalTargetRevenue += target.targetSales || 0;
           totalTargetDownloader += target.targetDownloader || 0;
           totalTargetRepeatOrder += target.targetRepeatOrder || 0;
-        }
-
-        const dailyData = app.dailyData || {};
-        const monthDates = Object.keys(dailyData).filter((d) => d.startsWith(monthKey)).sort();
-        let appRealSales = 0;
-        monthDates.forEach((d) => {
-          appRealSales += Number(dailyData[d]?.actualSales) || 0;
-        });
-
-        if (target) {
-          const lastFilledIdx = monthDates.reduce((acc, d, i) => {
-            const row = dailyData[d];
-            const hasData =
-              row && (
-                (row.actualSales != null && row.actualSales !== 0) ||
-                (row.actualDownloader != null && row.actualDownloader !== 0) ||
-                (row.actualRepeatOrder != null && row.actualRepeatOrder !== 0)
-              );
-            return hasData ? i : acc;
-          }, -1);
-          const [ymY, ymM] = monthKey.split('-').map(Number);
-          const daysInMonth = new Date(ymY, ymM, 0).getDate();
-          const baseDailySales = (target.targetSales || 0) / Math.max(1, daysInMonth);
-          const expectedSoFar = baseDailySales * (lastFilledIdx + 1);
-          // signed difference: negative = hutang, positive = kelebihan
-          totalSelisihSales += appRealSales - expectedSoFar;
         }
       } else {
         Object.keys(app.targetConfig || {}).forEach((m) => {
@@ -610,6 +584,10 @@ export default function App() {
         });
       }
     });
+
+    // Selisih = total real sales - total target revenue (sederhana)
+    // negatif = Kekurangan, positif = Kelebihan
+    totalSelisihSales = totalRealSales - totalTargetRevenue;
 
     const result = {
       totalRevenue: totalRealSales,
