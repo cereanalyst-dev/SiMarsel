@@ -48,23 +48,41 @@ function requireEnv(name: string): string {
   return v;
 }
 
+// Timeout per request ke Markaz biar function gak nunggu kelamaan kalau
+// API lemot. 8 detik = balance antara reliability + kasih kesempatan
+// API yg lambat untuk respond.
+const MARKAZ_FETCH_TIMEOUT_MS = 8000;
+
 async function markazGet<T>(path: string, params: Record<string, string>): Promise<T> {
   const base = requireEnv('MARKAZ_API_BASE_URL').replace(/\/$/, '');
   const apiKey = requireEnv('MARKAZ_API_KEY');
   const url = new URL(`${base}${path}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      Authorization: apiKey,
-      Accept: 'application/json',
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Markaz ${path} → HTTP ${res.status}: ${body.slice(0, 200)}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MARKAZ_FETCH_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: {
+        Authorization: apiKey,
+        Accept: 'application/json',
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Markaz ${path} → HTTP ${res.status}: ${body.slice(0, 200)}`);
+    }
+    return await (res.json() as Promise<T>);
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`Markaz ${path} → timeout setelah ${MARKAZ_FETCH_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json() as Promise<T>;
 }
 
 // ---------- Date helper ----------
@@ -232,10 +250,23 @@ export async function syncAllEnabled(opts: {
 
   if (platforms.length === 0) return [];
 
-  // Sequential, bukan parallel, biar Markaz API gak kebanjiran request.
+  // Strategi:
+  // - Kalau platforms array length === 1 → langsung sequential (cuma 1).
+  //   Ini cocok untuk frontend "Fetch Semua" yg call per-platform.
+  // - Kalau >1 platform → parallel batch (concurrency 4) untuk cron
+  //   yang loop semua platform dalam 1 HTTP call.
+  if (platforms.length === 1) {
+    return [await syncPlatform({ admin, userId, platform: platforms[0], date })];
+  }
+
+  const CONCURRENCY = 4;
   const results: SyncPlatformResult[] = [];
-  for (const p of platforms) {
-    results.push(await syncPlatform({ admin, userId, platform: p, date }));
+  for (let i = 0; i < platforms.length; i += CONCURRENCY) {
+    const batch = platforms.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map((p) => syncPlatform({ admin, userId, platform: p, date })),
+    );
+    results.push(...batchResults);
   }
   return results;
 }

@@ -310,11 +310,21 @@ export const TargetSection = ({
   const isTargetSetForMonth = selectedApp.isTargetSet?.[targetMonth];
 
   const summary = useMemo(() => {
-    // AUTO dari DB — tidak lagi pakai dailyData manual
-    const perDate = dates.map((date) => getActual(selectedApp.name, date));
-    const totalRealDownloader = perDate.reduce((sum, p) => sum + p.downloader, 0);
-    const totalRealSales = perDate.reduce((sum, p) => sum + p.sales, 0);
-    const totalRealRepeatOrder = perDate.reduce((sum, p) => sum + p.premium, 0);
+    // Real — prioritas manual override (dailyData.actualX) > auto DB.
+    // Konsisten dengan cell di operational sheet + globalSummary.
+    let totalRealDownloader = 0;
+    let totalRealSales = 0;
+    let totalRealRepeatOrder = 0;
+    dates.forEach((date) => {
+      const dayData = selectedApp.dailyData?.[date] ?? {};
+      const a = getActual(selectedApp.name, date);
+      totalRealDownloader += dayData.actualDownloader != null
+        ? Number(dayData.actualDownloader) : a.downloader;
+      totalRealSales += dayData.actualSales != null
+        ? Number(dayData.actualSales) : a.sales;
+      totalRealRepeatOrder += dayData.actualRepeatOrder != null
+        ? Number(dayData.actualRepeatOrder) : a.premium;
+    });
 
     const targetConfig = selectedApp.targetConfig?.[targetMonth] || {
       targetDownloader: 0,
@@ -334,18 +344,10 @@ export const TargetSection = ({
       ? (totalRealRepeatOrder / totalRealDownloader) * 100
       : 0;
 
-    // Selisih Sales (signed — bisa hutang atau kelebihan)
-    // lastFilledIdx sekarang = indeks tanggal terakhir yang ada data DB
-    const lastFilledIdx = dates.reduce((acc, d, i) => {
-      const a = getActual(selectedApp.name, d);
-      const hasData = a.sales > 0 || a.downloader > 0 || a.premium > 0;
-      return hasData ? i : acc;
-    }, -1);
-
-    const baseDailySales = targetConfig.targetSales / Math.max(1, dates.length);
-    const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
-    // Signed: negatif = Hutang, positif = Kelebihan
-    const selisihSales = totalRealSales - expectedSalesSoFar;
+    // Selisih Sales = total real - total target (formula simpel).
+    // - Negatif → Kekurangan (real < target)
+    // - Positif → Kelebihan (real > target)
+    const selisihSales = totalRealSales - (targetConfig.targetSales || 0);
 
     return {
       totalRealDownloader,
@@ -367,7 +369,6 @@ export const TargetSection = ({
     let totalRealSales = 0;
     let totalTargetRepeatOrder = 0;
     let totalRealRepeatOrder = 0;
-    let totalSelisihSales = 0; // signed: negatif=hutang, positif=kelebihan
 
     filteredAppsForSummary.forEach(app => {
       const targetConfig = app.targetConfig?.[targetMonth];
@@ -377,32 +378,25 @@ export const TargetSection = ({
         totalTargetRepeatOrder += targetConfig.targetRepeatOrder || 0;
       }
 
-      // Auto dari DB — loop tiap tanggal pakai getActual(app.name, date)
-      let appRealDownloader = 0;
-      let appRealSales = 0;
-      let appRealRepeatOrder = 0;
-      let lastFilledIdx = -1;
-
-      dates.forEach((date, idx) => {
+      // Real — prioritas manual override (dailyData.actualX), fallback ke DB
+      dates.forEach((date) => {
+        const dayData = app.dailyData?.[date] ?? {};
         const a = getActual(app.name, date);
-        appRealDownloader += a.downloader;
-        appRealSales += a.sales;
-        appRealRepeatOrder += a.premium;
-        if (a.downloader > 0 || a.sales > 0 || a.premium > 0) {
-          lastFilledIdx = idx;
-        }
+        totalRealDownloader += dayData.actualDownloader != null
+          ? Number(dayData.actualDownloader)
+          : a.downloader;
+        totalRealSales += dayData.actualSales != null
+          ? Number(dayData.actualSales)
+          : a.sales;
+        totalRealRepeatOrder += dayData.actualRepeatOrder != null
+          ? Number(dayData.actualRepeatOrder)
+          : a.premium;
       });
-
-      totalRealDownloader += appRealDownloader;
-      totalRealSales += appRealSales;
-      totalRealRepeatOrder += appRealRepeatOrder;
-
-      if (targetConfig && targetConfig.targetSales > 0) {
-        const baseDailySales = targetConfig.targetSales / Math.max(1, dates.length);
-        const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
-        totalSelisihSales += appRealSales - expectedSalesSoFar;
-      }
     });
+
+    // Selisih Sales = total real - total target (semua platform / app)
+    // Negatif → Kekurangan, Positif → Kelebihan
+    const totalSelisihSales = totalRealSales - totalTargetSales;
 
     return {
       totalTargetDownloader,
@@ -435,7 +429,7 @@ export const TargetSection = ({
               Strategi &amp; Target
             </h1>
             <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
-              Atur target bulanan per aplikasi, tracking aktual harian, dan monitor
+              Atur target bulanan per aplikasi, tracking aktual harian, dan monitor kekurangan/kelebihan
               sales secara real-time.
             </p>
           </div>
@@ -615,27 +609,25 @@ export const TargetSection = ({
                     let appRealDownloader = 0;
                     let appRealSales = 0;
                     let appRealRepeatOrder = 0;
-                    let lastFilledIdx = -1;
 
-                    // AUTO dari DB
-                    dates.forEach((date, idx) => {
+                    // Real per app — prioritas manual override > DB
+                    dates.forEach((date) => {
+                      const dayData = app.dailyData?.[date] ?? {};
                       const a = getActual(app.name, date);
-                      appRealDownloader += a.downloader;
-                      appRealSales += a.sales;
-                      appRealRepeatOrder += a.premium;
-                      if (a.downloader > 0 || a.sales > 0 || a.premium > 0) lastFilledIdx = idx;
+                      appRealDownloader += dayData.actualDownloader != null
+                        ? Number(dayData.actualDownloader) : a.downloader;
+                      appRealSales += dayData.actualSales != null
+                        ? Number(dayData.actualSales) : a.sales;
+                      appRealRepeatOrder += dayData.actualRepeatOrder != null
+                        ? Number(dayData.actualRepeatOrder) : a.premium;
                     });
 
                     const progressDownloader = target?.targetDownloader > 0 ? (appRealDownloader / target.targetDownloader) * 100 : 0;
                     const progressSales = target?.targetSales > 0 ? (appRealSales / target.targetSales) * 100 : 0;
                     const progressConversion = appRealDownloader > 0 ? (appRealRepeatOrder / appRealDownloader) * 100 : 0;
 
-                    let selisihSales = 0;
-                    if (target?.targetSales > 0) {
-                      const baseDailySales = target.targetSales / Math.max(1, dates.length);
-                      const expectedSalesSoFar = baseDailySales * (lastFilledIdx + 1);
-                      selisihSales = appRealSales - expectedSalesSoFar;
-                    }
+                    // Selisih = real - target (sederhana)
+                    const selisihSales = appRealSales - (target?.targetSales || 0);
                     const isSurplus = selisihSales >= 0;
 
                     return (
@@ -1036,11 +1028,22 @@ export const TargetSection = ({
                 <tbody>
                   {dates.map((date, idx) => {
                     const dayData = selectedApp.dailyData[date] || {};
-                    // AUTO dari DB — user tidak isi manual lagi
-                    const actualToday = getActual(selectedApp.name, date);
-                    const actualDownloader = actualToday.downloader;
-                    const actualRepeatOrder = actualToday.premium;
-                    const actualSales = actualToday.sales;
+                    // Real value: prioritas manual override > auto dari DB.
+                    // User bisa edit langsung di cell — tersimpan di
+                    // dailyData[date].actualX (auto-sync ke Supabase).
+                    const dbToday = getActual(selectedApp.name, date);
+                    const actualDownloader =
+                      dayData.actualDownloader != null
+                        ? Number(dayData.actualDownloader)
+                        : dbToday.downloader;
+                    const actualRepeatOrder =
+                      dayData.actualRepeatOrder != null
+                        ? Number(dayData.actualRepeatOrder)
+                        : dbToday.premium;
+                    const actualSales =
+                      dayData.actualSales != null
+                        ? Number(dayData.actualSales)
+                        : dbToday.sales;
 
                     const conv = actualDownloader > 0 ? (actualRepeatOrder / actualDownloader) * 100 : 0;
 
@@ -1141,11 +1144,20 @@ export const TargetSection = ({
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors tabular-nums"
                           />
                         </td>
-                        {/* Actual Downloader — AUTO dari DB (read-only) */}
-                        <td className="py-3 px-4 border-r border-slate-100" title="Auto dari database">
-                          <span className="block w-full text-[11px] font-black text-indigo-600 tabular-nums">
-                            {actualDownloader > 0 ? formatNumber(actualDownloader) : '–'}
-                          </span>
+                        {/* Actual Downloader — editable, default dari DB */}
+                        <td className="py-3 px-4 border-r border-slate-100" title="Default auto dari DB · klik untuk override manual">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={actualDownloader > 0 ? formatNumber(actualDownloader) : ''}
+                            onChange={(e) => {
+                              const val = parseFormattedNumber(e.target.value);
+                              updateDailyValue(date, 'actualDownloader', val || null);
+                            }}
+                            placeholder="–"
+                            aria-label={`Real downloader ${date}`}
+                            className="w-full bg-transparent text-[11px] font-black text-indigo-600 tabular-nums outline-none focus:bg-indigo-50/50 focus:ring-2 focus:ring-indigo-200 rounded transition-all placeholder:text-slate-300 placeholder:font-medium"
+                          />
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20">
                           <input
@@ -1157,11 +1169,20 @@ export const TargetSection = ({
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors tabular-nums"
                           />
                         </td>
-                        {/* Actual User Premium — AUTO dari DB (read-only) */}
-                        <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20" title="Auto dari database">
-                          <span className="block w-full text-[11px] font-black text-indigo-600 tabular-nums">
-                            {actualRepeatOrder > 0 ? formatNumber(actualRepeatOrder) : '–'}
-                          </span>
+                        {/* Actual User Premium — editable, default dari DB */}
+                        <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20" title="Default auto dari DB · klik untuk override manual">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={actualRepeatOrder > 0 ? formatNumber(actualRepeatOrder) : ''}
+                            onChange={(e) => {
+                              const val = parseFormattedNumber(e.target.value);
+                              updateDailyValue(date, 'actualRepeatOrder', val || null);
+                            }}
+                            placeholder="–"
+                            aria-label={`Real user premium ${date}`}
+                            className="w-full bg-transparent text-[11px] font-black text-indigo-600 tabular-nums outline-none focus:bg-indigo-50/50 focus:ring-2 focus:ring-indigo-200 rounded transition-all placeholder:text-slate-300 placeholder:font-medium"
+                          />
                         </td>
                         <td className={cn('py-3 px-4 text-[11px] font-black border-r border-slate-100', conv >= (selectedApp.targetConfig[targetMonth]?.targetConversion || 0) ? 'text-emerald-600' : 'text-rose-600')}>
                           {conv.toFixed(1)}%
@@ -1176,11 +1197,22 @@ export const TargetSection = ({
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-emerald-600 transition-colors tabular-nums"
                           />
                         </td>
-                        {/* Actual Sales/Revenue — AUTO dari DB (read-only) */}
-                        <td className="py-3 px-4 border-r border-slate-100 bg-emerald-50/20" title="Auto dari database">
-                          <span className="block w-full text-[11px] font-black text-emerald-600 tabular-nums">
-                            {actualSales > 0 ? formatCurrency(actualSales) : '–'}
-                          </span>
+                        {/* Actual Sales/Revenue — editable, default dari DB.
+                            Display pakai formatCurrency, parsing pakai
+                            parseFormattedNumber yg strip semua non-digit. */}
+                        <td className="py-3 px-4 border-r border-slate-100 bg-emerald-50/20" title="Default auto dari DB · klik untuk override manual">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={actualSales > 0 ? formatCurrency(actualSales) : ''}
+                            onChange={(e) => {
+                              const val = parseFormattedNumber(e.target.value);
+                              updateDailyValue(date, 'actualSales', val || null);
+                            }}
+                            placeholder="–"
+                            aria-label={`Real sales ${date}`}
+                            className="w-full bg-transparent text-[11px] font-black text-emerald-600 tabular-nums outline-none focus:bg-emerald-50/50 focus:ring-2 focus:ring-emerald-200 rounded transition-all placeholder:text-slate-300 placeholder:font-medium"
+                          />
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100">
                           <div className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase text-center", statusBg, statusColor)}>
@@ -1194,7 +1226,7 @@ export const TargetSection = ({
                         </td>
                         {/* Sebaran Kode Promo — auto dari DB, klasifikasi via regex per platform */}
                         {(['Sales', 'Marketing', 'Aplikasi', 'Live', 'Lainnya', 'Artikel', 'Tanpa Kode'] as PromoCategory[]).map((cat) => {
-                          const count = actualToday.promo[cat] || 0;
+                          const count = dbToday.promo[cat] || 0;
                           return (
                             <td key={cat} className="py-3 px-4 border-r border-slate-100 bg-amber-50/10 text-center">
                               <span className={cn(

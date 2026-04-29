@@ -107,7 +107,7 @@ export interface DashboardStats {
   progressDownloader: number;
   progressSales: number;
   progressConversion: number;
-  selisihSales: number; // signed: negatif = hutang, positif = kelebihan
+  selisihSales: number; // signed: negatif = kekurangan, positif = kelebihan
   totalRealDownloader: number;
   totalRealSales: number;
   totalRepeatOrderUsers: number;
