@@ -68,13 +68,23 @@ const PROMO_RULES: Record<string, Array<{ category: PromoCategory; pattern: RegE
 //   - "[ADMINJADIASN]"           array 1 code
 //   - "[]" / "" / null           tanpa kode
 // ) menjadi objek terstruktur.
+//
+// Normalisasi: strip semua karakter non-alphanumeric + uppercase.
+// Tujuan: kode "ADMIN-CEREBRUM", "admin_cerebrum", "ADMIN CEREBRUM",
+// "ADMINCEREBRUM" semua jadi 1 group "ADMINCEREBRUM" — gak duplikat
+// listing karena perbedaan kapitalisasi / spasi / dash / underscore.
 // ==============================================================
 
+// Normalize: uppercase + strip everything except A-Z 0-9
+export function normalizePromoKey(s: string): string {
+  return s.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
 export interface ParsedPromo {
-  raw: string | null;       // value asli (untuk display bila perlu)
-  mainCode: string | null;  // kode utama (ke-1)
-  resellerCode: string | null; // kode reseller (ke-2), kalau ada
-  isEmpty: boolean;         // true kalau gak ada kode (null / [] / "")
+  raw: string | null;            // value asli (untuk debug/display kalau perlu)
+  mainCode: string | null;       // kode utama, sudah normalized
+  resellerCode: string | null;   // kode reseller (ke-2), sudah normalized
+  isEmpty: boolean;              // true kalau gak ada kode (null / [] / "")
 }
 
 export function parsePromoCode(rawCode: string | null | undefined): ParsedPromo {
@@ -90,8 +100,12 @@ export function parsePromoCode(rawCode: string | null | undefined): ParsedPromo 
     return { raw: trimmed, mainCode: null, resellerCode: null, isEmpty: true };
   }
 
-  // Split by comma
-  const parts = stripped.split(',').map((p) => p.trim()).filter(Boolean);
+  // Split by comma → trim → normalize tiap part
+  const parts = stripped
+    .split(',')
+    .map((p) => normalizePromoKey(p))
+    .filter(Boolean);
+
   if (parts.length === 0) {
     return { raw: trimmed, mainCode: null, resellerCode: null, isEmpty: true };
   }
@@ -121,12 +135,11 @@ export function classifyPromo(
   const rules = PROMO_RULES[platform];
   if (!rules) return 'Lainnya';
 
-  // Klasifikasi berdasarkan kode utama (parts[0]).
-  // Boleh juga match seluruh raw string — saat ini pakai raw biar mudah
-  // ke-classify walau code berformat "[ADMIN..., RES...]".
-  const upper = (parsed.raw ?? '').toUpperCase();
+  // Test against normalized mainCode (no spasi/dash/dot, all uppercase).
+  // Pattern regex sudah uppercase, jadi match lebih konsisten.
+  const checkStr = parsed.mainCode ?? '';
   for (const rule of rules) {
-    if (rule.pattern.test(upper)) return rule.category;
+    if (rule.pattern.test(checkStr)) return rule.category;
   }
   return 'Lainnya';
 }
@@ -136,12 +149,11 @@ export function classifyPromo(
 // Kalau ada reseller, append "+RES" supaya jadi "ADMINJADIASN+RES".
 // ==============================================================
 
-export function buildPromoDisplayKey(
-  parsed: ParsedPromo,
-): string {
+export function buildPromoDisplayKey(parsed: ParsedPromo): string {
   if (parsed.isEmpty) return 'Tanpa Kode';
   if (!parsed.mainCode) return 'Lainnya';
-  return parsed.resellerCode ? `${parsed.mainCode.toUpperCase()}+RES` : parsed.mainCode.toUpperCase();
+  // mainCode sudah normalized di parsePromoCode (uppercase + no spec chars)
+  return parsed.resellerCode ? `${parsed.mainCode}+RES` : parsed.mainCode;
 }
 
 // Tone color untuk badge per kategori
