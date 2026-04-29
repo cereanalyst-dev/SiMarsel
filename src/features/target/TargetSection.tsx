@@ -37,7 +37,7 @@ const PROMO_RULES: Record<string, Array<{ category: PromoCategory; pattern: RegE
     { category: 'Live',      pattern: /(KEBUTCPNS|GASCPNS|GOCPNS|TEMBUSCPNS|PASTICPNS)/ },
   ],
   jadibumn: [
-    { category: 'Sales',     pattern: /(ADMINDINA|LOLOSBUMN|MEMBERBUMN|TELEGRAMBUMN|PROMOBUMN|DISKONBUMN|ADMINSOFI)/ },
+    { category: 'Sales',     pattern: /(ADMINDINA|LOLOSBUMN|MEMBERBUMN|TELEGRAMBUMN|PROMOBUMN|DISKONBUMN|ADMINSOFI|ADMINJADIBUMN)/ },
     { category: 'Marketing', pattern: /(JADIBUMN|TIKTOKJADIBUMN)/ },
     { category: 'Artikel',   pattern: /(BIMBELBUMN)/ },
     { category: 'Aplikasi',  pattern: /(DISKONAPK|TOASN|POTONGAN 5\.000|POTONGAN 2\.000)/ },
