@@ -1,8 +1,14 @@
 // Vercel Cron endpoint — dipanggil otomatis sesuai jadwal di vercel.json.
-// Default: jam 12:00 & 23:59 WIB setiap hari.
 //
 // Auth: Vercel Cron kirim header `Authorization: Bearer ${CRON_SECRET}`.
 // Kita verifikasi supaya endpoint ini gak bisa di-trigger orang random.
+//
+// Query params (optional):
+//   ?daysAgo=N  → fetch data N hari ke belakang dari hari ini WIB.
+//                 Default 0 (today). Pakai 1 untuk fetch data kemarin
+//                 (cocok untuk cron jam 00:00 WIB yang mau ambil data
+//                 hari sebelumnya yang sudah lengkap).
+//   ?date=YYYY-MM-DD → fetch tanggal eksplisit (override daysAgo).
 
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { syncAllEnabled, todayWIB } from '../_lib/markazClient.js';
@@ -26,9 +32,21 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
+  // ---------- Resolve target date ----------
+  // Priority: explicit ?date=YYYY-MM-DD > ?daysAgo=N > today (WIB).
+  const url = new URL(req.url);
+  const explicitDate = url.searchParams.get('date');
+  const daysAgoRaw = url.searchParams.get('daysAgo');
+  let date: string;
+  if (explicitDate && /^\d{4}-\d{2}-\d{2}$/.test(explicitDate)) {
+    date = explicitDate;
+  } else {
+    const daysAgo = daysAgoRaw ? Math.max(0, Math.min(365, Number(daysAgoRaw) || 0)) : 0;
+    date = todayWIB(new Date(), daysAgo);
+  }
+
   try {
     const admin = getSupabaseAdmin();
-    const date = todayWIB();
     const results = await syncAllEnabled({
       admin,
       userId: targetUserId,

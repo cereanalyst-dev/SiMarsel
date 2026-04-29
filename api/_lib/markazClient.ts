@@ -69,10 +69,13 @@ async function markazGet<T>(path: string, params: Record<string, string>): Promi
 
 // ---------- Date helper ----------
 
-// WIB = UTC+7. Ambil tanggal "hari ini" menurut WIB sebagai "YYYY-MM-DD".
-export function todayWIB(now: Date = new Date()): string {
-  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-  return wib.toISOString().slice(0, 10);
+// WIB = UTC+7. Default ambil tanggal "hari ini" menurut WIB sebagai
+// "YYYY-MM-DD". Optional daysAgo: 1 = kemarin, 2 = lusa, dst.
+// Berguna untuk cron yang fire jam 00:00 WIB tapi mau fetch data hari
+// sebelumnya (yang sudah lengkap, gak ada lagi transaksi yg masuk).
+export function todayWIB(now: Date = new Date(), daysAgo: number = 0): string {
+  const wibMs = now.getTime() + 7 * 60 * 60 * 1000 - daysAgo * 24 * 60 * 60 * 1000;
+  return new Date(wibMs).toISOString().slice(0, 10);
 }
 
 // ---------- Mapping ----------
