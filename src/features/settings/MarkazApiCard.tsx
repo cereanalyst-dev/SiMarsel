@@ -23,6 +23,17 @@ interface SyncState {
   updated_at: string;
 }
 
+// Hasil fetch satu kali ke /api/markaz/sync-now.
+// Pakai shape flat (semua field optional) supaya TypeScript narrowing
+// dengan if (r.ok) tidak bermasalah saat type union dipakai inline.
+interface SyncResult {
+  ok: boolean;
+  successes?: number;
+  errors?: number;
+  totalPlatforms?: number;
+  error?: string;
+}
+
 interface MarkazApiCardProps {
   detectedPlatforms?: string[];
   // Dipanggil setelah sync sukses, biar dashboard di parent re-fetch
@@ -128,68 +139,125 @@ export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: Markaz
     setRows((prev) => prev.filter((r) => r.id !== row.id));
   };
 
-  const callSyncNow = async (platforms?: string[]) => {
-    if (!supabase) {
-      toast.error('Supabase belum terkonfigurasi', 'Isi env dulu.');
-      return;
-    }
+  // Progress untuk "Fetch Semua" sequential
+  const [progress, setProgress] = useState<{
+    current: number;
+    total: number;
+    platform: string;
+  } | null>(null);
+
+  // Inti: 1 platform per HTTP call. Returns result object — caller decide
+  // apa mau kasih toast atau gak (silent in batch mode).
+  const fetchOnePlatform = async (platform?: string): Promise<SyncResult> => {
+    if (!supabase) return { ok: false, error: 'Supabase belum terkonfigurasi' };
     const { data: sessionRes } = await supabase.auth.getSession();
     const token = sessionRes?.session?.access_token;
-    if (!token) {
-      toast.error('Harus login dulu', 'Sesi kamu tidak aktif.');
-      return;
-    }
+    if (!token) return { ok: false, error: 'Sesi kamu tidak aktif' };
 
-    const res = await fetch('/api/markaz/sync-now', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        date: syncDate,
-        ...(platforms ? { platforms } : {}),
-      }),
-    });
-
-    if (res.status === 404) {
-      toast.error(
-        'Endpoint belum tersedia',
-        'Fetch manual hanya aktif di Vercel production. Deploy dulu lalu coba dari domain .vercel.app.',
-      );
-      return;
-    }
-
-    let body: unknown;
     try {
-      body = await res.json();
-    } catch {
-      toast.error('Respons invalid', `HTTP ${res.status}`);
+      const res = await fetch('/api/markaz/sync-now', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          date: syncDate,
+          ...(platform ? { platforms: [platform] } : {}),
+        }),
+      });
+
+      if (res.status === 404) {
+        return { ok: false, error: 'Endpoint belum tersedia (deploy dulu)' };
+      }
+      if (res.status === 504) {
+        return { ok: false, error: 'Timeout (504) — Markaz API lambat' };
+      }
+
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        return { ok: false, error: `Respons invalid HTTP ${res.status}` };
+      }
+      if (!res.ok || !(body as { ok?: boolean }).ok) {
+        const msg = (body as { error?: string }).error || `HTTP ${res.status}`;
+        return { ok: false, error: msg };
+      }
+      const summary = body as {
+        totalPlatforms: number;
+        successes: number;
+        errors: number;
+      };
+      return {
+        ok: true,
+        successes: summary.successes,
+        errors: summary.errors,
+        totalPlatforms: summary.totalPlatforms,
+      };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  // Fetch satu platform spesifik (button kecil di row)
+  const callSyncOne = async (platform: string) => {
+    const r = await fetchOnePlatform(platform);
+    if (r.ok) {
+      const s = r.successes ?? 0;
+      const e = r.errors ?? 0;
+      toast.success('Sinkronisasi selesai', `${platform}: ${s} sukses • ${e} error`);
+      void refresh();
+      if (onSyncComplete && s > 0) void onSyncComplete();
+    } else {
+      toast.error(`Gagal fetch ${platform}`, r.error ?? 'Unknown error');
+      void refresh();
+    }
+  };
+
+  // Fetch SEMUA platform — sequential satu-satu biar gak kena 504.
+  // Setiap platform = 1 HTTP call ke /api/markaz/sync-now (durasi ~5 detik
+  // per call, well within Vercel timeout).
+  const callSyncAll = async () => {
+    const enabled = rows.filter((r) => r.enabled);
+    if (enabled.length === 0) {
+      toast.warning('Tidak ada platform aktif', 'Toggle ON dulu salah satu.');
       return;
     }
 
-    if (!res.ok || !(body as { ok?: boolean }).ok) {
-      const msg = (body as { error?: string }).error || `HTTP ${res.status}`;
-      toast.error('Fetch gagal', msg);
-      return;
+    let totalSuccess = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < enabled.length; i += 1) {
+      const row = enabled[i];
+      setProgress({ current: i + 1, total: enabled.length, platform: row.platform });
+      const r = await fetchOnePlatform(row.platform);
+      if (r.ok) {
+        totalSuccess += r.successes ?? 0;
+        if ((r.errors ?? 0) > 0) errors.push(`${row.platform}: ${r.errors} error internal`);
+      } else {
+        errors.push(`${row.platform}: ${r.error ?? 'Unknown error'}`);
+      }
+      // Refresh setiap platform selesai biar UI update incrementally
+      void refresh();
     }
 
-    const summary = body as {
-      totalPlatforms: number;
-      successes: number;
-      errors: number;
-    };
-    toast.success(
-      'Sinkronisasi selesai',
-      `${summary.successes} sukses • ${summary.errors} error dari ${summary.totalPlatforms} platform`,
-    );
-    // Refresh sync_state (last_run timestamp dst)
-    void refresh();
-    // Trigger parent untuk re-fetch transactions/downloaders dari DB
-    // supaya dashboard langsung tampilin data baru hasil sync.
-    if (onSyncComplete && summary.successes > 0) {
-      void onSyncComplete();
+    setProgress(null);
+
+    if (errors.length > 0) {
+      logger.error('Sync errors:', errors);
+      toast.error(
+        `${totalSuccess} sukses · ${errors.length} error`,
+        errors[0] + (errors.length > 1 ? ` (+${errors.length - 1} error lain — cek console)` : ''),
+      );
+    } else {
+      toast.success(
+        'Semua platform selesai',
+        `${enabled.length} platform · ${totalSuccess} sukses tanpa error`,
+      );
     }
+
+    if (onSyncComplete && totalSuccess > 0) void onSyncComplete();
   };
 
   return (
@@ -237,7 +305,7 @@ export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: Markaz
           onClick={async () => {
             setSyncingAll(true);
             try {
-              await callSyncNow();
+              await callSyncAll();
             } finally {
               setSyncingAll(false);
             }
@@ -252,6 +320,26 @@ export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: Markaz
           {syncingAll ? 'Sync berjalan…' : 'Fetch Semua Platform'}
         </button>
       </div>
+
+      {/* Progress bar untuk Fetch Semua sequential */}
+      {progress && (
+        <div className="mb-6 p-4 rounded-2xl bg-indigo-50 border border-indigo-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">
+              Memproses {progress.current}/{progress.total} · {progress.platform}
+            </p>
+            <p className="text-[10px] font-black text-indigo-700 tabular-nums">
+              {Math.round((progress.current / progress.total) * 100)}%
+            </p>
+          </div>
+          <div className="h-2 bg-white rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 transition-all duration-300"
+              style={{ width: `${(progress.current / progress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Add platform */}
       <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/60 to-cyan-50/60 border border-indigo-100/60 mb-6">
@@ -394,7 +482,7 @@ export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: Markaz
                       onClick={async () => {
                         setSyncingId(row.id);
                         try {
-                          await callSyncNow([row.platform]);
+                          await callSyncOne(row.platform);
                         } finally {
                           setSyncingId(null);
                         }

@@ -250,13 +250,17 @@ export async function syncAllEnabled(opts: {
 
   if (platforms.length === 0) return [];
 
-  // Parallel dengan concurrency limit. Sebelumnya sequential — 7 platform
-  // × 4-5 detik = 28-35 detik, lewat batas Edge Hobby (25-30s) → 504.
-  // Sekarang process 4 platform sekaligus → ±2 batch × 5 detik = ±10 detik.
-  // Concurrency 4 = balance antara cepat tapi gak banjirin Markaz API.
+  // Strategi:
+  // - Kalau platforms array length === 1 → langsung sequential (cuma 1).
+  //   Ini cocok untuk frontend "Fetch Semua" yg call per-platform.
+  // - Kalau >1 platform → parallel batch (concurrency 4) untuk cron
+  //   yang loop semua platform dalam 1 HTTP call.
+  if (platforms.length === 1) {
+    return [await syncPlatform({ admin, userId, platform: platforms[0], date })];
+  }
+
   const CONCURRENCY = 4;
   const results: SyncPlatformResult[] = [];
-
   for (let i = 0; i < platforms.length; i += CONCURRENCY) {
     const batch = platforms.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.all(
@@ -264,6 +268,5 @@ export async function syncAllEnabled(opts: {
     );
     results.push(...batchResults);
   }
-
   return results;
 }
