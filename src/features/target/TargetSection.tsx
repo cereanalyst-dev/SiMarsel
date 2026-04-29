@@ -310,11 +310,21 @@ export const TargetSection = ({
   const isTargetSetForMonth = selectedApp.isTargetSet?.[targetMonth];
 
   const summary = useMemo(() => {
-    // AUTO dari DB — tidak lagi pakai dailyData manual
-    const perDate = dates.map((date) => getActual(selectedApp.name, date));
-    const totalRealDownloader = perDate.reduce((sum, p) => sum + p.downloader, 0);
-    const totalRealSales = perDate.reduce((sum, p) => sum + p.sales, 0);
-    const totalRealRepeatOrder = perDate.reduce((sum, p) => sum + p.premium, 0);
+    // Real — prioritas manual override (dailyData.actualX) > auto DB.
+    // Konsisten dengan cell di operational sheet + globalSummary.
+    let totalRealDownloader = 0;
+    let totalRealSales = 0;
+    let totalRealRepeatOrder = 0;
+    dates.forEach((date) => {
+      const dayData = selectedApp.dailyData?.[date] ?? {};
+      const a = getActual(selectedApp.name, date);
+      totalRealDownloader += dayData.actualDownloader != null
+        ? Number(dayData.actualDownloader) : a.downloader;
+      totalRealSales += dayData.actualSales != null
+        ? Number(dayData.actualSales) : a.sales;
+      totalRealRepeatOrder += dayData.actualRepeatOrder != null
+        ? Number(dayData.actualRepeatOrder) : a.premium;
+    });
 
     const targetConfig = selectedApp.targetConfig?.[targetMonth] || {
       targetDownloader: 0,
