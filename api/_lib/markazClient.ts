@@ -72,7 +72,11 @@ async function markazGet<T>(path: string, params: Record<string, string>): Promi
     });
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Markaz ${path} → HTTP ${res.status}: ${body.slice(0, 200)}`);
+      // Detail error supaya kalau platform tertentu (mis. cerebrum) gagal,
+      // user tau response code + body asli dari Markaz.
+      throw new Error(
+        `Markaz ${path}?${url.searchParams.toString()} → HTTP ${res.status}: ${body.slice(0, 300)}`,
+      );
     }
     return await (res.json() as Promise<T>);
   } catch (err) {

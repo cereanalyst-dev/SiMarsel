@@ -4,7 +4,10 @@ import type {
   ContentStatus,
   ContentType,
   Downloader,
+  MonthlyPerformance,
+  MonthlyStatusFilter,
   NewContentScript,
+  NewMonthlyPerformance,
   Transaction,
 } from '../types';
 import { getSupabase, isSupabaseConfigured } from './supabase';
@@ -609,6 +612,66 @@ export const bulkInsertContentScripts = async (
     }
   }
   return { inserted, failed };
+};
+
+// ============================================================
+// Monthly Performance (snapshot rekap bulanan per app)
+// ============================================================
+
+export interface MonthlyPerfFilter {
+  yearMonth?: string;
+  statusFilter?: MonthlyStatusFilter;
+}
+
+export const fetchMonthlyPerformance = async (
+  filter: MonthlyPerfFilter = {},
+): Promise<MonthlyPerformance[]> => {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  let query = supabase
+    .from('monthly_performance')
+    .select('*')
+    .order('year_month', { ascending: false })
+    .order('source_app', { ascending: true });
+  if (filter.yearMonth) query = query.eq('year_month', filter.yearMonth);
+  if (filter.statusFilter) query = query.eq('status_filter', filter.statusFilter);
+  const { data, error } = await query;
+  if (error) {
+    logger.error('Fetch monthly_performance gagal:', error.message);
+    return [];
+  }
+  return (data ?? []) as MonthlyPerformance[];
+};
+
+// Upsert batch — pakai unique(user_id, year_month, source_app, status_filter).
+// Re-upload di bulan yg sama akan UPDATE row existing, bukan duplikasi.
+export const upsertMonthlyPerformance = async (
+  rows: NewMonthlyPerformance[],
+): Promise<{ inserted: number; failed: number }> => {
+  const supabase = getSupabase();
+  if (!supabase || rows.length === 0) return { inserted: 0, failed: 0 };
+  const { error } = await supabase
+    .from('monthly_performance')
+    .upsert(rows, { onConflict: 'user_id,year_month,source_app,status_filter' });
+  if (error) {
+    logger.error('Upsert monthly_performance gagal:', error.message);
+    return { inserted: 0, failed: rows.length };
+  }
+  return { inserted: rows.length, failed: 0 };
+};
+
+export const deleteMonthlyPerformance = async (id: string): Promise<boolean> => {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('monthly_performance')
+    .delete()
+    .eq('id', id);
+  if (error) {
+    logger.error('Delete monthly_performance gagal:', error.message);
+    return false;
+  }
+  return true;
 };
 
 export { isSupabaseConfigured };
