@@ -16,7 +16,13 @@
     }
   ],
   "crons": [
-    { "path": "/api/cron/markaz-sync", "schedule": "0 5 * * *" },
-    { "path": "/api/cron/markaz-sync", "schedule": "59 16 * * *" }
+    {
+      "path": "/api/cron/markaz-sync?daysAgo=1",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/markaz-sync",
+      "schedule": "0 5 * * *"
+    }
   ]
 }

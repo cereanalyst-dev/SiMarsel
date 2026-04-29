@@ -18,6 +18,14 @@ interface MarkazTransaction {
   customer_email: string | null;
   status: number;
   status_message: string;  // filter: hanya "Success" yang di-ingest
+  // Field promo — Markaz mungkin pakai salah satu nama berikut.
+  // Kalau response API beneran punya, kita map ke kolom promo_code di DB.
+  promo_code?: string | null;
+  voucher_code?: string | null;
+  coupon_code?: string | null;
+  discount_code?: string | null;
+  promo?: string | null;
+  voucher?: string | null;
 }
 
 interface TransactionResponse {
@@ -61,10 +69,13 @@ async function markazGet<T>(path: string, params: Record<string, string>): Promi
 
 // ---------- Date helper ----------
 
-// WIB = UTC+7. Ambil tanggal "hari ini" menurut WIB sebagai "YYYY-MM-DD".
-export function todayWIB(now: Date = new Date()): string {
-  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-  return wib.toISOString().slice(0, 10);
+// WIB = UTC+7. Default ambil tanggal "hari ini" menurut WIB sebagai
+// "YYYY-MM-DD". Optional daysAgo: 1 = kemarin, 2 = lusa, dst.
+// Berguna untuk cron yang fire jam 00:00 WIB tapi mau fetch data hari
+// sebelumnya (yang sudah lengkap, gak ada lagi transaksi yg masuk).
+export function todayWIB(now: Date = new Date(), daysAgo: number = 0): string {
+  const wibMs = now.getTime() + 7 * 60 * 60 * 1000 - daysAgo * 24 * 60 * 60 * 1000;
+  return new Date(wibMs).toISOString().slice(0, 10);
 }
 
 // ---------- Mapping ----------
@@ -72,6 +83,11 @@ export function todayWIB(now: Date = new Date()): string {
 function mapTransactionRow(t: MarkazTransaction, platform: string, userId: string) {
   const ts = (t.paid_date || t.date || '').replace('T', ' ').slice(0, 19) || null;
   const email = (t.customer_email || '').trim() || null;
+  // Coba beberapa nama field — Markaz mungkin pakai salah satu di antaranya.
+  // Kalau semua null/undefined, simpan null (akan jadi 'Tanpa Kode' di UI).
+  const promoCode =
+    t.promo_code ?? t.voucher_code ?? t.coupon_code ??
+    t.discount_code ?? t.promo ?? t.voucher ?? null;
   return {
     user_id: userId,
     trx_id: t.trx_id,
@@ -80,7 +96,7 @@ function mapTransactionRow(t: MarkazTransaction, platform: string, userId: strin
     payment_date: ts,
     methode_name: t.payment_method,
     revenue: Number(t.nominal) || 0,
-    promo_code: null,
+    promo_code: promoCode,
     content_name: t.product,
     full_name: t.customer_name,
     email,
