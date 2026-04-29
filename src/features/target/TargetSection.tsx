@@ -435,7 +435,7 @@ export const TargetSection = ({
               Strategi &amp; Target
             </h1>
             <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
-              Atur target bulanan per aplikasi, tracking aktual harian, dan monitor hutang/kelebihan
+              Atur target bulanan per aplikasi, tracking aktual harian, dan monitor
               sales secara real-time.
             </p>
           </div>
@@ -554,7 +554,7 @@ export const TargetSection = ({
                       isSurplus ? 'text-emerald-500' : 'text-rose-400',
                     )}
                   >
-                    {isSurplus ? 'Kelebihan Sales' : 'Hutang Sales'}
+                    {isSurplus ? 'Kelebihan Sales' : 'Kekurangan Sales'}
                   </p>
                   <h3
                     className={cn(
@@ -671,7 +671,7 @@ export const TargetSection = ({
                             {formatCurrency(Math.abs(selisihSales))}
                           </span>
                           <span className={cn('block text-[9px] font-bold uppercase tracking-widest mt-0.5', isSurplus ? 'text-emerald-400' : 'text-rose-400')}>
-                            {isSurplus ? 'Kelebihan' : 'Hutang'}
+                            {isSurplus ? 'Kelebihan' : 'Kekurangan'}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-xs font-bold text-slate-500">{formatNumber(appRealDownloader)}</td>
@@ -932,7 +932,7 @@ export const TargetSection = ({
                       isSurplus ? 'text-emerald-500' : 'text-rose-400',
                     )}
                   >
-                    {isSurplus ? 'Kelebihan Sales' : 'Hutang Sales'}
+                    {isSurplus ? 'Kelebihan Sales' : 'Kekurangan Sales'}
                   </p>
                   <h3
                     className={cn(
