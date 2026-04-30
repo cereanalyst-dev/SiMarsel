@@ -53,7 +53,11 @@ tapi engaging, hindari klise.`,
 user dengan menggunakan context data yang dilampirkan. Bahasa Indonesia.`,
 };
 
-// Build context dari Supabase berdasarkan tipe pertanyaan
+// Build context dari Supabase berdasarkan tipe pertanyaan.
+//
+// Strategi: pakai SQL views yang sudah pre-aggregated supaya AI dapet
+// FULL history tanpa kena token limit. Daily / monthly / paket views
+// hasilnya kompak (ratusan row max), bukan ratusan ribu raw transactions.
 async function buildContext(
   type: ContextType,
   platform?: string,
@@ -61,48 +65,82 @@ async function buildContext(
   const admin = getSupabaseAdmin();
 
   if (type === 'analytics') {
-    // Aggregate stats + breakdown per app + transactions trend
-    const [{ data: stats }, { data: byAppMonth }] = await Promise.all([
+    // FULL history per bulan per app + global stats.
+    // View transactions_monthly_by_app return ~24 bulan × 7 app = ~168 row.
+    // Aman di token budget Claude (200K).
+    const [{ data: stats }, { data: monthly }] = await Promise.all([
       admin.from('overview_stats').select('*').maybeSingle(),
       admin
-        .from('transactions_daily_by_app')
+        .from('transactions_monthly_by_app')
         .select('*')
-        .order('date', { ascending: false })
-        .limit(60), // ~2 bulan terakhir
+        .order('year_month', { ascending: true }),  // oldest → newest
     ]);
 
-    return `Overview Stats:\n${JSON.stringify(stats, null, 2)}\n\n` +
-      `Transaksi 60 hari terakhir per app:\n${JSON.stringify(byAppMonth ?? [], null, 2)}`;
+    const filtered = platform
+      ? (monthly ?? []).filter((m) => String(m.source_app ?? '').toLowerCase() === platform.toLowerCase())
+      : monthly ?? [];
+
+    return `# Overview Stats (all-time)\n${JSON.stringify(stats, null, 2)}\n\n` +
+      `# Revenue & transaksi per bulan per app (FULL HISTORY, paling lama → terbaru)\n` +
+      `Total ${filtered.length} baris.\n${JSON.stringify(filtered, null, 2)}`;
   }
 
   if (type === 'recommendation') {
-    // Fetch top packages + revenue trend per app
+    // Aggregate FULL history per paket per app.
+    // packages_summary view sudah aggregated — top paket berdasar revenue.
     let query = admin
-      .from('transactions')
-      .select('content_name, revenue, source_app, payment_date')
-      .order('payment_date', { ascending: false })
-      .limit(200);
-    if (platform) query = query.eq('source_app', platform.toLowerCase());
-    const { data } = await query;
-    return `Sample 200 transaksi terakhir:\n${JSON.stringify(data ?? [], null, 2)}`;
+      .from('packages_summary')
+      .select('*')
+      .order('total_revenue', { ascending: false })
+      .limit(200); // top 200 paket buat keep token reasonable
+    if (platform) query = query.eq('source_app', platform.toUpperCase());
+    const [
+      { data: packages },
+      { data: monthly },
+    ] = await Promise.all([
+      query,
+      // Plus monthly trend untuk konteks tambahan
+      admin
+        .from('transactions_monthly_by_app')
+        .select('*')
+        .order('year_month', { ascending: true }),
+    ]);
+
+    const filteredMonthly = platform
+      ? (monthly ?? []).filter((m) => String(m.source_app ?? '').toLowerCase() === platform.toLowerCase())
+      : monthly ?? [];
+
+    return `# Top Paket berdasarkan revenue (FULL HISTORY)\n` +
+      `Total ${(packages ?? []).length} paket.\n${JSON.stringify(packages ?? [], null, 2)}\n\n` +
+      `# Trend bulanan per app (untuk konteks musiman)\n${JSON.stringify(filteredMonthly, null, 2)}`;
   }
 
   if (type === 'copy') {
-    // Pricing context: paket per platform
+    // Untuk generate copy: AI butuh tahu nama paket, harga rata-rata,
+    // dan popularitas — bukan trend. Top 50 paket cukup.
     let query = admin
-      .from('transactions')
-      .select('content_name, revenue, source_app')
-      .order('payment_date', { ascending: false })
+      .from('packages_summary')
+      .select('source_app, content_name, transaction_count, avg_price, min_price, max_price, total_revenue')
+      .order('transaction_count', { ascending: false })
       .limit(50);
-    if (platform) query = query.eq('source_app', platform.toLowerCase());
+    if (platform) query = query.eq('source_app', platform.toUpperCase());
     const { data } = await query;
-    const platforms = platform ? [platform] : ['JADIASN', 'JADIBUMN', 'CEREBRUM'];
-    return `Platform: ${platforms.join(', ')}\n\nContoh paket existing (50 sample terbaru):\n${JSON.stringify(data ?? [], null, 2)}`;
+
+    const platforms = platform ? [platform.toUpperCase()] : ['SEMUA PLATFORM'];
+    return `# Konteks platform: ${platforms.join(', ')}\n\n` +
+      `# Top 50 paket terlaris (FULL HISTORY)\n${JSON.stringify(data ?? [], null, 2)}`;
   }
 
-  // type === 'free' — minimal context
-  const { data: stats } = await admin.from('overview_stats').select('*').maybeSingle();
-  return `Overview Stats:\n${JSON.stringify(stats, null, 2)}`;
+  // type === 'free' — overview + monthly summary
+  const [{ data: stats }, { data: monthly }] = await Promise.all([
+    admin.from('overview_stats').select('*').maybeSingle(),
+    admin
+      .from('transactions_monthly_by_app')
+      .select('*')
+      .order('year_month', { ascending: true }),
+  ]);
+  return `# Overview Stats (all-time)\n${JSON.stringify(stats, null, 2)}\n\n` +
+    `# Revenue & transaksi per bulan per app (full history)\n${JSON.stringify(monthly ?? [], null, 2)}`;
 }
 
 // Call Anthropic Claude API
