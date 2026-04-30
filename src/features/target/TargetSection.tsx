@@ -2,11 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
-  Activity, Calendar, ChevronDown, ChevronRight,
-  MessageSquare, RefreshCw, Smartphone, Target,
+  Activity, Calendar, CheckCircle2, ChevronDown, ChevronRight,
+  Loader2, MessageSquare, RefreshCw, Smartphone, Target, XCircle,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
+import { useToast } from '../../components/Toast';
+import {
+  useMarkazSyncStates, triggerMarkazSync,
+} from '../../lib/markazSyncClient';
 import type { AppData, Downloader, Transaction } from '../../types';
 
 import { classifyPromo, type PromoCategory } from '../../lib/promoRules';
@@ -29,6 +33,8 @@ interface TargetSectionProps {
   // Auto-sourced dari database — tidak perlu input manual
   transactions?: Transaction[];
   downloaders?: Downloader[];
+  // Callback parent untuk re-fetch dashboard data setelah sync Markaz sukses
+  onMarkazSyncComplete?: () => void | Promise<void>;
 }
 
 export const TargetSection = ({
@@ -42,10 +48,44 @@ export const TargetSection = ({
   setCalendarFocusDate,
   transactions = [],
   downloaders = [],
+  onMarkazSyncComplete,
 }: TargetSectionProps) => {
+  const toast = useToast();
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
   const selectedApp = apps.find(a => a.id === selectedAppId) || apps[0];
+
+  // Markaz sync states — supaya bisa nampilin "Data terakhir" + tombol
+  // sync inline di tiap card platform.
+  const { states: markazStates, refresh: refreshMarkaz } = useMarkazSyncStates();
+  const [syncingPlatform, setSyncingPlatform] = useState<string | null>(null);
+
+  // Map platform name (lowercase) → MarkazSyncState untuk lookup cepat
+  const markazByPlatform = useMemo(() => {
+    const map = new Map<string, typeof markazStates[number]>();
+    markazStates.forEach((s) => map.set(s.platform.toLowerCase(), s));
+    return map;
+  }, [markazStates]);
+
+  const handleSyncPlatform = async (platformName: string) => {
+    const platform = platformName.trim().toLowerCase();
+    setSyncingPlatform(platform);
+    try {
+      const res = await triggerMarkazSync(platform);
+      if (res.ok) {
+        toast.success(
+          'Sync sukses',
+          `${platform.toUpperCase()}: ${res.successes ?? 0} sukses · ${res.errors ?? 0} error`,
+        );
+        await refreshMarkaz();
+        if (onMarkazSyncComplete) await onMarkazSyncComplete();
+      } else {
+        toast.error(`Gagal sync ${platform}`, res.error ?? 'Unknown error');
+      }
+    } finally {
+      setSyncingPlatform(null);
+    }
+  };
 
   const filteredAppsForSummary = useMemo(() => {
     if (platformFilter === 'All') return apps;
@@ -670,16 +710,24 @@ export const TargetSection = ({
                   <h3 className="text-base font-black text-slate-900 mb-1 px-1 truncate">
                     {app.name}
                   </h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-5">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3">
                     Klik untuk atur target
                   </p>
+
+                  {/* Markaz inline sync — tampil status terakhir + tombol fetch */}
+                  <MarkazInlineSync
+                    appName={app.name}
+                    syncState={markazByPlatform.get(app.name.trim().toLowerCase()) ?? null}
+                    isSyncing={syncingPlatform === app.name.trim().toLowerCase()}
+                    onSync={() => void handleSyncPlatform(app.name)}
+                  />
 
                   <div
                     onClick={() => {
                       setSelectedAppId(app.id);
                       setShowAppSelection(false);
                     }}
-                    className={cn('flex items-center justify-between pt-4 border-t border-slate-100', accent.text)}
+                    className={cn('flex items-center justify-between pt-3 mt-3 border-t border-slate-100', accent.text)}
                   >
                     <span className="text-[10px] font-black uppercase tracking-widest">Atur Target</span>
                     <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -1266,5 +1314,118 @@ export const TargetSection = ({
     </div>
   );
 };
+
+// ============================================================
+// MarkazInlineSync — tombol sync + status badge per card platform.
+// Tampil "Data terakhir: 29 Apr 2026" + tombol Fetch.
+// Kalau platform belum ada di api_sync_state, tampil tombol "Aktifkan
+// Sync" (= insert row di api_sync_state dengan enabled=true).
+// ============================================================
+
+import type { MarkazSyncState } from '../../lib/markazSyncClient';
+import { getSupabase } from '../../lib/supabase';
+
+function MarkazInlineSync({
+  appName, syncState, isSyncing, onSync,
+}: {
+  appName: string;
+  syncState: MarkazSyncState | null;
+  isSyncing: boolean;
+  onSync: () => void;
+}) {
+  // Stop propagation supaya klik tombol gak nge-trigger card click (yg
+  // buka detail target page).
+  const stopPropAndCall = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    fn();
+  };
+
+  // Kalau belum ada di api_sync_state, kasih tombol "Aktifkan Sync"
+  if (!syncState) {
+    return (
+      <button
+        type="button"
+        onClick={stopPropAndCall(async () => {
+          const supabase = getSupabase();
+          if (!supabase) return;
+          const { data: userRes } = await supabase.auth.getUser();
+          const uid = userRes?.user?.id;
+          if (!uid) return;
+          await supabase.from('api_sync_state').upsert(
+            { user_id: uid, platform: appName.trim().toLowerCase(), enabled: true },
+            { onConflict: 'user_id,platform' },
+          );
+          // Trigger sync langsung setelah aktifkan
+          onSync();
+        })}
+        className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-cyan-50 border border-slate-100 hover:border-cyan-200 transition-all group/sync"
+      >
+        <span className="inline-flex items-center gap-2 text-[10px] font-black text-slate-500 group-hover/sync:text-cyan-700 uppercase tracking-widest">
+          <RefreshCw className="w-3 h-3" />
+          Aktifkan Sync Markaz
+        </span>
+        <span className="text-[9px] font-bold text-slate-400">→</span>
+      </button>
+    );
+  }
+
+  const lastDate = syncState.last_synced_date
+    ? format(new Date(syncState.last_synced_date), 'dd MMM yyyy')
+    : null;
+  const isError = syncState.last_status === 'error';
+  const isSuccess = syncState.last_status === 'success';
+
+  return (
+    <div className={cn(
+      'rounded-xl border p-2.5 space-y-2 transition-all',
+      isError ? 'bg-rose-50/50 border-rose-100'
+        : isSuccess ? 'bg-emerald-50/40 border-emerald-100'
+        : 'bg-slate-50 border-slate-100',
+    )}>
+      {/* Status row */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {isSuccess && <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />}
+          {isError && <XCircle className="w-3 h-3 text-rose-600 flex-shrink-0" />}
+          {!isSuccess && !isError && <Calendar className="w-3 h-3 text-slate-400 flex-shrink-0" />}
+          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest truncate">
+            {lastDate ? `Data: ${lastDate}` : 'Belum sync'}
+          </span>
+        </div>
+        {syncState.enabled ? null : (
+          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-1.5 py-0.5 rounded bg-slate-100">
+            Off
+          </span>
+        )}
+      </div>
+
+      {/* Sync button */}
+      <button
+        type="button"
+        disabled={isSyncing}
+        onClick={stopPropAndCall(onSync)}
+        className={cn(
+          'w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+          'bg-white text-slate-700 border border-slate-200 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200',
+          'disabled:opacity-50 disabled:cursor-wait',
+        )}
+      >
+        {isSyncing
+          ? <Loader2 className="w-3 h-3 animate-spin" />
+          : <RefreshCw className="w-3 h-3" />}
+        {isSyncing ? 'Syncing…' : 'Fetch Markaz'}
+      </button>
+
+      {/* Error message kalau ada */}
+      {isError && syncState.last_error && (
+        <p className="text-[9px] font-medium text-rose-700 leading-snug line-clamp-2"
+           title={syncState.last_error}>
+          {syncState.last_error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default TargetSection;

@@ -909,6 +909,7 @@ export default function App() {
                           setCalendarFocusDate={setCalendarFocusDate}
                           transactions={data}
                           downloaders={downloaderData}
+                          onMarkazSyncComplete={refetchData}
                         />
                       </motion.div>
                     )
