@@ -42,6 +42,7 @@ export default [
         KeyboardEvent: 'readonly',
         Event: 'readonly',
         Node: 'readonly',
+        navigator: 'readonly',
         performance: 'readonly',
         Blob: 'readonly',
         URL: 'readonly',

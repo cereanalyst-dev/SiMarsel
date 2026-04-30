@@ -1,4 +1,5 @@
-import { ChevronRight, LogOut, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronRight, LogOut, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import {
@@ -18,14 +19,46 @@ interface Props {
 export const Sidebar = ({
   activeTab, setActiveTab, onSignOut, userEmail, mobileOpen = false, onCloseMobile,
 }: Props) => {
+  // Track expanded sub-menu group. Auto-expand kalau activeTab adalah child
+  // dari salah satu group, supaya user gak harus klik 2x pas refresh.
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const init = new Set<string>();
+    MENU_ITEMS.forEach((item) => {
+      if (item.children?.some((c) => c.id === activeTab)) init.add(item.id);
+    });
+    return init;
+  });
+
+  // Re-evaluate kalau activeTab pindah ke child di group lain
+  useEffect(() => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      MENU_ITEMS.forEach((item) => {
+        if (item.children?.some((c) => c.id === activeTab)) next.add(item.id);
+      });
+      return next;
+    });
+  }, [activeTab]);
+
   const handleNavClick = (id: string) => {
     setActiveTab(id);
     onCloseMobile?.();
   };
+
+  const toggleGroup = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const mainItems = MENU_ITEMS.filter((m) => m.group === 'main');
   const systemItems = MENU_ITEMS.filter((m) => m.group === 'system');
 
-  const renderItem = (item: (typeof MENU_ITEMS)[number]) => {
+  // Single-item button (no sub-menu)
+  const renderLeaf = (item: (typeof MENU_ITEMS)[number]) => {
     const isActive = activeTab === item.id;
     return (
       <button
@@ -56,6 +89,85 @@ export const Sidebar = ({
       </button>
     );
   };
+
+  // Group with children — render parent + collapsible sub-items
+  const renderGroup = (item: (typeof MENU_ITEMS)[number]) => {
+    const isOpen = expanded.has(item.id);
+    const hasActiveChild = item.children?.some((c) => c.id === activeTab) ?? false;
+    return (
+      <div key={item.id}>
+        <button
+          onClick={() => toggleGroup(item.id)}
+          className={cn(
+            'group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200',
+            hasActiveChild
+              ? 'text-white bg-white/5'
+              : 'text-slate-300 hover:text-white hover:bg-white/5',
+          )}
+        >
+          <item.icon
+            className={cn(
+              'w-4.5 h-4.5 flex-shrink-0 transition-colors',
+              hasActiveChild ? 'text-amber-300' : 'text-slate-400 group-hover:text-amber-300',
+            )}
+            strokeWidth={hasActiveChild ? 2.5 : 2}
+          />
+          <span className="flex-1 text-left">{item.label}</span>
+          <ChevronDown
+            className={cn(
+              'w-3.5 h-3.5 text-slate-400 transition-transform',
+              isOpen && 'rotate-180',
+            )}
+          />
+        </button>
+        <AnimatePresence initial={false}>
+          {isOpen && item.children && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="overflow-hidden ml-4 mt-0.5 mb-1 pl-3 border-l border-white/5 space-y-0.5"
+            >
+              {item.children.map((child) => {
+                const ChildIcon = child.icon;
+                const isActive = activeTab === child.id;
+                return (
+                  <button
+                    key={child.id}
+                    onClick={() => handleNavClick(child.id)}
+                    className={cn(
+                      'group relative w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-bold transition-all',
+                      isActive
+                        ? 'bg-white/95 text-slate-900 shadow-[0_4px_14px_-4px_rgba(0,0,0,0.3)]'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5',
+                    )}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="sidebar-indicator"
+                        className="absolute inset-y-1 -left-3 w-0.5 rounded-full bg-amber-400"
+                      />
+                    )}
+                    <ChildIcon
+                      className={cn(
+                        'w-3.5 h-3.5 flex-shrink-0',
+                        isActive ? 'text-indigo-600' : 'text-slate-500 group-hover:text-amber-300',
+                      )}
+                    />
+                    <span className="flex-1 text-left">{child.label}</span>
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  const renderItem = (item: (typeof MENU_ITEMS)[number]) =>
+    item.children?.length ? renderGroup(item) : renderLeaf(item);
 
   const sidebarContent = (
     <aside

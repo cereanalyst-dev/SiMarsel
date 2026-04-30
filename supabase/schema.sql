@@ -379,6 +379,42 @@ where payment_date is not null
 group by 1, 2
 order by 1 desc, 2;
 
+-- Ringkasan bulanan per app (full history) — dipakai Asisten AI
+-- untuk analisa trend long-term tanpa token blow up.
+create or replace view public.transactions_monthly_by_app as
+select
+  to_char(date_trunc('month', payment_date), 'YYYY-MM') as year_month,
+  upper(source_app)                                      as source_app,
+  sum(revenue)                                           as revenue,
+  count(*)                                               as transactions,
+  count(distinct coalesce(email, phone, full_name, trx_id)) as unique_buyers,
+  round(sum(revenue) / nullif(count(*), 0))              as aov
+from public.transactions
+where payment_date is not null
+group by 1, 2
+order by 1, 2;
+
+-- Aggregate per paket per app (full history) — buat rekomendasi paket +
+-- copy generation. AI dapat data lengkap tanpa harus baca raw transactions.
+create or replace view public.packages_summary as
+select
+  upper(source_app)                                      as source_app,
+  content_name,
+  count(*)                                               as transaction_count,
+  sum(revenue)                                           as total_revenue,
+  round(avg(revenue))                                    as avg_price,
+  min(revenue)                                           as min_price,
+  max(revenue)                                           as max_price,
+  to_char(min(payment_date), 'YYYY-MM-DD')               as first_sold,
+  to_char(max(payment_date), 'YYYY-MM-DD')               as last_sold,
+  count(distinct coalesce(email, phone, full_name, trx_id)) as unique_buyers
+from public.transactions
+where content_name is not null
+  and content_name <> ''
+  and payment_date is not null
+group by upper(source_app), content_name
+order by sum(revenue) desc;
+
 -- ---------------------------------------------------------------------------
 -- Overview stats — computed di server, single row hasil query.
 -- Dipakai dashboard untuk skip fetch 294K rows saat load awal.

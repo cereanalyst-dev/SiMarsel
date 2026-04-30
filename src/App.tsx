@@ -39,6 +39,7 @@ const SocialMediaAnalysis = lazy(() => import('./features/social/SocialMediaAnal
 const ContentSection = lazy(() => import('./features/konten/ContentSection'));
 const PromoSection = lazy(() => import('./features/promo/PromoSection'));
 const BulananSection = lazy(() => import('./features/bulanan/BulananSection'));
+const AsistenAISection = lazy(() => import('./features/ai/AsistenAISection'));
 const SettingsSection = lazy(() => import('./features/settings/SettingsSection'));
 
 // Preload semua chunk tab setelah initial render selesai. Tujuannya:
@@ -56,6 +57,7 @@ const preloadAllTabs = () => {
   void import('./features/konten/ContentSection');
   void import('./features/promo/PromoSection');
   void import('./features/bulanan/BulananSection');
+  void import('./features/ai/AsistenAISection');
   void import('./features/settings/SettingsSection');
 };
 
@@ -983,6 +985,13 @@ export default function App() {
                   )}
                   {activeTab === 'bulanan' && (
                     <BulananSection key="bulanan" />
+                  )}
+                  {activeTab === 'asisten-ai' && (
+                    <AsistenAISection
+                      key="asisten-ai"
+                      detectedPlatforms={availableOptions.source_apps}
+                      setActiveTab={setActiveTab}
+                    />
                   )}
                   {activeTab === 'settings' && (
                     <motion.div

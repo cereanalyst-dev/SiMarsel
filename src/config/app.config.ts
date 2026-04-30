@@ -11,7 +11,7 @@
  */
 import {
   BarChart3, Calendar, FileText, LayoutDashboard, MessageSquare, Package,
-  Settings, Tag, Target, TrendingUp, type LucideIcon,
+  Settings, Sparkles, Tag, Target, TrendingUp, type LucideIcon,
 } from 'lucide-react';
 
 // ---------- Branding ----------
@@ -48,24 +48,57 @@ export const APP_SHORT_NAMES: Record<string, string> = {
 export const APP_NAME_STRIP_PREFIX = /^JADI/i;
 
 // ---------- Menu / Tab ----------
+// Mendukung sub-menu collapsible: kalau item punya `children`, di-render
+// sebagai expandable section di sidebar. Klik child → activeTab = child.id.
 export interface MenuItem {
   id: string;
   icon: LucideIcon;
   label: string;
   group: 'main' | 'system';
+  // Optional: kalau ada children, sidebar render group dengan sub-items.
+  // Item parent itu sendiri tidak punya halaman — cuma toggle expand.
+  children?: Array<{ id: string; icon: LucideIcon; label: string }>;
 }
 
 export const MENU_ITEMS: MenuItem[] = [
+  // 1. Tab tunggal
   { id: 'overview',   icon: LayoutDashboard, label: 'Ringkasan Performa',  group: 'main' },
-  { id: 'optimasi',   icon: TrendingUp,      label: 'Optimasi Harga',       group: 'main' },
+
+  // 2. Group "Performa" (Produk + Kode Promo + Bulanan + Optimasi Harga)
+  {
+    id: 'performa-group',
+    icon: BarChart3,
+    label: 'Analisa Performa',
+    group: 'main',
+    children: [
+      { id: 'packages',   icon: Package,    label: 'Produk' },
+      { id: 'kode-promo', icon: Tag,        label: 'Kode Promo' },
+      { id: 'bulanan',    icon: BarChart3,  label: 'Bulanan' },
+      { id: 'optimasi',   icon: TrendingUp, label: 'Optimasi Harga' },
+    ],
+  },
+
+  // 3. Strategi & Target
   { id: 'target',     icon: Target,          label: 'Strategi & Target',    group: 'main' },
-  { id: 'packages',   icon: Package,         label: 'Performa Produk',      group: 'main' },
-  { id: 'kode-promo', icon: Tag,             label: 'Performa Kode Promo',  group: 'main' },
-  { id: 'bulanan',    icon: BarChart3,       label: 'Performa Bulanan',     group: 'main' },
-  { id: 'calendar',   icon: Calendar,        label: 'Kalender Marsel',      group: 'main' },
-  { id: 'social',     icon: MessageSquare,   label: 'Analisa Sosial Media', group: 'main' },
-  { id: 'konten',     icon: FileText,        label: 'Manajemen Konten',     group: 'main' },
-  { id: 'settings',   icon: Settings,        label: 'Settings',             group: 'system' },
+
+  // 4. Group "Konten Hub" (Kalender + Konten + Sosmed)
+  {
+    id: 'konten-group',
+    icon: FileText,
+    label: 'Konten Hub',
+    group: 'main',
+    children: [
+      { id: 'calendar', icon: Calendar,      label: 'Kalender Marsel' },
+      { id: 'konten',   icon: FileText,      label: 'Manajemen Konten' },
+      { id: 'social',   icon: MessageSquare, label: 'Analisa Sosmed' },
+    ],
+  },
+
+  // 5. Asisten AI (BARU)
+  { id: 'asisten-ai', icon: Sparkles,       label: 'Asisten AI',           group: 'main' },
+
+  // 6. Settings (lebih ringkas — tinggal upload data + akses Markaz config)
+  { id: 'settings',   icon: Settings,       label: 'Settings',             group: 'system' },
 ];
 
 // Tab yang dipilih saat pertama kali buka dashboard.
