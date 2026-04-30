@@ -347,6 +347,58 @@ create policy "monthly_perf_write_own"
   with check (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------
+-- 7) tasks : tasklist Kanban lintas departemen (Marketing + Sales).
+--    Workflow: Request → To Do → In Progress → Done.
+-- ---------------------------------------------------------------------------
+create table if not exists public.tasks (
+  id              uuid         primary key default uuid_generate_v4(),
+  user_id         uuid         references auth.users(id) on delete set null,
+  title           text         not null,
+  description     text,
+  status          text         not null default 'request'
+                  check (status in ('request', 'todo', 'progress', 'done')),
+  department      text         not null default 'general'
+                  check (department in ('marketing', 'sales', 'general')),
+  priority        text         not null default 'medium'
+                  check (priority in ('low', 'medium', 'high', 'urgent')),
+  assigned_to     text,
+  due_date        date,
+  labels          text[],
+  related_paket   text,
+  related_skrip   uuid         references public.content_scripts(id) on delete set null,
+  position        integer      not null default 0,           -- buat sorting dalam 1 kolom Kanban
+  created_at      timestamptz  not null default now(),
+  updated_at      timestamptz  not null default now()
+);
+
+create index if not exists idx_tasks_status      on public.tasks (status);
+create index if not exists idx_tasks_due_date    on public.tasks (due_date);
+create index if not exists idx_tasks_department  on public.tasks (department);
+create index if not exists idx_tasks_assigned_to on public.tasks (assigned_to);
+
+drop trigger if exists trg_tasks_touch on public.tasks;
+create trigger trg_tasks_touch
+  before update on public.tasks
+  for each row execute function public.touch_updated_at();
+
+alter table public.tasks enable row level security;
+
+-- Multi-user collaboration: semua authenticated user bisa read & write semua
+-- task. Cocok untuk team kecil yang saling percaya.
+drop policy if exists "tasks_read_auth" on public.tasks;
+create policy "tasks_read_auth"
+  on public.tasks for select
+  to authenticated
+  using (true);
+
+drop policy if exists "tasks_write_auth" on public.tasks;
+create policy "tasks_write_auth"
+  on public.tasks for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- ---------------------------------------------------------------------------
 -- Helper views (opsional — membantu eksplorasi di SQL editor)
 -- ---------------------------------------------------------------------------
 

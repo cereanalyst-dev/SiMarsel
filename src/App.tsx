@@ -40,6 +40,7 @@ const ContentSection = lazy(() => import('./features/konten/ContentSection'));
 const PromoSection = lazy(() => import('./features/promo/PromoSection'));
 const BulananSection = lazy(() => import('./features/bulanan/BulananSection'));
 const AsistenAISection = lazy(() => import('./features/ai/AsistenAISection'));
+const TasklistSection = lazy(() => import('./features/tasklist/TasklistSection'));
 const SettingsSection = lazy(() => import('./features/settings/SettingsSection'));
 
 // Preload semua chunk tab setelah initial render selesai. Tujuannya:
@@ -58,6 +59,7 @@ const preloadAllTabs = () => {
   void import('./features/promo/PromoSection');
   void import('./features/bulanan/BulananSection');
   void import('./features/ai/AsistenAISection');
+  void import('./features/tasklist/TasklistSection');
   void import('./features/settings/SettingsSection');
 };
 
@@ -992,6 +994,20 @@ export default function App() {
                       detectedPlatforms={availableOptions.source_apps}
                       setActiveTab={setActiveTab}
                     />
+                  )}
+                  {activeTab === 'tasklist' && (
+                    <motion.div
+                      key="tasklist"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <TasklistSection
+                        setActiveTab={setActiveTab}
+                        setCalendarFocusDate={setCalendarFocusDate}
+                      />
+                    </motion.div>
                   )}
                   {activeTab === 'settings' && (
                     <motion.div

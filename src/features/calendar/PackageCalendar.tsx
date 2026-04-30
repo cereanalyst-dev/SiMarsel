@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import {
-  Activity, ChevronLeft, ChevronRight, Crown, Film, Flame,
-  Image as ImageIcon, Layers, MessageSquare, Package,
+  Activity, CheckSquare, ChevronLeft, ChevronRight, Crown, Film, Flame,
+  Image as ImageIcon, Layers, MessageSquare, Package, Sparkles,
   ShoppingBag, Smartphone, TrendingUp, Zap,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
-import { generateDailyInsight } from '../../lib/dailyInsight';
-import { fetchContentScripts } from '../../lib/dataAccess';
+import { fetchContentScripts, fetchTasks } from '../../lib/dataAccess';
+import { getSupabase } from '../../lib/supabase';
 import type {
-  AppData, AvailableOptions, ContentScript, ContentType, Downloader, Transaction,
+  AppData, AvailableOptions, ContentScript, ContentType, Downloader,
+  Task, Transaction,
 } from '../../types';
 
 const compactRp = (v: number) => {
@@ -39,6 +40,15 @@ export const PackageCalendar = ({
   // Konten dari Manajemen Konten yang upload_status === 'published'
   // → tampil di kalender pada scheduled_date masing-masing.
   const [publishedKonten, setPublishedKonten] = useState<ContentScript[]>([]);
+  // Tasks dari Tasklist yang punya due_date — di-overlay ke kalender
+  // sebagai indicator + ditampilkan di detail panel pas hari di-klik.
+  const [tasks, setTasks] = useState<Task[]>([]);
+  // AI-generated insight per-hari — di-trigger user via tombol, biar
+  // request ke endpoint AI ga jalan otomatis setiap kali pilih tanggal.
+  const [aiInsight, setAiInsight] = useState<string>('');
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError, setInsightError] = useState<string | null>(null);
+
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -46,12 +56,17 @@ export const PackageCalendar = ({
       // status='published' (workflow) ATAU upload_status='published'.
       // Lebih lenient — setiap konten yg user "tandai sebagai published"
       // dengan 2 cara berbeda akan muncul di kalender.
-      const all = await fetchContentScripts();
+      const [allKonten, allTasks] = await Promise.all([
+        fetchContentScripts(),
+        fetchTasks(),
+      ]);
       if (!active) return;
-      const filtered = all.filter(
-        (s) => s.status === 'published' || s.upload_status === 'published',
+      setPublishedKonten(
+        allKonten.filter(
+          (s) => s.status === 'published' || s.upload_status === 'published',
+        ),
       );
-      setPublishedKonten(filtered);
+      setTasks(allTasks);
     };
     void load();
     return () => { active = false; };
@@ -69,6 +84,20 @@ export const PackageCalendar = ({
     });
     return map;
   }, [publishedKonten]);
+
+  // Index task by due_date — buat indicator di calendar cell + list di
+  // panel detail.
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach((t) => {
+      if (!t.due_date) return;
+      const key = t.due_date.slice(0, 10);
+      const arr = map.get(key) ?? [];
+      arr.push(t);
+      map.set(key, arr);
+    });
+    return map;
+  }, [tasks]);
 
   useEffect(() => {
     if (focusDate) {
@@ -134,20 +163,112 @@ export const PackageCalendar = ({
     return map;
   }, [filteredData]);
 
-  const selectedDayInsight = useMemo(() => {
-    if (!selectedDay) return "";
-    
-    const dayRevenue = activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.revenue, 0) || 0;
-    const dayTransactions = activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.transactions, 0) || 0;
-    const dayDownloaders = downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).reduce((acc, curr) => acc + curr.count, 0);
-    const dayStrategies = apps.map(app => ({
-      appName: app.name,
-      strategy: app.dailyData?.[selectedDay]
-    })).filter(s => s.strategy);
-    const daySocialContent = apps.flatMap(app => app.dailyData?.[selectedDay]?.socialContent || []);
-    
-    return generateDailyInsight(dayRevenue, dayTransactions, dayDownloaders, dayStrategies, daySocialContent);
-  }, [selectedDay, activePackagesByDay, downloaderData, apps]);
+  // Reset AI insight setiap pindah tanggal — user harus klik tombol
+  // Generate Insight kalau mau analisis untuk tanggal yg baru di-pilih.
+  useEffect(() => {
+    setAiInsight('');
+    setInsightError(null);
+    setInsightLoading(false);
+  }, [selectedDay]);
+
+  const handleGenerateInsight = useCallback(async () => {
+    if (!selectedDay) return;
+    setInsightLoading(true);
+    setInsightError(null);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) throw new Error('Supabase belum siap');
+      const { data: sessionRes } = await supabase.auth.getSession();
+      const token = sessionRes?.session?.access_token;
+      if (!token) throw new Error('Sesi habis — login dulu');
+
+      const dayPackages = activePackagesByDay[selectedDay]?.packages ?? [];
+      const dayRevenue = dayPackages.reduce((acc, p) => acc + p.revenue, 0);
+      const dayTransactions = dayPackages.reduce(
+        (acc, p) => acc + p.transactions,
+        0,
+      );
+      const dayDownloaders = downloaderData
+        .filter((d) => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay)
+        .reduce((acc, d) => acc + d.count, 0);
+      const dayStrategies = apps
+        .map((app) => ({ appName: app.name, daily: app.dailyData?.[selectedDay] }))
+        .filter((s) => s.daily);
+      const daySocialContent = apps.flatMap(
+        (app) => app.dailyData?.[selectedDay]?.socialContent ?? [],
+      );
+      const dayKonten = kontenByDate.get(selectedDay) ?? [];
+      const dayTasks = tasksByDate.get(selectedDay) ?? [];
+      const conv = dayDownloaders > 0
+        ? ((dayTransactions / dayDownloaders) * 100).toFixed(2)
+        : '0';
+
+      // Compose context yang ringkas tapi padat — biar response AI fokus
+      // ke hari yang user pilih, bukan ke history bulanan.
+      const ctxLines = [
+        `Tanggal: ${format(parseISO(selectedDay), 'dd MMMM yyyy')}`,
+        `Revenue harian: Rp${dayRevenue.toLocaleString('id-ID')}`,
+        `Transaksi: ${dayTransactions} | Downloader: ${dayDownloaders} | Konversi: ${conv}%`,
+        `Paket aktif (${dayPackages.length}):`,
+        ...dayPackages.slice(0, 8).map(
+          (p) => `  - ${p.name}: Rp${p.revenue.toLocaleString('id-ID')} dari ${p.transactions} trx`,
+        ),
+        '',
+        `Strategi operasional (${dayStrategies.length}):`,
+        ...dayStrategies.map((s) => {
+          const d = s.daily!;
+          const parts = [
+            d.strategy && `strategy=${d.strategy}`,
+            d.benefit && `benefit=${d.benefit}`,
+            d.event && `event=${d.event}`,
+            d.activity && `activity=${d.activity}`,
+            d.promo && `promo=${d.promo}`,
+          ].filter(Boolean).join('; ');
+          return `  - ${s.appName}: ${parts || '(tanpa strategi)'}`;
+        }),
+        '',
+        `Konten social media manual (${daySocialContent.length}):`,
+        ...daySocialContent.slice(0, 6).map(
+          (c) => `  - [${c.platform}] ${c.title || '(tanpa judul)'} — reach ${c.reach}, eng ${c.engagement}`,
+        ),
+        '',
+        `Konten Manajemen Konten published (${dayKonten.length}):`,
+        ...dayKonten.slice(0, 6).map(
+          (k) => `  - [${k.platform}] ${k.type}: ${k.title ?? '(tanpa judul)'}`,
+        ),
+        '',
+        `Task yang due hari ini (${dayTasks.length}):`,
+        ...dayTasks.slice(0, 6).map(
+          (t) => `  - [${t.department}/${t.priority}/${t.status}] ${t.title}`,
+        ),
+      ].join('\n');
+
+      const query = `Berdasarkan data harian di bawah ini, beri insight singkat (3-5 kalimat) tentang sebab-akibat performa hari ini, faktor utama yang ngaruh, dan saran konkret untuk besok:
+
+${ctxLines}`;
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query, contextType: 'analytics' }),
+      });
+      if (res.status === 404) {
+        throw new Error('Endpoint AI belum tersedia (deploy dulu)');
+      }
+      const body = await res.json();
+      if (!res.ok || !body.ok) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      setAiInsight(body.content ?? '');
+    } catch (err) {
+      setInsightError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setInsightLoading(false);
+    }
+  }, [selectedDay, activePackagesByDay, downloaderData, apps, kontenByDate, tasksByDate]);
 
   const selectedMonthPackages = useMemo(() => {
     const monthStr = format(currentMonth, 'yyyy-MM');
@@ -384,6 +505,7 @@ export const PackageCalendar = ({
             const hasActivity = packages.length > 0;
             const isSelected = selectedDay === dateStr;
             const kontenCount = kontenByDate.get(dateStr)?.length ?? 0;
+            const taskCount = tasksByDate.get(dateStr)?.length ?? 0;
             const isToday = dateStr === todayKey;
             const isTop = dateStr === topDay;
             const dow = day.getDay();
@@ -423,10 +545,10 @@ export const PackageCalendar = ({
             return (
               <div
                 key={dateStr}
-                onClick={() => (hasActivity || kontenCount > 0) && setSelectedDay(isSelected ? null : dateStr)}
+                onClick={() => (hasActivity || kontenCount > 0 || taskCount > 0) && setSelectedDay(isSelected ? null : dateStr)}
                 className={cn(
                   'aspect-square relative group',
-                  hasActivity && 'cursor-pointer',
+                  (hasActivity || kontenCount > 0 || taskCount > 0) && 'cursor-pointer',
                   isSelected && 'z-10',
                 )}
                 style={{ perspective: '1000px' }}
@@ -480,7 +602,7 @@ export const PackageCalendar = ({
                       </span>
                     )}
 
-                    {/* Indicator: ada konten Manajemen Konten yg published di tanggal ini */}
+                    {/* Indicator: konten Manajemen Konten yg published di tanggal ini */}
                     {kontenCount > 0 && (
                       <span
                         title={`${kontenCount} konten terjadwal published`}
@@ -490,6 +612,18 @@ export const PackageCalendar = ({
                         )}
                       >
                         {kontenCount > 9 ? '9+' : kontenCount}
+                      </span>
+                    )}
+                    {/* Indicator: task dari Tasklist yang due di tanggal ini */}
+                    {taskCount > 0 && (
+                      <span
+                        title={`${taskCount} task due`}
+                        className={cn(
+                          'absolute bottom-1 right-1 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm text-[8px] font-black tabular-nums',
+                          tier >= 4 ? 'bg-cyan-300 text-cyan-900' : 'bg-cyan-500 text-white',
+                        )}
+                      >
+                        {taskCount > 9 ? '9+' : taskCount}
                       </span>
                     )}
                   </div>
@@ -573,241 +707,338 @@ export const PackageCalendar = ({
           </div>
         </div>
 
-        {/* Daily Detail View */}
+        {/* === Daily Detail Panel ===
+            Tampil ketika user pilih tanggal & ada minimal 1: transaksi
+            paket, konten Manajemen Konten published, atau task due. Semua
+            blok di dalamnya conditional jadi panel auto-shrink kalau hari
+            yang dipilih cuma punya konten/task tanpa transaksi. */}
         <AnimatePresence mode="wait">
-          {selectedDay && activePackagesByDay[selectedDay] && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-8 pt-8 border-t border-slate-100 overflow-hidden"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-indigo-600" />
-                  Detail Transaksi - {format(new Date(selectedDay), 'dd MMMM yyyy')}
-                </h4>
-                <button 
-                  onClick={() => setSelectedDay(null)}
-                  className="text-[10px] font-black text-slate-400 uppercase hover:text-rose-500 transition-colors"
-                >
-                  Tutup
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Revenue</p>
-                  <h3 className="text-xl font-black text-indigo-600">
-                    {formatCurrency(activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.revenue, 0) || 0)}
-                  </h3>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {Object.entries(activePackagesByDay[selectedDay]?.appBreakdown || {}).map(([app, vals]: [string, any]) => (
-                      <span key={app} className="text-[8px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                        {app}: {formatCurrency(vals.revenue)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Transaksi</p>
-                  <h3 className="text-xl font-black text-emerald-600">
-                    {formatNumber(activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.transactions, 0) || 0)}
-                  </h3>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {Object.entries(activePackagesByDay[selectedDay]?.appBreakdown || {}).map(([app, vals]: [string, any]) => (
-                      <span key={app} className="text-[8px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                        {app}: {formatNumber(vals.transactions)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
-                  <h3 className="text-xl font-black text-violet-600">
-                    {formatNumber(downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).reduce((acc, curr) => acc + curr.count, 0))}
-                  </h3>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).map((d, i) => (
-                      <span key={i} className="text-[8px] font-bold text-violet-500 bg-violet-50 px-2 py-0.5 rounded border border-violet-100">
-                        {d.source_app}: {d.count}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">AOV Harian</p>
-                  <h3 className="text-xl font-black text-amber-600">
-                    {(() => {
-                      const rev = activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.revenue, 0) || 0;
-                      const trx = activePackagesByDay[selectedDay]?.packages.reduce((acc, curr) => acc + curr.transactions, 0) || 0;
-                      return trx ? formatCurrency(rev / trx) : 'Rp0';
-                    })()}
-                  </h3>
-                </div>
-              </div>
+          {selectedDay && (
+            activePackagesByDay[selectedDay] ||
+            (kontenByDate.get(selectedDay)?.length ?? 0) > 0 ||
+            (tasksByDate.get(selectedDay)?.length ?? 0) > 0
+          ) && (() => {
+            const dayPackages = activePackagesByDay[selectedDay]?.packages ?? [];
+            const dayBreakdown = activePackagesByDay[selectedDay]?.appBreakdown ?? {};
+            const hasActivity = dayPackages.length > 0;
+            const dayRevenue = dayPackages.reduce((s, p) => s + p.revenue, 0);
+            const dayTrx = dayPackages.reduce((s, p) => s + p.transactions, 0);
+            const dayDl = downloaderData
+              .filter((d) => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay)
+              .reduce((s, d) => s + d.count, 0);
+            const daySocialContent = apps.flatMap(
+              (app) => app.dailyData?.[selectedDay]?.socialContent ?? [],
+            );
+            const dayKonten = kontenByDate.get(selectedDay) ?? [];
+            const dayTasks = tasksByDate.get(selectedDay) ?? [];
+            const totalKonten = daySocialContent.length + dayKonten.length;
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <div className="max-h-[350px] overflow-y-auto custom-scrollbar pr-2 border border-slate-100 rounded-2xl">
-                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest p-4 border-b border-slate-50 sticky top-0 bg-white z-20 flex items-center gap-2">
-                    <ShoppingBag className="w-3 h-3 text-emerald-600" />
-                    Detail Transaksi
-                  </h5>
-                  <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-10 bg-white z-10">
-                      <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                        <th className="py-4 px-4 bg-white">Nama Paket</th>
-                        <th className="py-4 px-4 bg-white">Revenue</th>
-                        <th className="py-4 px-4 bg-white">Transactions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...activePackagesByDay[selectedDay].packages].sort((a, b) => b.revenue - a.revenue).map((pkg, i) => (
-                        <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-all group">
-                          <td className="py-4 px-4 align-top">
-                            <div className="text-xs font-black text-slate-700 max-w-[250px] whitespace-normal break-words line-clamp-5 leading-relaxed" title={pkg.name}>
-                              {pkg.name}
+            return (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-8 pt-8 border-t border-slate-100 overflow-hidden"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-indigo-600" />
+                    Detail {format(new Date(selectedDay), 'dd MMMM yyyy')}
+                  </h4>
+                  <button
+                    onClick={() => setSelectedDay(null)}
+                    className="text-[10px] font-black text-slate-400 uppercase hover:text-rose-500 transition-colors"
+                  >
+                    Tutup
+                  </button>
+                </div>
+
+                {hasActivity && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Revenue</p>
+                      <h3 className="text-xl font-black text-indigo-600">{formatCurrency(dayRevenue)}</h3>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {Object.entries(dayBreakdown).map(([app, vals]: [string, any]) => (
+                          <span key={app} className="text-[8px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                            {app}: {formatCurrency(vals.revenue)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Transaksi</p>
+                      <h3 className="text-xl font-black text-emerald-600">{formatNumber(dayTrx)}</h3>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {Object.entries(dayBreakdown).map(([app, vals]: [string, any]) => (
+                          <span key={app} className="text-[8px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                            {app}: {formatNumber(vals.transactions)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
+                      <h3 className="text-xl font-black text-violet-600">{formatNumber(dayDl)}</h3>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).map((d, i) => (
+                          <span key={i} className="text-[8px] font-bold text-violet-500 bg-violet-50 px-2 py-0.5 rounded border border-violet-100">
+                            {d.source_app}: {d.count}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">AOV Harian</p>
+                      <h3 className="text-xl font-black text-amber-600">
+                        {dayTrx ? formatCurrency(dayRevenue / dayTrx) : 'Rp0'}
+                      </h3>
+                    </div>
+                  </div>
+                )}
+
+                {hasActivity && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div className="max-h-[350px] overflow-y-auto custom-scrollbar pr-2 border border-slate-100 rounded-2xl">
+                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest p-4 border-b border-slate-50 sticky top-0 bg-white z-20 flex items-center gap-2">
+                        <ShoppingBag className="w-3 h-3 text-emerald-600" />
+                        Detail Transaksi
+                      </h5>
+                      <table className="w-full text-left border-collapse">
+                        <thead className="sticky top-10 bg-white z-10">
+                          <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                            <th className="py-4 px-4 bg-white">Nama Paket</th>
+                            <th className="py-4 px-4 bg-white">Revenue</th>
+                            <th className="py-4 px-4 bg-white">Transactions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...dayPackages].sort((a, b) => b.revenue - a.revenue).map((pkg, i) => (
+                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-all group">
+                              <td className="py-4 px-4 align-top">
+                                <div className="text-xs font-black text-slate-700 max-w-[250px] whitespace-normal break-words line-clamp-5 leading-relaxed" title={pkg.name}>
+                                  {pkg.name}
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-xs font-black text-indigo-600 align-top">{formatCurrency(pkg.revenue)}</td>
+                              <td className="py-4 px-4 text-xs font-bold text-slate-500 align-top">{formatNumber(pkg.transactions)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Zap className="w-3 h-3 text-indigo-600" />
+                        Strategi & Aktivitas Operasional
+                      </h5>
+                      <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                        {apps.filter(app => !selectedApp || app.name.toUpperCase() === selectedApp.toUpperCase()).map(app => {
+                          const dayData = app.dailyData?.[selectedDay];
+                          if (!dayData) return null;
+                          const hasStrategy = dayData.strategy || dayData.benefit || dayData.event || dayData.activity || dayData.bcan || dayData.story || dayData.chat;
+                          if (!hasStrategy) return null;
+                          return (
+                            <div key={app.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                              <p className="text-[9px] font-black text-indigo-600 uppercase mb-2">{app.name}</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                {dayData.strategy && (<div><p className="text-[8px] font-bold text-slate-400 uppercase">User Premium</p><p className="text-[10px] font-bold text-slate-700">{dayData.strategy}</p></div>)}
+                                {dayData.benefit && (<div><p className="text-[8px] font-bold text-slate-400 uppercase">Benefit</p><p className="text-[10px] font-bold text-slate-700">{dayData.benefit}</p></div>)}
+                                {dayData.event && (<div><p className="text-[8px] font-bold text-slate-400 uppercase">Event</p><p className="text-[10px] font-bold text-slate-700">{dayData.event}</p></div>)}
+                                {dayData.activity && (<div><p className="text-[8px] font-bold text-slate-400 uppercase">Aktivitas</p><p className="text-[10px] font-bold text-slate-700">{dayData.activity}</p></div>)}
+                              </div>
                             </div>
-                          </td>
-                          <td className="py-4 px-4 text-xs font-black text-indigo-600 align-top">{formatCurrency(pkg.revenue)}</td>
-                          <td className="py-4 px-4 text-xs font-bold text-slate-500 align-top">{formatNumber(pkg.transactions)}</td>
-                        </tr>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* === Konten Hari Ini (UNIFIED) ===
+                    Gabungan: konten sosial media manual (dari socialContent
+                    di Strategi & Target) + konten Manajemen Konten (status
+                    published) untuk tanggal ini. Sebelumnya 2 section
+                    terpisah, sekarang 1 panel. */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
+                  <div className="flex items-center justify-between mb-5">
+                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <MessageSquare className="w-3 h-3 text-indigo-600" />
+                      Konten Hari Ini
+                    </h5>
+                    <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-slate-50 text-slate-500 border border-slate-100">
+                      {totalKonten} konten
+                    </span>
+                  </div>
+
+                  {totalKonten === 0 ? (
+                    <p className="text-[11px] font-bold text-slate-400 italic text-center py-6">
+                      Belum ada konten terjadwal atau di-input untuk tanggal ini.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Konten manual dari socialContent */}
+                      {daySocialContent.map((content, i) => (
+                        <div key={`social-${i}`} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <span className="text-[8px] font-black text-indigo-600 uppercase">{content.platform}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                              <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                Manual
+                              </span>
+                              <span className="text-[8px] font-bold text-slate-400">{content.postingTime} WIB</span>
+                            </div>
+                          </div>
+                          <p className="text-[11px] font-bold text-slate-700 mb-2">{content.title || 'Tanpa Judul'}</p>
+                          <p className="text-[10px] text-slate-500 mb-3 line-clamp-2">{content.caption}</p>
+                          <div className="grid grid-cols-3 gap-4 mb-2">
+                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Reach</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.reach)}</p></div>
+                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Eng</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.engagement)}</p></div>
+                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Views</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.views)}</p></div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Type: {content.contentType}</span>
+                            {content.cta && <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">CTA: {content.cta}</span>}
+                            <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Obj: {content.objective}</span>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
 
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Zap className="w-3 h-3 text-indigo-600" />
-                    Strategi & Aktivitas Operasional
-                  </h5>
-                  <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                    {apps.filter(app => !selectedApp || app.name.toUpperCase() === selectedApp.toUpperCase()).map(app => {
-                      const dayData = app.dailyData?.[selectedDay];
-                      if (!dayData) return null;
-                      
-                      const hasStrategy = dayData.strategy || dayData.benefit || dayData.event || dayData.activity || dayData.bcan || dayData.story || dayData.chat;
-                      if (!hasStrategy) return null;
-
-                      return (
-                        <div key={app.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                          <p className="text-[9px] font-black text-indigo-600 uppercase mb-2">{app.name}</p>
-                          <div className="grid grid-cols-2 gap-3">
-                            {dayData.strategy && (
-                              <div>
-                                <p className="text-[8px] font-bold text-slate-400 uppercase">User Premium</p>
-                                <p className="text-[10px] font-bold text-slate-700">{dayData.strategy}</p>
+                      {/* Konten dari Manajemen Konten (published) */}
+                      {dayKonten.map((s) => {
+                        const Icon = TYPE_ICON[s.type];
+                        return (
+                          <div key={`konten-${s.id}`} className="p-4 bg-rose-50/50 rounded-xl border border-rose-100">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 bg-white text-rose-600 rounded-md flex items-center justify-center flex-shrink-0 border border-rose-100">
+                                  <Icon className="w-3 h-3" />
+                                </div>
+                                <span className="text-[8px] font-black uppercase tracking-widest text-rose-600">
+                                  {s.platform.toUpperCase()} · {TYPE_LABEL[s.type]}
+                                </span>
                               </div>
-                            )}
-                            {dayData.benefit && (
-                              <div>
-                                <p className="text-[8px] font-bold text-slate-400 uppercase">Benefit</p>
-                                <p className="text-[10px] font-bold text-slate-700">{dayData.benefit}</p>
-                              </div>
-                            )}
-                            {dayData.event && (
-                              <div>
-                                <p className="text-[8px] font-bold text-slate-400 uppercase">Event</p>
-                                <p className="text-[10px] font-bold text-slate-700">{dayData.event}</p>
-                              </div>
-                            )}
-                            {dayData.activity && (
-                              <div>
-                                <p className="text-[8px] font-bold text-slate-400 uppercase">Aktivitas</p>
-                                <p className="text-[10px] font-bold text-slate-700">{dayData.activity}</p>
-                              </div>
+                              <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 flex-shrink-0">
+                                Published
+                              </span>
+                            </div>
+                            <p className="text-[12px] font-black text-slate-900 leading-tight mb-1 line-clamp-2">
+                              {s.title || 'Tanpa Judul'}
+                            </p>
+                            {s.link_konten && (
+                              <a
+                                href={s.link_konten}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] font-bold text-indigo-600 underline-offset-2 hover:underline mt-1 inline-block truncate max-w-full"
+                              >
+                                {s.link_konten}
+                              </a>
                             )}
                           </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* === Tasks due hari ini === */}
+                {dayTasks.length > 0 && (
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
+                    <div className="flex items-center justify-between mb-5">
+                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <CheckSquare className="w-3 h-3 text-cyan-600" />
+                        Task Due Hari Ini
+                      </h5>
+                      <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-100">
+                        {dayTasks.length} task
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {dayTasks.map((t) => (
+                        <div
+                          key={t.id}
+                          className="p-3 bg-slate-50 rounded-xl border border-slate-100"
+                        >
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-cyan-100 text-cyan-700">
+                              {t.department}
+                            </span>
+                            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-amber-100 text-amber-700">
+                              {t.priority}
+                            </span>
+                            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white text-slate-500 border border-slate-200">
+                              {t.status}
+                            </span>
+                          </div>
+                          <p className="text-[12px] font-black text-slate-900 leading-tight line-clamp-2">
+                            {t.title}
+                          </p>
+                          {t.assigned_to && (
+                            <p className="text-[10px] font-bold text-slate-400 mt-1">
+                              → {t.assigned_to}
+                            </p>
+                          )}
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Social Media & Insights */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                    <MessageSquare className="w-3 h-3 text-indigo-600" />
-                    Konten Sosial Media
-                  </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {apps.flatMap(app => app.dailyData?.[selectedDay as string]?.socialContent || []).map((content, i) => (
-                      <div key={i} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="flex justify-between mb-2">
-                          <span className="text-[8px] font-black text-indigo-600 uppercase">{content.platform}</span>
-                          <span className="text-[8px] font-bold text-slate-400">{content.postingTime} WIB</span>
-                        </div>
-                        <p className="text-[11px] font-bold text-slate-700 mb-2">{content.title || 'Tanpa Judul'}</p>
-                        <p className="text-[10px] text-slate-500 mb-3 line-clamp-2">{content.caption}</p>
-                        <div className="grid grid-cols-3 gap-4 mb-4">
-                          <div>
-                            <p className="text-[7px] font-bold text-slate-400 uppercase">Reach</p>
-                            <p className="text-[10px] font-black text-slate-900">{formatNumber(content.reach)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[7px] font-bold text-slate-400 uppercase">Eng</p>
-                            <p className="text-[10px] font-black text-slate-900">{formatNumber(content.engagement)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[7px] font-bold text-slate-400 uppercase">Views</p>
-                            <p className="text-[10px] font-black text-slate-900">{formatNumber(content.views)}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Type: {content.contentType}</span>
-                          {content.cta && <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">CTA: {content.cta}</span>}
-                          <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Obj: {content.objective}</span>
-                        </div>
-                      </div>
-                    ))}
-                    {apps.every(app => !app.dailyData?.[selectedDay as string]?.socialContent?.length) && (
-                      <div className="col-span-full py-8 text-center">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Belum ada data konten</p>
-                      </div>
-                    )}
+                {/* === AI Insight === */}
+                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-2xl text-white">
+                  <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                    <h5 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                      <TrendingUp className="w-3 h-3 text-white" />
+                      AI Insight Harian
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => void handleGenerateInsight()}
+                      disabled={insightLoading}
+                      className={cn(
+                        'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all',
+                        'bg-white text-indigo-700 hover:bg-indigo-50 shadow-md',
+                        'disabled:bg-white/40 disabled:text-white/70 disabled:cursor-not-allowed',
+                      )}
+                    >
+                      <Sparkles className={cn('w-3.5 h-3.5', insightLoading && 'animate-pulse')} />
+                      {insightLoading
+                        ? 'Generating…'
+                        : aiInsight
+                          ? 'Regenerate Insight'
+                          : 'Generate Insight'}
+                    </button>
                   </div>
-                </div>
-                <div className="bg-indigo-600 p-6 rounded-2xl text-white">
-                  <h5 className="text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-3 h-3 text-white" />
-                    Auto-Generated Insights
-                  </h5>
-                  <p className="text-[11px] leading-relaxed opacity-90 italic">
-                    {selectedDayInsight}
-                  </p>
+
+                  {insightError && (
+                    <div className="bg-rose-500/20 border border-rose-300/40 rounded-xl p-3 mb-3">
+                      <p className="text-[10px] font-bold text-rose-100">
+                        ❌ {insightError}
+                      </p>
+                    </div>
+                  )}
+
+                  {aiInsight ? (
+                    <div className="text-[12px] leading-relaxed text-white/95 whitespace-pre-wrap">
+                      {aiInsight}
+                    </div>
+                  ) : !insightError && (
+                    <p className="text-[11px] leading-relaxed text-white/70 italic">
+                      Klik tombol Generate Insight untuk minta analisis sebab-akibat
+                      hari ini ke AI berdasarkan data revenue, konten, strategi, &amp; task.
+                    </p>
+                  )}
+
                   <div className="mt-4 pt-4 border-t border-white/10">
-                    <p className="text-[8px] font-bold text-indigo-200 uppercase tracking-widest">Sebab-Akibat Analysis</p>
-                    <p className="text-[10px] mt-1 text-white/80">Analisa ini dibuat secara otomatis berdasarkan korelasi data konten, strategi operasional, dan performa sales harian.</p>
+                    <p className="text-[8px] font-bold text-indigo-200 uppercase tracking-widest">Powered by Claude · Asisten AI</p>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
-
-        {/* === Konten Terjadwal (dari Manajemen Konten, status published) ===
-            Render terpisah dari AnimatePresence di atas — supaya tetap muncul
-            walau tanggal yg dipilih TIDAK ada transaksi (konten-only). */}
-        {selectedDay && (kontenByDate.get(selectedDay)?.length ?? 0) > 0 && (
-          <div className={cn(!activePackagesByDay[selectedDay] && 'pt-8 border-t border-slate-100')}>
-            <KontenTerjadwalCard
-              items={kontenByDate.get(selectedDay) ?? []}
-              date={selectedDay}
-            />
-            {!activePackagesByDay[selectedDay] && (
-              <div className="text-center mt-4">
-                <button
-                  onClick={() => setSelectedDay(null)}
-                  className="text-[10px] font-black text-slate-400 uppercase hover:text-rose-500 transition-colors"
-                >
-                  Tutup
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
         {!selectedDay && (
           <div className="pt-8 border-t border-slate-100">
@@ -860,8 +1091,8 @@ export const PackageCalendar = ({
 };
 
 // ============================================================
-// Konten Terjadwal Card — list content_scripts published di tanggal aktif.
-// Connect dari Manajemen Konten → Kalender Marsel.
+// Type icon/label maps — dipakai di "Konten Hari Ini" detail panel
+// untuk menampilkan icon + label sesuai content_scripts.type.
 // ============================================================
 const TYPE_ICON: Record<ContentType, typeof Film> = {
   video: Film,
@@ -874,71 +1105,5 @@ const TYPE_LABEL: Record<ContentType, string> = {
   carousel: 'Carousel',
   single_post: 'Single Post',
 };
-
-function KontenTerjadwalCard({ items, date }: { items: ContentScript[]; date: string }) {
-  return (
-    <div className="bg-gradient-to-br from-rose-50 via-white to-rose-50/30 rounded-2xl p-6 border border-rose-100 mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <h5 className="text-[10px] font-black text-rose-700 uppercase tracking-widest flex items-center gap-2">
-          <Layers className="w-3 h-3" />
-          Konten Terjadwal · {format(new Date(date), 'dd MMM yyyy')}
-        </h5>
-        <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 bg-white px-2 py-1 rounded-md border border-rose-100">
-          {items.length} konten
-        </span>
-      </div>
-
-      {items.length === 0 ? (
-        <p className="text-[11px] font-bold text-slate-400 italic text-center py-4">
-          Belum ada konten Manajemen Konten yang terjadwal published di tanggal ini.
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {items.map((s) => {
-            const Icon = TYPE_ICON[s.type];
-            return (
-              <div
-                key={s.id}
-                className="bg-white p-4 rounded-xl border border-slate-100 hover:border-rose-200 hover:shadow-md transition-all"
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-                      {TYPE_LABEL[s.type]}
-                    </span>
-                  </div>
-                  <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 flex-shrink-0">
-                    Published
-                  </span>
-                </div>
-
-                <p className="text-[12px] font-black text-slate-900 leading-tight mb-1 line-clamp-2">
-                  {s.title || 'Tanpa Judul'}
-                </p>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  {s.platform.toUpperCase()}
-                </p>
-
-                {s.link_konten && (
-                  <a
-                    href={s.link_konten}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] font-bold text-indigo-600 underline-offset-2 hover:underline mt-2 inline-block truncate max-w-full"
-                  >
-                    {s.link_konten}
-                  </a>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default PackageCalendar;
