@@ -8,6 +8,8 @@ import type {
   MonthlyStatusFilter,
   NewContentScript,
   NewMonthlyPerformance,
+  NewTask,
+  Task,
   Transaction,
 } from '../types';
 import { getSupabase, isSupabaseConfigured } from './supabase';
@@ -669,6 +671,70 @@ export const deleteMonthlyPerformance = async (id: string): Promise<boolean> => 
     .eq('id', id);
   if (error) {
     logger.error('Delete monthly_performance gagal:', error.message);
+    return false;
+  }
+  return true;
+};
+
+// ============================================================
+// Tasks (Kanban tasklist)
+// ============================================================
+
+export const fetchTasks = async (): Promise<Task[]> => {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: false });
+  if (error) {
+    logger.error('Fetch tasks gagal:', error.message);
+    return [];
+  }
+  return (data ?? []) as Task[];
+};
+
+export const createTask = async (payload: NewTask): Promise<Task | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Create task gagal:', error.message);
+    return null;
+  }
+  return data as Task;
+};
+
+export const updateTask = async (
+  id: string,
+  patch: Partial<NewTask>,
+): Promise<Task | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Update task gagal:', error.message);
+    return null;
+  }
+  return data as Task;
+};
+
+export const deleteTask = async (id: string): Promise<boolean> => {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase.from('tasks').delete().eq('id', id);
+  if (error) {
+    logger.error('Delete task gagal:', error.message);
     return false;
   }
   return true;

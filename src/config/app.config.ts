@@ -10,8 +10,9 @@
  * Nilai yang perlu secret (URL/key Supabase) tetap di .env.local.
  */
 import {
-  BarChart3, Calendar, FileText, LayoutDashboard, MessageSquare, Package,
-  Settings, Sparkles, Tag, Target, TrendingUp, type LucideIcon,
+  BarChart3, Calendar, FileText, KanbanSquare, LayoutDashboard,
+  MessageSquare, Package, Settings, Sparkles, Tag, Target,
+  TrendingUp, type LucideIcon,
 } from 'lucide-react';
 
 // ---------- Branding ----------
@@ -81,23 +82,29 @@ export const MENU_ITEMS: MenuItem[] = [
   // 3. Strategi & Target
   { id: 'target',     icon: Target,          label: 'Strategi & Target',    group: 'main' },
 
-  // 4. Group "Konten Hub" (Kalender + Konten + Sosmed)
+  // 4. Kalender Marsel — standalone (per request user)
+  { id: 'calendar',   icon: Calendar,        label: 'Kalender Marsel',      group: 'main' },
+
+  // 5. Tasklist — Kanban board lintas departemen (Marketing + Sales)
+  { id: 'tasklist',   icon: KanbanSquare,    label: 'Tasklist',             group: 'main' },
+
+  // 6. Group "Konten Hub" (Manajemen Konten + Analisa Sosmed — calendar
+  //    sudah keluar jadi standalone)
   {
     id: 'konten-group',
     icon: FileText,
     label: 'Konten Hub',
     group: 'main',
     children: [
-      { id: 'calendar', icon: Calendar,      label: 'Kalender Marsel' },
       { id: 'konten',   icon: FileText,      label: 'Manajemen Konten' },
       { id: 'social',   icon: MessageSquare, label: 'Analisa Sosmed' },
     ],
   },
 
-  // 5. Asisten AI (BARU)
+  // 7. Asisten AI
   { id: 'asisten-ai', icon: Sparkles,       label: 'Asisten AI',           group: 'main' },
 
-  // 6. Settings (lebih ringkas — tinggal upload data + akses Markaz config)
+  // 8. Settings
   { id: 'settings',   icon: Settings,       label: 'Settings',             group: 'system' },
 ];
 

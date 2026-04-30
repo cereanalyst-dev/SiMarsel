@@ -242,3 +242,30 @@ export interface MonthlyPerformance {
 }
 
 export type NewMonthlyPerformance = Omit<MonthlyPerformance, 'id' | 'created_at' | 'updated_at'>;
+
+// ============================================================
+// Tasks (Tasklist Kanban — Marketing + Sales)
+// ============================================================
+export type TaskStatus = 'request' | 'todo' | 'progress' | 'done';
+export type TaskDepartment = 'marketing' | 'sales' | 'general';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface Task {
+  id: string;
+  user_id: string | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  department: TaskDepartment;
+  priority: TaskPriority;
+  assigned_to: string | null;
+  due_date: string | null;     // 'YYYY-MM-DD'
+  labels: string[] | null;
+  related_paket: string | null;
+  related_skrip: string | null; // FK content_scripts.id
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewTask = Omit<Task, 'id' | 'created_at' | 'updated_at'>;
