@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Calendar, CheckCircle2, Clock, Plus, RefreshCw, Trash2, Wifi, XCircle,
@@ -8,31 +8,10 @@ import { logger } from '../../lib/logger';
 import { getSupabase } from '../../lib/supabase';
 import { useToast } from '../../components/Toast';
 import { format } from 'date-fns';
-
-interface SyncState {
-  id: string;
-  user_id: string;
-  platform: string;
-  enabled: boolean;
-  last_run_at: string | null;          // kapan fetch dijalankan (timestamp)
-  last_synced_date: string | null;     // TANGGAL DATA yg di-fetch (date param ke API Markaz)
-  last_status: string | null;
-  last_error: string | null;
-  last_tx_inserted: number;
-  last_dl_total: number;
-  updated_at: string;
-}
-
-// Hasil fetch satu kali ke /api/markaz/sync-now.
-// Pakai shape flat (semua field optional) supaya TypeScript narrowing
-// dengan if (r.ok) tidak bermasalah saat type union dipakai inline.
-interface SyncResult {
-  ok: boolean;
-  successes?: number;
-  errors?: number;
-  totalPlatforms?: number;
-  error?: string;
-}
+import {
+  triggerMarkazSync, useMarkazSyncStates,
+  type MarkazSyncState,
+} from '../../lib/markazSyncClient';
 
 interface MarkazApiCardProps {
   detectedPlatforms?: string[];
@@ -49,32 +28,19 @@ const STATUS_COLORS: Record<string, string> = {
 export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: MarkazApiCardProps) => {
   const supabase = getSupabase();
   const toast = useToast();
-  const [rows, setRows] = useState<SyncState[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Pakai shared hook (DRY): same logic dengan TargetSection inline sync
+  const { states: rows, loading, refresh } = useMarkazSyncStates();
   const [addingPlatform, setAddingPlatform] = useState('');
   const [syncDate, setSyncDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!supabase) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('api_sync_state')
-      .select('*')
-      .order('platform', { ascending: true });
-    if (error) {
-      logger.error('Load api_sync_state:', error);
-      toast.error('Gagal load config', error.message);
-    } else {
-      setRows((data ?? []) as SyncState[]);
-    }
-    setLoading(false);
-  }, [supabase, toast]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  // Progress untuk "Fetch Semua" sequential
+  const [progress, setProgress] = useState<{
+    current: number;
+    total: number;
+    platform: string;
+  } | null>(null);
 
   // Suggest platforms yang ada di DB tapi belum di-config
   const suggestedPlatforms = useMemo(() => {
@@ -112,7 +78,7 @@ export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: Markaz
     void refresh();
   };
 
-  const toggleEnabled = async (row: SyncState, next: boolean) => {
+  const toggleEnabled = async (row: MarkazSyncState, next: boolean) => {
     if (!supabase) return;
     const { error } = await supabase
       .from('api_sync_state')
@@ -122,10 +88,10 @@ export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: Markaz
       toast.error('Gagal update', error.message);
       return;
     }
-    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, enabled: next } : r)));
+    void refresh();
   };
 
-  const removeRow = async (row: SyncState) => {
+  const removeRow = async (row: MarkazSyncState) => {
     if (!supabase) return;
     if (!window.confirm(`Hapus config untuk "${row.platform}"?`)) return;
     const { error } = await supabase
@@ -136,69 +102,12 @@ export const MarkazApiCard = ({ detectedPlatforms = [], onSyncComplete }: Markaz
       toast.error('Gagal hapus', error.message);
       return;
     }
-    setRows((prev) => prev.filter((r) => r.id !== row.id));
+    void refresh();
   };
 
-  // Progress untuk "Fetch Semua" sequential
-  const [progress, setProgress] = useState<{
-    current: number;
-    total: number;
-    platform: string;
-  } | null>(null);
-
-  // Inti: 1 platform per HTTP call. Returns result object — caller decide
-  // apa mau kasih toast atau gak (silent in batch mode).
-  const fetchOnePlatform = async (platform?: string): Promise<SyncResult> => {
-    if (!supabase) return { ok: false, error: 'Supabase belum terkonfigurasi' };
-    const { data: sessionRes } = await supabase.auth.getSession();
-    const token = sessionRes?.session?.access_token;
-    if (!token) return { ok: false, error: 'Sesi kamu tidak aktif' };
-
-    try {
-      const res = await fetch('/api/markaz/sync-now', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          date: syncDate,
-          ...(platform ? { platforms: [platform] } : {}),
-        }),
-      });
-
-      if (res.status === 404) {
-        return { ok: false, error: 'Endpoint belum tersedia (deploy dulu)' };
-      }
-      if (res.status === 504) {
-        return { ok: false, error: 'Timeout (504) — Markaz API lambat' };
-      }
-
-      let body: unknown;
-      try {
-        body = await res.json();
-      } catch {
-        return { ok: false, error: `Respons invalid HTTP ${res.status}` };
-      }
-      if (!res.ok || !(body as { ok?: boolean }).ok) {
-        const msg = (body as { error?: string }).error || `HTTP ${res.status}`;
-        return { ok: false, error: msg };
-      }
-      const summary = body as {
-        totalPlatforms: number;
-        successes: number;
-        errors: number;
-      };
-      return {
-        ok: true,
-        successes: summary.successes,
-        errors: summary.errors,
-        totalPlatforms: summary.totalPlatforms,
-      };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  };
+  // Inti fetch 1 platform — pakai shared helper supaya gak duplikat dgn
+  // TargetSection inline sync.
+  const fetchOnePlatform = (platform?: string) => triggerMarkazSync(platform, syncDate);
 
   // Fetch satu platform spesifik (button kecil di row)
   const callSyncOne = async (platform: string) => {
