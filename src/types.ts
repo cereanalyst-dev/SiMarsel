@@ -269,3 +269,35 @@ export interface Task {
 }
 
 export type NewTask = Omit<Task, 'id' | 'created_at' | 'updated_at'>;
+
+// ============================================================
+// KPI — kartu per orang + metrics di-group by perspektif.
+// Achievement & target diisi manual; pencapaian (%) & score
+// dihitung di client (bukan di DB) supaya editing realtime.
+// ============================================================
+export interface KpiCard {
+  id: string;
+  user_id: string | null;
+  name: string;
+  description: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewKpiCard = Omit<KpiCard, 'id' | 'created_at' | 'updated_at'>;
+
+export interface KpiMetric {
+  id: string;
+  card_id: string;
+  perspektif: string;            // mis. "Brand Awareness"
+  metric_indicator: string;      // mis. "Total Views"
+  bobot: number;                 // 0-100 (%)
+  target: number | null;
+  achievement: number | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewKpiMetric = Omit<KpiMetric, 'id' | 'created_at' | 'updated_at'>;

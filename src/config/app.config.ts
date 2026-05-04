@@ -10,7 +10,7 @@
  * Nilai yang perlu secret (URL/key Supabase) tetap di .env.local.
  */
 import {
-  BarChart3, Calendar, FileText, KanbanSquare, LayoutDashboard,
+  BarChart3, Calendar, FileText, Gauge, KanbanSquare, LayoutDashboard,
   MessageSquare, Package, Settings, Sparkles, Tag, Target,
   TrendingUp, type LucideIcon,
 } from 'lucide-react';
@@ -87,6 +87,9 @@ export const MENU_ITEMS: MenuItem[] = [
 
   // 5. Tasklist — Kanban board lintas departemen (Marketing + Sales)
   { id: 'tasklist',   icon: KanbanSquare,    label: 'Tasklist',             group: 'main' },
+
+  // 5b. KPI — kartu performa per orang dengan metric per perspektif
+  { id: 'kpi',        icon: Gauge,           label: 'KPI',                  group: 'main' },
 
   // 6. Group "Konten Hub" (Manajemen Konten + Analisa Sosmed — calendar
   //    sudah keluar jadi standalone)

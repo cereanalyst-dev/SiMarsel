@@ -399,6 +399,81 @@ create policy "tasks_write_auth"
   with check (true);
 
 -- ---------------------------------------------------------------------------
+-- 8) kpi_cards + kpi_metrics : KPI per orang (Marketing + Sales).
+--    1 card = 1 orang. Tiap card berisi banyak metric yang di-group by
+--    perspektif (Brand Awareness, Revenue Performance, dsb).
+--    Pencapaian = achievement / target. Score = pencapaian × bobot.
+-- ---------------------------------------------------------------------------
+create table if not exists public.kpi_cards (
+  id          uuid         primary key default uuid_generate_v4(),
+  user_id     uuid         references auth.users(id) on delete set null,
+  name        text         not null,                          -- nama orang
+  description text,
+  position    integer      not null default 0,
+  created_at  timestamptz  not null default now(),
+  updated_at  timestamptz  not null default now()
+);
+
+create index if not exists idx_kpi_cards_user_id on public.kpi_cards (user_id);
+
+drop trigger if exists trg_kpi_cards_touch on public.kpi_cards;
+create trigger trg_kpi_cards_touch
+  before update on public.kpi_cards
+  for each row execute function public.touch_updated_at();
+
+create table if not exists public.kpi_metrics (
+  id                uuid         primary key default uuid_generate_v4(),
+  card_id           uuid         not null references public.kpi_cards(id) on delete cascade,
+  perspektif        text         not null,                    -- mis. Brand Awareness
+  metric_indicator  text         not null,                    -- mis. Total Views
+  bobot             numeric      not null default 0,          -- 0-100 (%)
+  target            numeric,                                  -- nullable
+  achievement       numeric,                                  -- nullable
+  position          integer      not null default 0,
+  created_at        timestamptz  not null default now(),
+  updated_at        timestamptz  not null default now()
+);
+
+create index if not exists idx_kpi_metrics_card_id    on public.kpi_metrics (card_id);
+create index if not exists idx_kpi_metrics_perspektif on public.kpi_metrics (perspektif);
+
+drop trigger if exists trg_kpi_metrics_touch on public.kpi_metrics;
+create trigger trg_kpi_metrics_touch
+  before update on public.kpi_metrics
+  for each row execute function public.touch_updated_at();
+
+alter table public.kpi_cards   enable row level security;
+alter table public.kpi_metrics enable row level security;
+
+-- KPI biasanya dibuka rame-rame di review meeting → semua authenticated
+-- user bisa read & write. Sama policy dgn tasks.
+drop policy if exists "kpi_cards_read_auth" on public.kpi_cards;
+create policy "kpi_cards_read_auth"
+  on public.kpi_cards for select
+  to authenticated
+  using (true);
+
+drop policy if exists "kpi_cards_write_auth" on public.kpi_cards;
+create policy "kpi_cards_write_auth"
+  on public.kpi_cards for all
+  to authenticated
+  using (true)
+  with check (true);
+
+drop policy if exists "kpi_metrics_read_auth" on public.kpi_metrics;
+create policy "kpi_metrics_read_auth"
+  on public.kpi_metrics for select
+  to authenticated
+  using (true);
+
+drop policy if exists "kpi_metrics_write_auth" on public.kpi_metrics;
+create policy "kpi_metrics_write_auth"
+  on public.kpi_metrics for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- ---------------------------------------------------------------------------
 -- Helper views (opsional — membantu eksplorasi di SQL editor)
 -- ---------------------------------------------------------------------------
 
