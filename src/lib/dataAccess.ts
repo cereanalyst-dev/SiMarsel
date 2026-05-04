@@ -4,9 +4,13 @@ import type {
   ContentStatus,
   ContentType,
   Downloader,
+  KpiCard,
+  KpiMetric,
   MonthlyPerformance,
   MonthlyStatusFilter,
   NewContentScript,
+  NewKpiCard,
+  NewKpiMetric,
   NewMonthlyPerformance,
   NewTask,
   Task,
@@ -735,6 +739,131 @@ export const deleteTask = async (id: string): Promise<boolean> => {
   const { error } = await supabase.from('tasks').delete().eq('id', id);
   if (error) {
     logger.error('Delete task gagal:', error.message);
+    return false;
+  }
+  return true;
+};
+
+// ============================================================
+// KPI cards + metrics
+// ============================================================
+
+export const fetchKpiCards = async (): Promise<KpiCard[]> => {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('kpi_cards')
+    .select('*')
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: false });
+  if (error) {
+    logger.error('Fetch KPI cards gagal:', error.message);
+    return [];
+  }
+  return (data ?? []) as KpiCard[];
+};
+
+export const createKpiCard = async (payload: NewKpiCard): Promise<KpiCard | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('kpi_cards')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Create KPI card gagal:', error.message);
+    return null;
+  }
+  return data as KpiCard;
+};
+
+export const updateKpiCard = async (
+  id: string,
+  patch: Partial<NewKpiCard>,
+): Promise<KpiCard | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('kpi_cards')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Update KPI card gagal:', error.message);
+    return null;
+  }
+  return data as KpiCard;
+};
+
+export const deleteKpiCard = async (id: string): Promise<boolean> => {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase.from('kpi_cards').delete().eq('id', id);
+  if (error) {
+    logger.error('Delete KPI card gagal:', error.message);
+    return false;
+  }
+  return true;
+};
+
+export const fetchKpiMetrics = async (cardId: string): Promise<KpiMetric[]> => {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('kpi_metrics')
+    .select('*')
+    .eq('card_id', cardId)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) {
+    logger.error('Fetch KPI metrics gagal:', error.message);
+    return [];
+  }
+  return (data ?? []) as KpiMetric[];
+};
+
+export const createKpiMetric = async (payload: NewKpiMetric): Promise<KpiMetric | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('kpi_metrics')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Create KPI metric gagal:', error.message);
+    return null;
+  }
+  return data as KpiMetric;
+};
+
+export const updateKpiMetric = async (
+  id: string,
+  patch: Partial<NewKpiMetric>,
+): Promise<KpiMetric | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('kpi_metrics')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Update KPI metric gagal:', error.message);
+    return null;
+  }
+  return data as KpiMetric;
+};
+
+export const deleteKpiMetric = async (id: string): Promise<boolean> => {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase.from('kpi_metrics').delete().eq('id', id);
+  if (error) {
+    logger.error('Delete KPI metric gagal:', error.message);
     return false;
   }
   return true;
