@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ArrowLeft, Briefcase, ChevronRight, Edit2, Plus, Target as TargetIcon,
-  Trash2, User as UserIcon, X,
+  ArrowLeft, Briefcase, Calendar, ChevronRight, Edit2, Filter,
+  Plus, Target as TargetIcon, Trash2, User as UserIcon, X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useToast } from '../../components/Toast';
@@ -21,6 +21,17 @@ import type {
 // ============================================================
 // Helpers
 // ============================================================
+const MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
+
+const fmtPeriod = (year: number | null, month: number | null): string => {
+  if (year == null) return 'Tanpa Periode';
+  if (month == null) return String(year);
+  return `${MONTH_NAMES[month - 1]} ${year}`;
+};
+
 const calcPencapaian = (achievement: number | null, target: number | null): number => {
   if (target == null || target === 0) return 0;
   if (achievement == null) return 0;
@@ -84,6 +95,11 @@ export const KpiSection = () => {
   const [showCreateCard, setShowCreateCard] = useState(false);
   const [editingCard, setEditingCard] = useState<KpiCard | null>(null);
 
+  // Filter periode — global, dipakai di semua level (Lapis 1 & 2).
+  // 'All' = semua periode, 'none' = card tanpa periode (legacy).
+  const [filterYear, setFilterYear] = useState<'All' | 'none' | number>('All');
+  const [filterMonth, setFilterMonth] = useState<'All' | number>('All');
+
   const refresh = useCallback(async () => {
     setLoading(true);
     const [divs, cards] = await Promise.all([
@@ -108,16 +124,44 @@ export const KpiSection = () => {
     [allCards, activeCardId],
   );
 
+  // Tahun yang muncul di data — buat populate dropdown filter.
+  const availableYears = useMemo(() => {
+    const set = new Set<number>();
+    allCards.forEach((c) => {
+      if (c.period_year != null) set.add(c.period_year);
+    });
+    return Array.from(set).sort((a, b) => b - a);
+  }, [allCards]);
+
+  // Apply filter — cards yang lolos kriteria periode.
+  const filteredCards = useMemo(() => {
+    return allCards.filter((c) => {
+      if (filterYear === 'none') {
+        if (c.period_year != null) return false;
+        return true;
+      }
+      if (filterYear !== 'All') {
+        if (c.period_year !== filterYear) return false;
+      }
+      if (filterMonth !== 'All') {
+        if (c.period_month !== filterMonth) return false;
+      }
+      return true;
+    });
+  }, [allCards, filterYear, filterMonth]);
+
   const cardsByDivision = useMemo(() => {
     const map = new Map<string, KpiCard[]>();
-    allCards.forEach((c) => {
+    filteredCards.forEach((c) => {
       const key = c.division_id ?? '__none__';
       const arr = map.get(key) ?? [];
       arr.push(c);
       map.set(key, arr);
     });
     return map;
-  }, [allCards]);
+  }, [filteredCards]);
+
+  const filterActive = filterYear !== 'All' || filterMonth !== 'All';
 
   // --- Division handlers ---
   const handleSaveDivision = async (
@@ -165,7 +209,13 @@ export const KpiSection = () => {
 
   // --- Card handlers ---
   const handleSaveCard = async (
-    payload: { name: string; description: string | null; division_id: string | null },
+    payload: {
+      name: string;
+      description: string | null;
+      division_id: string | null;
+      period_year: number | null;
+      period_month: number | null;
+    },
     existingId: string | null,
   ) => {
     const supabase = getSupabase();
@@ -184,6 +234,8 @@ export const KpiSection = () => {
         division_id: payload.division_id,
         name: payload.name,
         description: payload.description,
+        period_year: payload.period_year,
+        period_month: payload.period_month,
         position: 0,
       };
       const created = await createKpiCard(full);
@@ -252,6 +304,21 @@ export const KpiSection = () => {
           </button>
         )}
       </div>
+
+      {/* Filter periode — hanya tampil di list view (Lapis 1 & 2). */}
+      {!activeCard && (
+        <PeriodFilterBar
+          year={filterYear}
+          month={filterMonth}
+          availableYears={availableYears}
+          onChangeYear={setFilterYear}
+          onChangeMonth={setFilterMonth}
+          totalMatched={filteredCards.length}
+          totalAll={allCards.length}
+          onReset={() => { setFilterYear('All'); setFilterMonth('All'); }}
+          active={filterActive}
+        />
+      )}
 
       {/* Render lapis sesuai navigasi */}
       {loading ? (
@@ -354,6 +421,100 @@ function Breadcrumb({
         </>
       )}
     </p>
+  );
+}
+
+// ============================================================
+// Filter bar — periode (tahun + bulan)
+// ============================================================
+function PeriodFilterBar({
+  year, month, availableYears, onChangeYear, onChangeMonth,
+  totalMatched, totalAll, onReset, active,
+}: {
+  year: 'All' | 'none' | number;
+  month: 'All' | number;
+  availableYears: number[];
+  onChangeYear: (v: 'All' | 'none' | number) => void;
+  onChangeMonth: (v: 'All' | number) => void;
+  totalMatched: number;
+  totalAll: number;
+  onReset: () => void;
+  active: boolean;
+}) {
+  // Tahun fallback list — tahun ini ± 2 tahun, supaya filter tetap usable
+  // walau belum ada card yg punya periode.
+  const fallbackYears = useMemo(() => {
+    const now = new Date().getFullYear();
+    return [now + 1, now, now - 1, now - 2];
+  }, []);
+  const yearOptions = availableYears.length > 0
+    ? availableYears
+    : fallbackYears;
+
+  return (
+    <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+        <Filter className="w-3.5 h-3.5" />
+        Filter Periode
+      </div>
+
+      <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+        <select
+          value={String(year)}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === 'All') onChangeYear('All');
+            else if (v === 'none') onChangeYear('none');
+            else onChangeYear(Number(v));
+          }}
+          aria-label="Filter tahun"
+          className="bg-transparent text-[11px] font-black text-slate-700 outline-none cursor-pointer uppercase tracking-widest"
+        >
+          <option value="All">SEMUA TAHUN</option>
+          <option value="none">TANPA PERIODE</option>
+          {yearOptions.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+        <select
+          value={String(month)}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === 'All') onChangeMonth('All');
+            else onChangeMonth(Number(v));
+          }}
+          aria-label="Filter bulan"
+          disabled={year === 'All' || year === 'none'}
+          className="bg-transparent text-[11px] font-black text-slate-700 outline-none cursor-pointer uppercase tracking-widest disabled:cursor-not-allowed disabled:text-slate-300"
+        >
+          <option value="All">SEMUA BULAN</option>
+          {MONTH_NAMES.map((name, i) => (
+            <option key={name} value={i + 1}>{name.toUpperCase()}</option>
+          ))}
+        </select>
+      </div>
+
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+        {active
+          ? `${totalMatched} dari ${totalAll} card`
+          : `Total: ${totalAll} card`}
+      </p>
+
+      {active && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="ml-auto inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-xl"
+        >
+          <X className="w-3 h-3" />
+          Reset Filter
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -538,9 +699,15 @@ function CardListView({
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
                 </div>
                 {c.description && (
-                  <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-snug">
+                  <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-snug mb-2">
                     {c.description}
                   </p>
+                )}
+                {c.period_year != null && (
+                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                    <Calendar className="w-2.5 h-2.5" />
+                    {fmtPeriod(c.period_year, c.period_month)}
+                  </span>
                 )}
               </button>
 
@@ -686,6 +853,12 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
               KPI Detail
             </p>
             <h2 className="text-lg font-black text-slate-900">{card.name}</h2>
+            {card.period_year != null && (
+              <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                <Calendar className="w-2.5 h-2.5" />
+                {fmtPeriod(card.period_year, card.period_month)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -1080,13 +1253,35 @@ function CardModal({ card, divisions, defaultDivisionId, onClose, onSave }: {
   divisions: KpiDivision[];
   defaultDivisionId: string | null;
   onClose: () => void;
-  onSave: (payload: { name: string; description: string | null; division_id: string | null }) => void;
+  onSave: (payload: {
+    name: string;
+    description: string | null;
+    division_id: string | null;
+    period_year: number | null;
+    period_month: number | null;
+  }) => void;
 }) {
   const [name, setName] = useState(card?.name ?? '');
   const [description, setDescription] = useState(card?.description ?? '');
   const [divisionId, setDivisionId] = useState<string>(
     card?.division_id ?? defaultDivisionId ?? (divisions[0]?.id ?? ''),
   );
+  // Periode default = tahun ini, bulan ini (kalau create new). Edit pakai
+  // existing data; null artinya "Tanpa Periode".
+  const now = new Date();
+  const [periodYear, setPeriodYear] = useState<number | null>(
+    card ? card.period_year : now.getFullYear(),
+  );
+  const [periodMonth, setPeriodMonth] = useState<number | null>(
+    card ? card.period_month : now.getMonth() + 1,
+  );
+
+  // Tahun pilihan: tahun ini ± 3 tahun (cukup buat KPI lookback/lookahead).
+  const yearOptions = useMemo(() => {
+    const y = now.getFullYear();
+    return [y + 1, y, y - 1, y - 2, y - 3];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ModalShell title={card ? 'Edit Card' : 'Buat Card Baru'} onClose={onClose}>
@@ -1112,6 +1307,44 @@ function CardModal({ card, divisions, defaultDivisionId, onClose, onSave }: {
             className="form-input"
           />
         </FormField>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Tahun">
+            <select
+              value={periodYear == null ? '' : String(periodYear)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '') {
+                  setPeriodYear(null);
+                  setPeriodMonth(null);
+                } else {
+                  setPeriodYear(Number(v));
+                }
+              }}
+              className="form-input"
+            >
+              <option value="">— Tanpa Periode —</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Bulan">
+            <select
+              value={periodMonth == null ? '' : String(periodMonth)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPeriodMonth(v === '' ? null : Number(v));
+              }}
+              disabled={periodYear == null}
+              className="form-input disabled:bg-slate-50 disabled:text-slate-400"
+            >
+              <option value="">— Tahunan —</option>
+              {MONTH_NAMES.map((nm, i) => (
+                <option key={nm} value={i + 1}>{nm}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
         <FormField label="Deskripsi (opsional)">
           <textarea
             value={description}
@@ -1128,6 +1361,8 @@ function CardModal({ card, divisions, defaultDivisionId, onClose, onSave }: {
           name: name.trim(),
           description: description.trim() || null,
           division_id: divisionId,
+          period_year: periodYear,
+          period_month: periodYear == null ? null : periodMonth,
         })}
         disabled={!name.trim() || !divisionId}
         submitLabel={card ? 'Simpan' : 'Buat'}

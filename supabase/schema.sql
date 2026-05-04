@@ -434,8 +434,16 @@ create table if not exists public.kpi_cards (
 alter table public.kpi_cards
   add column if not exists division_id uuid references public.kpi_divisions(id) on delete cascade;
 
+-- Periode KPI — label & filter. period_month null = KPI tahunan saja.
+alter table public.kpi_cards
+  add column if not exists period_year  integer;
+alter table public.kpi_cards
+  add column if not exists period_month integer
+    check (period_month is null or (period_month between 1 and 12));
+
 create index if not exists idx_kpi_cards_user_id     on public.kpi_cards (user_id);
 create index if not exists idx_kpi_cards_division_id on public.kpi_cards (division_id);
+create index if not exists idx_kpi_cards_period      on public.kpi_cards (period_year, period_month);
 
 drop trigger if exists trg_kpi_cards_touch on public.kpi_cards;
 create trigger trg_kpi_cards_touch

@@ -293,6 +293,8 @@ export interface KpiCard {
   division_id: string | null;       // nullable supaya legacy data tetap aman
   name: string;
   description: string | null;
+  period_year: number | null;       // mis. 2026
+  period_month: number | null;      // 1-12, atau null untuk KPI tahunan
   position: number;
   created_at: string;
   updated_at: string;
