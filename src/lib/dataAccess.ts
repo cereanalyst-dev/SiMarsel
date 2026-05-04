@@ -5,11 +5,13 @@ import type {
   ContentType,
   Downloader,
   KpiCard,
+  KpiDivision,
   KpiMetric,
   MonthlyPerformance,
   MonthlyStatusFilter,
   NewContentScript,
   NewKpiCard,
+  NewKpiDivision,
   NewKpiMetric,
   NewMonthlyPerformance,
   NewTask,
@@ -745,17 +747,81 @@ export const deleteTask = async (id: string): Promise<boolean> => {
 };
 
 // ============================================================
-// KPI cards + metrics
+// KPI divisions + cards + metrics (3 lapis)
 // ============================================================
 
-export const fetchKpiCards = async (): Promise<KpiCard[]> => {
+export const fetchKpiDivisions = async (): Promise<KpiDivision[]> => {
   const supabase = getSupabase();
   if (!supabase) return [];
   const { data, error } = await supabase
+    .from('kpi_divisions')
+    .select('*')
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: false });
+  if (error) {
+    logger.error('Fetch KPI divisions gagal:', error.message);
+    return [];
+  }
+  return (data ?? []) as KpiDivision[];
+};
+
+export const createKpiDivision = async (payload: NewKpiDivision): Promise<KpiDivision | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('kpi_divisions')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Create KPI division gagal:', error.message);
+    return null;
+  }
+  return data as KpiDivision;
+};
+
+export const updateKpiDivision = async (
+  id: string,
+  patch: Partial<NewKpiDivision>,
+): Promise<KpiDivision | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('kpi_divisions')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) {
+    logger.error('Update KPI division gagal:', error.message);
+    return null;
+  }
+  return data as KpiDivision;
+};
+
+export const deleteKpiDivision = async (id: string): Promise<boolean> => {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase.from('kpi_divisions').delete().eq('id', id);
+  if (error) {
+    logger.error('Delete KPI division gagal:', error.message);
+    return false;
+  }
+  return true;
+};
+
+export const fetchKpiCards = async (divisionId?: string): Promise<KpiCard[]> => {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  let query = supabase
     .from('kpi_cards')
     .select('*')
     .order('position', { ascending: true })
     .order('created_at', { ascending: false });
+  if (divisionId) {
+    query = query.eq('division_id', divisionId);
+  }
+  const { data, error } = await query;
   if (error) {
     logger.error('Fetch KPI cards gagal:', error.message);
     return [];

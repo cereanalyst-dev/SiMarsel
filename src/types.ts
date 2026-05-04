@@ -271,13 +271,26 @@ export interface Task {
 export type NewTask = Omit<Task, 'id' | 'created_at' | 'updated_at'>;
 
 // ============================================================
-// KPI — kartu per orang + metrics di-group by perspektif.
+// KPI — 3 lapis: Divisi → Card (per orang) → Metric (per perspektif).
 // Achievement & target diisi manual; pencapaian (%) & score
 // dihitung di client (bukan di DB) supaya editing realtime.
 // ============================================================
+export interface KpiDivision {
+  id: string;
+  user_id: string | null;
+  name: string;
+  description: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewKpiDivision = Omit<KpiDivision, 'id' | 'created_at' | 'updated_at'>;
+
 export interface KpiCard {
   id: string;
   user_id: string | null;
+  division_id: string | null;       // nullable supaya legacy data tetap aman
   name: string;
   description: string | null;
   position: number;
