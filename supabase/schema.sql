@@ -399,14 +399,29 @@ create policy "tasks_write_auth"
   with check (true);
 
 -- ---------------------------------------------------------------------------
--- 8) kpi_cards + kpi_metrics : KPI per orang (Marketing + Sales).
---    1 card = 1 orang. Tiap card berisi banyak metric yang di-group by
---    perspektif (Brand Awareness, Revenue Performance, dsb).
+-- 8) kpi_divisions + kpi_cards + kpi_metrics : 3 lapis KPI.
+--    Divisi (Marketing/Sales/dsb) → Card (per orang) → Metric (per perspektif).
 --    Pencapaian = achievement / target. Score = pencapaian × bobot.
 -- ---------------------------------------------------------------------------
+create table if not exists public.kpi_divisions (
+  id          uuid         primary key default uuid_generate_v4(),
+  user_id     uuid         references auth.users(id) on delete set null,
+  name        text         not null,                          -- mis. Marketing, Sales
+  description text,
+  position    integer      not null default 0,
+  created_at  timestamptz  not null default now(),
+  updated_at  timestamptz  not null default now()
+);
+
+drop trigger if exists trg_kpi_divisions_touch on public.kpi_divisions;
+create trigger trg_kpi_divisions_touch
+  before update on public.kpi_divisions
+  for each row execute function public.touch_updated_at();
+
 create table if not exists public.kpi_cards (
   id          uuid         primary key default uuid_generate_v4(),
   user_id     uuid         references auth.users(id) on delete set null,
+  division_id uuid         references public.kpi_divisions(id) on delete cascade,
   name        text         not null,                          -- nama orang
   description text,
   position    integer      not null default 0,
@@ -414,7 +429,13 @@ create table if not exists public.kpi_cards (
   updated_at  timestamptz  not null default now()
 );
 
-create index if not exists idx_kpi_cards_user_id on public.kpi_cards (user_id);
+-- Kolom division_id ditambahkan kemudian — supaya migrasi idempotent.
+-- Database lama tanpa kolom ini akan dapat ALTER TABLE di bawah.
+alter table public.kpi_cards
+  add column if not exists division_id uuid references public.kpi_divisions(id) on delete cascade;
+
+create index if not exists idx_kpi_cards_user_id     on public.kpi_cards (user_id);
+create index if not exists idx_kpi_cards_division_id on public.kpi_cards (division_id);
 
 drop trigger if exists trg_kpi_cards_touch on public.kpi_cards;
 create trigger trg_kpi_cards_touch
@@ -442,11 +463,25 @@ create trigger trg_kpi_metrics_touch
   before update on public.kpi_metrics
   for each row execute function public.touch_updated_at();
 
-alter table public.kpi_cards   enable row level security;
-alter table public.kpi_metrics enable row level security;
+alter table public.kpi_divisions enable row level security;
+alter table public.kpi_cards     enable row level security;
+alter table public.kpi_metrics   enable row level security;
 
 -- KPI biasanya dibuka rame-rame di review meeting → semua authenticated
 -- user bisa read & write. Sama policy dgn tasks.
+drop policy if exists "kpi_divisions_read_auth" on public.kpi_divisions;
+create policy "kpi_divisions_read_auth"
+  on public.kpi_divisions for select
+  to authenticated
+  using (true);
+
+drop policy if exists "kpi_divisions_write_auth" on public.kpi_divisions;
+create policy "kpi_divisions_write_auth"
+  on public.kpi_divisions for all
+  to authenticated
+  using (true)
+  with check (true);
+
 drop policy if exists "kpi_cards_read_auth" on public.kpi_cards;
 create policy "kpi_cards_read_auth"
   on public.kpi_cards for select

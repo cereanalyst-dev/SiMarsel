@@ -1,28 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ArrowLeft, ChevronRight, Edit2, Plus, Target as TargetIcon,
+  ArrowLeft, Briefcase, ChevronRight, Edit2, Plus, Target as TargetIcon,
   Trash2, User as UserIcon, X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useToast } from '../../components/Toast';
 import {
-  createKpiCard, createKpiMetric, deleteKpiCard, deleteKpiMetric,
-  fetchKpiCards, fetchKpiMetrics, updateKpiCard, updateKpiMetric,
+  createKpiCard, createKpiDivision, createKpiMetric,
+  deleteKpiCard, deleteKpiDivision, deleteKpiMetric,
+  fetchKpiCards, fetchKpiDivisions, fetchKpiMetrics,
+  updateKpiCard, updateKpiDivision, updateKpiMetric,
 } from '../../lib/dataAccess';
 import { getSupabase } from '../../lib/supabase';
 import type {
-  KpiCard, KpiMetric, NewKpiCard, NewKpiMetric,
+  KpiCard, KpiDivision, KpiMetric,
+  NewKpiCard, NewKpiDivision, NewKpiMetric,
 } from '../../types';
 
 // ============================================================
-// Helpers — pencapaian & score selalu dihitung di client supaya
-// editing realtime tanpa round-trip ke DB.
+// Helpers
 // ============================================================
 const calcPencapaian = (achievement: number | null, target: number | null): number => {
   if (target == null || target === 0) return 0;
   if (achievement == null) return 0;
-  return (achievement / target) * 100; // dalam persen, mis. 85 = 85%
+  return (achievement / target) * 100;
 };
 
 const calcScore = (pencapaianPct: number, bobot: number): number =>
@@ -31,24 +33,65 @@ const calcScore = (pencapaianPct: number, bobot: number): number =>
 const fmtPct = (n: number): string =>
   `${n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
-const fmtNumber = (n: number | null): string =>
-  n == null ? '' : n.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+// Display angka pakai locale Indonesia: ribuan dengan titik, desimal koma.
+//   1000      → "1.000"
+//   1500000   → "1.500.000"
+//   1500.5    → "1.500,5"
+const fmtNumberId = (n: number | null): string => {
+  if (n == null) return '';
+  return n.toLocaleString('id-ID', { maximumFractionDigits: 4 });
+};
+
+// Parse string Indonesia-style ke number. Menerima:
+//   "1.000.000"   → 1000000
+//   "1.500,50"    → 1500.5
+//   "1500"        → 1500
+//   "0,5"         → 0.5
+//   ""            → null
+// Strategi: kalau ada koma, anggap sebagai desimal (titik = ribuan).
+//           kalau cuma titik, anggap titik sebagai ribuan.
+const parseLocaleNumber = (s: string): number | null => {
+  const trimmed = s.trim();
+  if (trimmed === '') return null;
+  let normalized: string;
+  if (trimmed.includes(',')) {
+    // Format Indonesia: titik = ribuan, koma = desimal
+    normalized = trimmed.replace(/\./g, '').replace(',', '.');
+  } else {
+    // Cuma titik: anggap sebagai ribuan separator. Strip semua titik.
+    // Catatan: "0.5" → 5. User Indonesia harusnya pakai "0,5" untuk 0,5.
+    normalized = trimmed.replace(/\./g, '');
+  }
+  const parsed = Number(normalized);
+  if (Number.isNaN(parsed)) return null;
+  return parsed;
+};
 
 // ============================================================
-// Main — list cards atau detail
+// Main — 3 lapis: Divisi → Orang → Metrics
 // ============================================================
 export const KpiSection = () => {
   const toast = useToast();
-  const [cards, setCards] = useState<KpiCard[]>([]);
+  const [divisions, setDivisions] = useState<KpiDivision[]>([]);
+  const [allCards, setAllCards] = useState<KpiCard[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [activeDivisionId, setActiveDivisionId] = useState<string | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+
+  const [showCreateDivision, setShowCreateDivision] = useState(false);
+  const [editingDivision, setEditingDivision] = useState<KpiDivision | null>(null);
   const [showCreateCard, setShowCreateCard] = useState(false);
   const [editingCard, setEditingCard] = useState<KpiCard | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const data = await fetchKpiCards();
-    setCards(data);
+    const [divs, cards] = await Promise.all([
+      fetchKpiDivisions(),
+      fetchKpiCards(),
+    ]);
+    setDivisions(divs);
+    setAllCards(cards);
     setLoading(false);
   }, []);
 
@@ -56,8 +99,73 @@ export const KpiSection = () => {
     void refresh();
   }, [refresh]);
 
-  const handleSaveCard = async (
+  const activeDivision = useMemo(
+    () => divisions.find((d) => d.id === activeDivisionId) ?? null,
+    [divisions, activeDivisionId],
+  );
+  const activeCard = useMemo(
+    () => allCards.find((c) => c.id === activeCardId) ?? null,
+    [allCards, activeCardId],
+  );
+
+  const cardsByDivision = useMemo(() => {
+    const map = new Map<string, KpiCard[]>();
+    allCards.forEach((c) => {
+      const key = c.division_id ?? '__none__';
+      const arr = map.get(key) ?? [];
+      arr.push(c);
+      map.set(key, arr);
+    });
+    return map;
+  }, [allCards]);
+
+  // --- Division handlers ---
+  const handleSaveDivision = async (
     payload: { name: string; description: string | null },
+    existingId: string | null,
+  ) => {
+    const supabase = getSupabase();
+    let userId: string | null = null;
+    if (supabase) {
+      const { data } = await supabase.auth.getUser();
+      userId = data?.user?.id ?? null;
+    }
+    if (existingId) {
+      const updated = await updateKpiDivision(existingId, payload);
+      if (updated) { toast.success('Divisi diupdate'); void refresh(); }
+      else toast.error('Gagal update divisi');
+    } else {
+      const full: NewKpiDivision = {
+        user_id: userId,
+        name: payload.name,
+        description: payload.description,
+        position: 0,
+      };
+      const created = await createKpiDivision(full);
+      if (created) { toast.success('Divisi dibuat'); void refresh(); }
+      else toast.error('Gagal create divisi');
+    }
+    setEditingDivision(null);
+    setShowCreateDivision(false);
+  };
+
+  const handleDeleteDivision = async (div: KpiDivision) => {
+    const cardCount = cardsByDivision.get(div.id)?.length ?? 0;
+    const msg = cardCount > 0
+      ? `Hapus divisi "${div.name}" beserta ${cardCount} card di dalamnya?`
+      : `Hapus divisi "${div.name}"?`;
+    if (!window.confirm(msg)) return;
+    const ok = await deleteKpiDivision(div.id);
+    if (ok) {
+      toast.success('Divisi dihapus');
+      if (activeDivisionId === div.id) setActiveDivisionId(null);
+      void refresh();
+    } else toast.error('Gagal hapus divisi');
+  };
+
+  // --- Card handlers ---
+  const handleSaveCard = async (
+    payload: { name: string; description: string | null; division_id: string | null },
     existingId: string | null,
   ) => {
     const supabase = getSupabase();
@@ -73,6 +181,7 @@ export const KpiSection = () => {
     } else {
       const full: NewKpiCard = {
         user_id: userId,
+        division_id: payload.division_id,
         name: payload.name,
         description: payload.description,
         position: 0,
@@ -90,15 +199,10 @@ export const KpiSection = () => {
     const ok = await deleteKpiCard(card.id);
     if (ok) {
       toast.success('Card dihapus');
-      setCards((prev) => prev.filter((c) => c.id !== card.id));
+      setAllCards((prev) => prev.filter((c) => c.id !== card.id));
       if (activeCardId === card.id) setActiveCardId(null);
     } else toast.error('Gagal hapus card');
   };
-
-  const activeCard = useMemo(
-    () => cards.find((c) => c.id === activeCardId) ?? null,
-    [cards, activeCardId],
-  );
 
   return (
     <motion.div
@@ -106,9 +210,9 @@ export const KpiSection = () => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* Header */}
+      {/* Header dengan breadcrumb */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
-        <div>
+        <div className="min-w-0">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 mb-3">
             <TargetIcon className="w-3 h-3 animate-pulse" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">
@@ -118,13 +222,26 @@ export const KpiSection = () => {
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
             KPI
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
-            Kartu KPI per orang. Klik card untuk lihat & edit metric per perspektif.
-            Pencapaian &amp; score dihitung otomatis dari achievement / target.
-          </p>
+          <Breadcrumb
+            divisionName={activeDivision?.name ?? null}
+            cardName={activeCard?.name ?? null}
+            onClickRoot={() => { setActiveCardId(null); setActiveDivisionId(null); }}
+            onClickDivision={() => setActiveCardId(null)}
+          />
         </div>
 
-        {!activeCardId && (
+        {/* Action button — beda per level */}
+        {!activeCardId && !activeDivisionId && (
+          <button
+            type="button"
+            onClick={() => setShowCreateDivision(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Buat Divisi
+          </button>
+        )}
+        {!activeCardId && activeDivisionId && (
           <button
             type="button"
             onClick={() => setShowCreateCard(true)}
@@ -136,45 +253,53 @@ export const KpiSection = () => {
         )}
       </div>
 
-      {/* List view atau detail view */}
-      {activeCard ? (
+      {/* Render lapis sesuai navigasi */}
+      {loading ? (
+        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
+          Memuat KPI…
+        </div>
+      ) : activeCard ? (
         <KpiCardDetail
           card={activeCard}
           onBack={() => setActiveCardId(null)}
           onEditCard={() => setEditingCard(activeCard)}
           onDeleteCard={() => void handleDeleteCard(activeCard)}
         />
-      ) : loading ? (
-        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
-          Memuat KPI cards…
-        </div>
-      ) : cards.length === 0 ? (
-        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
-          <UserIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-black text-slate-700 mb-1">Belum ada KPI card</p>
-          <p className="text-xs text-slate-400 font-medium">
-            Klik tombol &ldquo;Buat Card&rdquo; di atas untuk mulai.
-          </p>
-        </div>
+      ) : activeDivision ? (
+        <CardListView
+          division={activeDivision}
+          cards={cardsByDivision.get(activeDivision.id) ?? []}
+          onBack={() => setActiveDivisionId(null)}
+          onOpenCard={(c) => setActiveCardId(c.id)}
+          onEditCard={(c) => setEditingCard(c)}
+          onDeleteCard={(c) => void handleDeleteCard(c)}
+          onCreateCard={() => setShowCreateCard(true)}
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cards.map((c) => (
-            <KpiCardItem
-              key={c.id}
-              card={c}
-              onOpen={() => setActiveCardId(c.id)}
-              onEdit={() => setEditingCard(c)}
-              onDelete={() => void handleDeleteCard(c)}
-            />
-          ))}
-        </div>
+        <DivisionListView
+          divisions={divisions}
+          cardCounts={(id) => cardsByDivision.get(id)?.length ?? 0}
+          onOpen={(d) => setActiveDivisionId(d.id)}
+          onEdit={(d) => setEditingDivision(d)}
+          onDelete={(d) => void handleDeleteDivision(d)}
+          onCreate={() => setShowCreateDivision(true)}
+        />
       )}
 
-      {/* Modal create/edit card */}
+      {/* Modals */}
       <AnimatePresence>
+        {(showCreateDivision || editingDivision) && (
+          <DivisionModal
+            division={editingDivision}
+            onClose={() => { setEditingDivision(null); setShowCreateDivision(false); }}
+            onSave={(payload) => void handleSaveDivision(payload, editingDivision?.id ?? null)}
+          />
+        )}
         {(showCreateCard || editingCard) && (
           <CardModal
             card={editingCard}
+            divisions={divisions}
+            defaultDivisionId={activeDivisionId}
             onClose={() => { setEditingCard(null); setShowCreateCard(false); }}
             onSave={(payload) => void handleSaveCard(payload, editingCard?.id ?? null)}
           />
@@ -185,67 +310,268 @@ export const KpiSection = () => {
 };
 
 // ============================================================
-// Card list item — hanya nama orang sesuai request user.
+// Breadcrumb
 // ============================================================
-function KpiCardItem({ card, onOpen, onEdit, onDelete }: {
-  card: KpiCard;
-  onOpen: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+function Breadcrumb({
+  divisionName, cardName, onClickRoot, onClickDivision,
+}: {
+  divisionName: string | null;
+  cardName: string | null;
+  onClickRoot: () => void;
+  onClickDivision: () => void;
 }) {
   return (
-    <div className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative">
+    <p className="text-sm text-slate-500 font-medium mt-1.5 flex items-center gap-1.5 flex-wrap">
       <button
         type="button"
-        onClick={onOpen}
-        className="w-full text-left"
-      >
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-white flex items-center justify-center shadow-md">
-            <UserIcon className="w-5 h-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
-              KPI Owner
-            </p>
-            <h3 className="text-base font-black text-slate-900 truncate">
-              {card.name}
-            </h3>
-          </div>
-          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
-        </div>
-        {card.description && (
-          <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-snug">
-            {card.description}
-          </p>
+        onClick={onClickRoot}
+        className={cn(
+          'hover:text-emerald-600 transition-colors',
+          divisionName || cardName ? 'underline-offset-2 hover:underline' : 'font-bold text-slate-700',
         )}
+      >
+        Semua Divisi
       </button>
+      {divisionName && (
+        <>
+          <ChevronRight className="w-3 h-3 text-slate-300" />
+          <button
+            type="button"
+            onClick={onClickDivision}
+            className={cn(
+              'hover:text-emerald-600 transition-colors',
+              cardName ? 'underline-offset-2 hover:underline' : 'font-bold text-slate-700',
+            )}
+          >
+            {divisionName}
+          </button>
+        </>
+      )}
+      {cardName && (
+        <>
+          <ChevronRight className="w-3 h-3 text-slate-300" />
+          <span className="font-bold text-slate-700">{cardName}</span>
+        </>
+      )}
+    </p>
+  );
+}
 
-      {/* Action buttons */}
-      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+// ============================================================
+// Lapis 1 — Division list
+// ============================================================
+function DivisionListView({
+  divisions, cardCounts, onOpen, onEdit, onDelete, onCreate,
+}: {
+  divisions: KpiDivision[];
+  cardCounts: (id: string) => number;
+  onOpen: (d: KpiDivision) => void;
+  onEdit: (d: KpiDivision) => void;
+  onDelete: (d: KpiDivision) => void;
+  onCreate: () => void;
+}) {
+  if (divisions.length === 0) {
+    return (
+      <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
+        <Briefcase className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+        <p className="text-sm font-black text-slate-700 mb-1">Belum ada Divisi</p>
+        <p className="text-xs text-slate-400 font-medium mb-4">
+          Buat divisi (Marketing, Sales, dst) untuk mengelompokkan KPI per orang.
+        </p>
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          aria-label="Edit"
-          className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100 shadow-sm"
+          onClick={onCreate}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest"
         >
-          <Edit2 className="w-3 h-3" />
-        </button>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          aria-label="Hapus"
-          className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 shadow-sm"
-        >
-          <Trash2 className="w-3 h-3" />
+          <Plus className="w-4 h-4" />
+          Buat Divisi
         </button>
       </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {divisions.map((d) => {
+        const count = cardCounts(d.id);
+        return (
+          <div
+            key={d.id}
+            className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative"
+          >
+            <button
+              type="button"
+              onClick={() => onOpen(d)}
+              className="w-full text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-emerald-500 text-white flex items-center justify-center shadow-md">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
+                    Divisi
+                  </p>
+                  <h3 className="text-base font-black text-slate-900 truncate">
+                    {d.name}
+                  </h3>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              {d.description && (
+                <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-snug mb-2">
+                  {d.description}
+                </p>
+              )}
+              <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                <UserIcon className="w-2.5 h-2.5" />
+                {count} Orang
+              </span>
+            </button>
+
+            <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEdit(d); }}
+                aria-label="Edit"
+                className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100 shadow-sm"
+              >
+                <Edit2 className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDelete(d); }}
+                aria-label="Hapus"
+                className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 shadow-sm"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ============================================================
-// Card detail — list metric grouped by perspektif + edit inline.
+// Lapis 2 — Card list (per orang dalam 1 divisi)
+// ============================================================
+function CardListView({
+  division, cards, onBack, onOpenCard, onEditCard, onDeleteCard, onCreateCard,
+}: {
+  division: KpiDivision;
+  cards: KpiCard[];
+  onBack: () => void;
+  onOpenCard: (c: KpiCard) => void;
+  onEditCard: (c: KpiCard) => void;
+  onDeleteCard: (c: KpiCard) => void;
+  onCreateCard: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Kembali"
+          className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-emerald-500 text-white flex items-center justify-center shadow-md">
+          <Briefcase className="w-5 h-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+            Divisi
+          </p>
+          <h2 className="text-lg font-black text-slate-900 truncate">{division.name}</h2>
+          {division.description && (
+            <p className="text-[11px] text-slate-500 font-medium line-clamp-1">
+              {division.description}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {cards.length === 0 ? (
+        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
+          <UserIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm font-black text-slate-700 mb-1">Belum ada KPI orang</p>
+          <p className="text-xs text-slate-400 font-medium mb-4">
+            Tambahkan card untuk anggota divisi {division.name}.
+          </p>
+          <button
+            type="button"
+            onClick={onCreateCard}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest"
+          >
+            <Plus className="w-4 h-4" />
+            Buat Card
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cards.map((c) => (
+            <div
+              key={c.id}
+              className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative"
+            >
+              <button
+                type="button"
+                onClick={() => onOpenCard(c)}
+                className="w-full text-left"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-white flex items-center justify-center shadow-md">
+                    <UserIcon className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
+                      KPI Owner
+                    </p>
+                    <h3 className="text-base font-black text-slate-900 truncate">
+                      {c.name}
+                    </h3>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+                </div>
+                {c.description && (
+                  <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-snug">
+                    {c.description}
+                  </p>
+                )}
+              </button>
+
+              <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onEditCard(c); }}
+                  aria-label="Edit"
+                  className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100 shadow-sm"
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onDeleteCard(c); }}
+                  aria-label="Hapus"
+                  className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 shadow-sm"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Lapis 3 — Card detail (metric tables per perspektif)
 // ============================================================
 function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
   card: KpiCard;
@@ -269,7 +595,6 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
     void refresh();
   }, [refresh]);
 
-  // Group by perspektif (preserve insertion order)
   const grouped = useMemo(() => {
     const map = new Map<string, KpiMetric[]>();
     metrics.forEach((m) => {
@@ -280,7 +605,6 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
     return map;
   }, [metrics]);
 
-  // Optimistic patch — update local state lalu DB. Rollback kalau gagal.
   const patchLocal = (id: string, patch: Partial<NewKpiMetric>) => {
     setMetrics((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   };
@@ -334,7 +658,6 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
     setShowAddPerspektif(false);
   };
 
-  // Total score across all groups (max teoritis 100% × jumlah perspektif)
   const grandTotal = useMemo(
     () => metrics.reduce(
       (sum, m) => sum + calcScore(calcPencapaian(m.achievement, m.target), m.bobot),
@@ -345,7 +668,6 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
 
   return (
     <div className="space-y-6">
-      {/* Sub-header */}
       <div className="bg-white p-5 rounded-3xl border border-slate-100 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
@@ -397,7 +719,6 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
         </div>
       </div>
 
-      {/* Metric tables — 1 per perspektif */}
       {loading ? (
         <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
           Memuat metric…
@@ -434,7 +755,6 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
                   toast.warning('Perspektif sudah ada');
                   return;
                 }
-                // Update semua metric di grup ini ke perspektif baru
                 await Promise.all(
                   rows.map((r) => updateKpiMetric(r.id, { perspektif: trimmed })),
                 );
@@ -466,7 +786,7 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
 }
 
 // ============================================================
-// Perspektif table — 1 group, dengan total score row.
+// Perspektif table — dengan total bobot & total score
 // ============================================================
 function PerspektifTable({
   perspektif, rows, onPatchMetric, onAddMetric, onDeleteMetric, onRenamePerspektif,
@@ -489,7 +809,6 @@ function PerspektifTable({
 
   return (
     <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
-      {/* Header row */}
       <div className="flex items-center justify-between px-5 py-3 bg-emerald-50 border-b border-emerald-100">
         {editingName ? (
           <input
@@ -522,15 +841,14 @@ function PerspektifTable({
         </button>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50/50">
               <th className="py-3 px-4 w-1/3">Metric Indicator</th>
-              <th className="py-3 px-3 w-[80px]">Bobot (%)</th>
-              <th className="py-3 px-3 w-[100px]">Target</th>
-              <th className="py-3 px-3 w-[100px]">Achievement</th>
+              <th className="py-3 px-3 w-[90px]">Bobot (%)</th>
+              <th className="py-3 px-3 w-[120px]">Target</th>
+              <th className="py-3 px-3 w-[120px]">Achievement</th>
               <th className="py-3 px-3 w-[110px] text-emerald-700">% Pencapaian</th>
               <th className="py-3 px-3 w-[90px] text-indigo-700">Score</th>
               <th className="py-3 px-3 w-[40px]" />
@@ -604,7 +922,7 @@ function PerspektifTable({
                 'py-3 px-3 text-xs tabular-nums',
                 Math.abs(totalBobot - 100) < 0.01 ? 'text-emerald-700' : 'text-amber-600',
               )}>
-                {fmtNumber(totalBobot)}%
+                {fmtNumberId(totalBobot)}%
               </td>
               <td colSpan={3} />
               <td className="py-3 px-3 text-xs text-indigo-700 tabular-nums">
@@ -617,7 +935,7 @@ function PerspektifTable({
       </div>
       {Math.abs(totalBobot - 100) > 0.01 && rows.length > 0 && (
         <div className="px-5 py-2 bg-amber-50 border-t border-amber-100 text-[10px] font-bold text-amber-700">
-          ⚠️ Total bobot {fmtNumber(totalBobot)}% — idealnya 100% per perspektif.
+          ⚠️ Total bobot {fmtNumberId(totalBobot)}% — idealnya 100% per perspektif.
         </div>
       )}
     </div>
@@ -625,7 +943,7 @@ function PerspektifTable({
 }
 
 // ============================================================
-// Inline cell editors — debounced save on blur / Enter.
+// Inline cell editors
 // ============================================================
 function CellInput({ value, placeholder, onSave }: {
   value: string;
@@ -649,23 +967,38 @@ function CellInput({ value, placeholder, onSave }: {
   );
 }
 
+// Number input dengan locale ID:
+//   - blur (tampilan): "1.000.000"
+//   - focus (edit): "1000000" (raw, supaya gampang ngetik)
 function CellNumberInput({ value, onSave, placeholder, suffix }: {
   value: number | null;
   onSave: (v: number | null) => void;
   placeholder?: string;
   suffix?: string;
 }) {
+  const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(value == null ? '' : String(value));
-  useEffect(() => { setDraft(value == null ? '' : String(value)); }, [value]);
+
+  useEffect(() => {
+    if (!focused) {
+      setDraft(value == null ? '' : String(value));
+    }
+  }, [value, focused]);
+
+  const display = focused
+    ? draft
+    : (value == null ? '' : fmtNumberId(value));
 
   const commit = () => {
+    setFocused(false);
     const trimmed = draft.trim();
     if (trimmed === '') {
       if (value !== null) onSave(null);
       return;
     }
-    const parsed = Number(trimmed.replace(',', '.'));
-    if (Number.isNaN(parsed)) {
+    const parsed = parseLocaleNumber(trimmed);
+    if (parsed == null) {
+      // invalid — rollback ke nilai sebelumnya
       setDraft(value == null ? '' : String(value));
       return;
     }
@@ -675,13 +1008,18 @@ function CellNumberInput({ value, onSave, placeholder, suffix }: {
   return (
     <div className="flex items-center gap-0.5">
       <input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        value={display}
+        onChange={(e) => { setFocused(true); setDraft(e.target.value); }}
+        onFocus={() => {
+          setFocused(true);
+          setDraft(value == null ? '' : String(value));
+        }}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           if (e.key === 'Escape') {
             setDraft(value == null ? '' : String(value));
+            setFocused(false);
             (e.target as HTMLInputElement).blur();
           }
         }}
@@ -697,17 +1035,74 @@ function CellNumberInput({ value, onSave, placeholder, suffix }: {
 // ============================================================
 // Modals
 // ============================================================
-function CardModal({ card, onClose, onSave }: {
-  card: KpiCard | null;
+function DivisionModal({ division, onClose, onSave }: {
+  division: KpiDivision | null;
   onClose: () => void;
   onSave: (payload: { name: string; description: string | null }) => void;
 }) {
+  const [name, setName] = useState(division?.name ?? '');
+  const [description, setDescription] = useState(division?.description ?? '');
+
+  return (
+    <ModalShell title={division ? 'Edit Divisi' : 'Buat Divisi Baru'} onClose={onClose}>
+      <div className="space-y-4">
+        <FormField label="Nama Divisi *">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="mis. Marketing, Sales, Content, …"
+            autoFocus
+            className="form-input"
+          />
+        </FormField>
+        <FormField label="Deskripsi (opsional)">
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Deskripsi singkat divisi…"
+            className="form-input"
+          />
+        </FormField>
+      </div>
+      <ModalFooter
+        onClose={onClose}
+        onSubmit={() => name.trim() && onSave({ name: name.trim(), description: description.trim() || null })}
+        disabled={!name.trim()}
+        submitLabel={division ? 'Simpan' : 'Buat'}
+      />
+    </ModalShell>
+  );
+}
+
+function CardModal({ card, divisions, defaultDivisionId, onClose, onSave }: {
+  card: KpiCard | null;
+  divisions: KpiDivision[];
+  defaultDivisionId: string | null;
+  onClose: () => void;
+  onSave: (payload: { name: string; description: string | null; division_id: string | null }) => void;
+}) {
   const [name, setName] = useState(card?.name ?? '');
   const [description, setDescription] = useState(card?.description ?? '');
+  const [divisionId, setDivisionId] = useState<string>(
+    card?.division_id ?? defaultDivisionId ?? (divisions[0]?.id ?? ''),
+  );
 
   return (
     <ModalShell title={card ? 'Edit Card' : 'Buat Card Baru'} onClose={onClose}>
       <div className="space-y-4">
+        <FormField label="Divisi *">
+          <select
+            value={divisionId}
+            onChange={(e) => setDivisionId(e.target.value)}
+            className="form-input"
+          >
+            <option value="" disabled>Pilih divisi…</option>
+            {divisions.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        </FormField>
         <FormField label="Nama Orang *">
           <input
             value={name}
@@ -727,24 +1122,16 @@ function CardModal({ card, onClose, onSave }: {
           />
         </FormField>
       </div>
-      <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100"
-        >
-          Batal
-        </button>
-        <button
-          type="button"
-          onClick={() => name.trim() && onSave({ name: name.trim(), description: description.trim() || null })}
-          disabled={!name.trim()}
-          className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:bg-slate-300 disabled:shadow-none"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Simpan
-        </button>
-      </div>
+      <ModalFooter
+        onClose={onClose}
+        onSubmit={() => name.trim() && divisionId && onSave({
+          name: name.trim(),
+          description: description.trim() || null,
+          division_id: divisionId,
+        })}
+        disabled={!name.trim() || !divisionId}
+        submitLabel={card ? 'Simpan' : 'Buat'}
+      />
     </ModalShell>
   );
 }
@@ -760,29 +1147,17 @@ function PerspektifModal({ onClose, onSave }: {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="mis. Brand Awareness, Revenue Performance, SEO Performance…"
+          placeholder="mis. Brand Awareness, Revenue Performance, …"
           autoFocus
           className="form-input"
         />
       </FormField>
-      <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100"
-        >
-          Batal
-        </button>
-        <button
-          type="button"
-          onClick={() => name.trim() && onSave(name)}
-          disabled={!name.trim()}
-          className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:bg-slate-300 disabled:shadow-none"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Tambah
-        </button>
-      </div>
+      <ModalFooter
+        onClose={onClose}
+        onSubmit={() => name.trim() && onSave(name)}
+        disabled={!name.trim()}
+        submitLabel="Tambah"
+      />
     </ModalShell>
   );
 }
@@ -832,6 +1207,32 @@ function ModalShell({ title, onClose, children }: {
     </motion.div>
   );
 }
+
+const ModalFooter = ({ onClose, onSubmit, disabled, submitLabel }: {
+  onClose: () => void;
+  onSubmit: () => void;
+  disabled: boolean;
+  submitLabel: string;
+}) => (
+  <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
+    <button
+      type="button"
+      onClick={onClose}
+      className="px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100"
+    >
+      Batal
+    </button>
+    <button
+      type="button"
+      onClick={onSubmit}
+      disabled={disabled}
+      className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:bg-slate-300 disabled:shadow-none"
+    >
+      <Plus className="w-3.5 h-3.5" />
+      {submitLabel}
+    </button>
+  </div>
+);
 
 const FormField = ({ label, children }: {
   label: string;
