@@ -31,23 +31,25 @@ export interface Downloader {
   year_month: string;
 }
 
+// 17 metrik per post yang user input manual atau via Excel.
 export interface SocialMediaContent {
-  platform: string;
-  postingTime: string;
-  contentType: string;
-  title: string;
+  platform: string;                   // Instagram, TikTok, Facebook, YouTube, X, dll
+  jenisKonten: string;                // Reel, Feed, Story, Carousel, Video, Shorts, Live
   caption: string;
-  cta: string;
-  topic: string;
-  reach: number;
-  engagement: number;
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  hook: string;
-  link: string;
-  objective: string;
+  tanggalUpload: string;              // YYYY-MM-DD
+  tayangan: number;                   // views
+  jangkauan: number;                  // reach
+  pemirsa: number;                    // unique audience
+  jumlahBersihInteraksi: number;      // net interactions
+  sukaTanggapan: number;              // likes & reactions
+  komen: number;
+  share: number;
+  save: number;
+  klikTautan: number;                 // link clicks
+  balasan: number;                    // replies
+  mengikuti: number;                  // followers gained dari konten ini
+  waktuTonton: number;                // total watch time (detik)
+  rataRataWaktuTonton: number;        // avg watch time (detik)
 }
 
 export interface DailyData {

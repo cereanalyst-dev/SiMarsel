@@ -23,13 +23,13 @@ export const generateDailyInsight = (
   let insight = '';
 
   if (socialContent.length > 0) {
-    const totalReach = socialContent.reduce((acc, curr) => acc + curr.reach, 0);
+    const totalReach = socialContent.reduce((acc, curr) => acc + (curr.jangkauan || 0), 0);
     if (totalReach > 10000 && revenue > 5000000) {
-      insight += `Konten sosial media hari ini sangat efektif dengan reach ${formatNumber(totalReach)}, berkontribusi signifikan terhadap revenue harian yang mencapai ${formatCurrency(revenue)}. `;
+      insight += `Konten sosial media hari ini sangat efektif dengan jangkauan ${formatNumber(totalReach)}, berkontribusi signifikan terhadap revenue harian yang mencapai ${formatCurrency(revenue)}. `;
     } else if (totalReach > 5000 && downloaders > 100) {
       insight += `Aktivitas konten berhasil mendorong traffic baru dengan ${downloaders} downloader baru hari ini. `;
-    } else if (socialContent.some((c) => c.engagement > 500)) {
-      insight += `Salah satu konten mendapatkan engagement tinggi, namun konversi ke sales masih perlu dioptimalkan. `;
+    } else if (socialContent.some((c) => (c.jumlahBersihInteraksi || 0) > 500)) {
+      insight += `Salah satu konten mendapatkan interaksi tinggi, namun konversi ke sales masih perlu dioptimalkan. `;
     } else {
       insight += `Aktivitas konten sosial media membantu menjaga brand awareness hari ini. `;
     }

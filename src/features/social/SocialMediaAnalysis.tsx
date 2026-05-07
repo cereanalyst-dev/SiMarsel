@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { logger } from '../../lib/logger';
 import { motion } from 'motion/react';
 import { format, parse } from 'date-fns';
 import * as XLSX from 'xlsx';
-import { Calendar, Download, FileSpreadsheet, Layers, Plus, Search, Smartphone, Trash2, Upload } from 'lucide-react';
+import {
+  Calendar, Download, FileSpreadsheet, Layers, Plus, Search, Smartphone,
+  Trash2, Upload,
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatters';
 import { excelDateToJSDate } from '../../lib/excelDate';
@@ -21,24 +23,37 @@ interface Props {
   setCalendarFocusDate: (date: Date) => void;
 }
 
+const PLATFORM_OPTIONS = ['Instagram', 'TikTok', 'Facebook', 'Twitter/X', 'YouTube', 'LinkedIn'];
+const JENIS_KONTEN_OPTIONS = ['Reel', 'Feed', 'Story', 'Carousel', 'Video', 'Shorts', 'Live', 'Single Post'];
+
 const emptyContent = (): SocialMediaContent => ({
   platform: 'Instagram',
-  postingTime: '10:00',
-  contentType: 'Feed',
-  title: '',
+  jenisKonten: 'Reel',
   caption: '',
-  cta: '',
-  topic: '',
-  reach: 0,
-  engagement: 0,
-  views: 0,
-  likes: 0,
-  comments: 0,
-  shares: 0,
-  hook: '',
-  link: '',
-  objective: 'Awareness',
+  tanggalUpload: format(new Date(), 'yyyy-MM-dd'),
+  tayangan: 0,
+  jangkauan: 0,
+  pemirsa: 0,
+  jumlahBersihInteraksi: 0,
+  sukaTanggapan: 0,
+  komen: 0,
+  share: 0,
+  save: 0,
+  klikTautan: 0,
+  balasan: 0,
+  mengikuti: 0,
+  waktuTonton: 0,
+  rataRataWaktuTonton: 0,
 });
+
+// Format detik → "1m 30s"
+const formatDuration = (sec: number): string => {
+  if (!sec || sec <= 0) return '0s';
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s}s`;
+};
 
 export const SocialMediaAnalysis = ({
   apps,
@@ -46,14 +61,13 @@ export const SocialMediaAnalysis = ({
   setActiveTab,
   setCalendarFocusDate,
 }: Props) => {
+  const toast = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Konten dari Skrip Konten yang sudah status='published'.
-  // Auto-load on mount + auto-refresh.
   const [publishedKonten, setPublishedKonten] = useState<ContentScript[]>([]);
-
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -64,8 +78,8 @@ export const SocialMediaAnalysis = ({
     return () => { active = false; };
   }, []);
 
-  // Konversi ContentScript → shape yang sama dengan socialContent legacy
-  // supaya bisa di-merge ke listing & filter yang sama.
+  // ContentScript published → shape mirip SocialMediaContent.
+  // Metrik-nya 0 karena Skrip Konten cuma punya metadata, belum ada metrik aktual.
   const kontenAsSocialContent = useMemo(() => {
     return publishedKonten.map((s) => {
       const dateStr = s.scheduled_date ?? format(new Date(s.updated_at), 'yyyy-MM-dd');
@@ -73,41 +87,35 @@ export const SocialMediaAnalysis = ({
       const typeLabel =
         s.type === 'video' ? 'Video' :
         s.type === 'carousel' ? 'Carousel' : 'Single Post';
-
-      // Caption: prioritas caption_instagram → caption_tiktok → caption umum
       const caption =
         (c?.caption_instagram as string | undefined) ||
         (c?.caption_tiktok as string | undefined) ||
         (c?.caption as string | undefined) ||
-        '';
+        s.title || '';
 
       return {
-        // shape mirroring SocialMediaContent + identification
         platform: s.platform.toUpperCase(),
-        postingTime: '—',
-        contentType: typeLabel,
-        title: s.title ?? '(Tanpa judul)',
+        jenisKonten: typeLabel,
         caption,
-        cta:
-          (c?.tahapan_4_cta as string | undefined) ||
-          (c?.cta as string | undefined) ||
-          '',
-        topic: '',
-        reach: 0,
-        engagement: 0,
-        views: 0,
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        hook: (c?.hook as string | undefined) ?? '',
-        link: s.link_konten ?? s.link_video ?? '',
-        objective: '',
+        tanggalUpload: dateStr,
+        tayangan: 0,
+        jangkauan: 0,
+        pemirsa: 0,
+        jumlahBersihInteraksi: 0,
+        sukaTanggapan: 0,
+        komen: 0,
+        share: 0,
+        save: 0,
+        klikTautan: 0,
+        balasan: 0,
+        mengikuti: 0,
+        waktuTonton: 0,
+        rataRataWaktuTonton: 0,
         date: dateStr,
         appId: `konten:${s.id}`,
         appName: s.platform.toUpperCase(),
         contentIndex: 0,
-        // Marker biar UI tau ini dari Skrip Konten
-        _fromKonten: true,
+        _fromKonten: true as const,
         _scriptId: s.id,
       };
     });
@@ -118,6 +126,8 @@ export const SocialMediaAnalysis = ({
       Object.entries(app.dailyData || {}).flatMap(([date, dayData]) =>
         (dayData.socialContent || []).map((content, idx) => ({
           ...content,
+          // tanggalUpload override: kalau ada di content pakai itu, fallback ke key date.
+          tanggalUpload: content.tanggalUpload || date,
           date,
           appId: app.id,
           appName: app.name,
@@ -127,10 +137,11 @@ export const SocialMediaAnalysis = ({
       ),
     );
     return [...kontenAsSocialContent, ...fromLegacy]
-      .sort((a, b) => b.date.localeCompare(a.date));
+      .sort((a, b) => b.tanggalUpload.localeCompare(a.tanggalUpload));
   }, [apps, kontenAsSocialContent]);
 
   const handleDateClick = (dateStr: string) => {
+    if (!dateStr) return;
     const date = parse(dateStr, 'yyyy-MM-dd', new Date());
     setCalendarFocusDate(date);
     setActiveTab('calendar');
@@ -141,9 +152,9 @@ export const SocialMediaAnalysis = ({
     return allContent.filter((item) => {
       const matchesSearch =
         !searchTerm ||
-        (item.title || '').toLowerCase().includes(needle) ||
         (item.caption || '').toLowerCase().includes(needle) ||
-        (item.hook || '').toLowerCase().includes(needle);
+        (item.platform || '').toLowerCase().includes(needle) ||
+        (item.jenisKonten || '').toLowerCase().includes(needle);
       const matchesPlatform = platformFilter === 'All' || item.platform === platformFilter;
       return matchesSearch && matchesPlatform;
     });
@@ -155,8 +166,7 @@ export const SocialMediaAnalysis = ({
   );
 
   const handleDelete = (appId: string, date: string, contentIndex: number) => {
-    const confirmed = window.confirm('Yakin ingin hapus konten ini?');
-    if (!confirmed) return;
+    if (!window.confirm('Yakin ingin hapus konten ini?')) return;
     setApps(
       apps.map((app) => {
         if (app.id !== appId) return app;
@@ -174,63 +184,58 @@ export const SocialMediaAnalysis = ({
     );
   };
 
-  // ===================== IMPORT / TEMPLATE EXCEL =====================
+  // ===================== EXCEL TEMPLATE / IMPORT =====================
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
   const handleDownloadTemplate = () => {
-    const appNamesHint = apps.map((a) => a.name).join(', ');
     const exampleAppName = apps[0]?.name ?? 'JADIBUMN';
     const today = format(new Date(), 'yyyy-MM-dd');
+    const appNamesHint = apps.map((a) => a.name).join(', ');
 
     const rows = [
       {
-        'Nama App':   exampleAppName,
-        'Tanggal':    today,
-        'Jam Posting':'10:00',
-        'Platform':   'Instagram',
-        'Jenis Konten':'Reels',
-        'Objective':  'Awareness',
-        'Judul':      'Tips Jitu Lolos Tes BUMN 2026',
-        'Hook':       'Jangan asal ikut tes — simak dulu...',
-        'Caption':    'Caption lengkap di sini. Pakai kalimat persuasif dan CTA jelas.',
-        'CTA':        'Daftar sekarang',
-        'Topik':      'Persiapan tes BUMN',
-        'Link':       'https://example.com',
-        'Reach':      5000,
-        'Engagement': 250,
-        'Views':      8000,
-        'Likes':      200,
-        'Comments':   30,
-        'Shares':     20,
+        'Nama App':             exampleAppName,
+        'Platform':             'Instagram',
+        'Jenis Konten':         'Reel',
+        'Caption':              'Caption lengkap di sini.',
+        'Tanggal Upload':       today,
+        'Tayangan':             8000,
+        'Jangkauan':            5000,
+        'Pemirsa':              4500,
+        'Jumlah Bersih Interaksi': 250,
+        'Suka & Tanggapan':     200,
+        'Komen':                30,
+        'Share':                20,
+        'Save':                 15,
+        'Klik Tautan':          12,
+        'Balasan':              5,
+        'Mengikuti':            8,
+        'Waktu Tonton (detik)': 1800,
+        'Rata-rata Waktu Tonton (detik)': 18,
       },
     ];
-
     const ws = XLSX.utils.json_to_sheet(rows);
-
-    // Set column widths for readability
     ws['!cols'] = [
-      { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
-      { wch: 40 }, { wch: 40 }, { wch: 60 }, { wch: 20 }, { wch: 24 }, { wch: 30 },
-      { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+      { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 60 }, { wch: 14 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 18 },
+      { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
+      { wch: 12 }, { wch: 18 }, { wch: 24 },
     ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Konten Sosial Media');
 
-    // Sheet kedua: petunjuk
     const noteRows = [
       ['Petunjuk Pengisian Template'],
       [''],
-      ['1.', 'Kolom "Nama App" HARUS cocok dengan salah satu: ' + appNamesHint],
-      ['2.', 'Tanggal format YYYY-MM-DD (mis. 2024-03-15). Boleh juga format Excel Date.'],
-      ['3.', 'Jam Posting format HH:mm (24 jam), mis. 09:30, 14:15.'],
-      ['4.', 'Platform: Instagram, TikTok, Facebook, Twitter/X, YouTube, LinkedIn.'],
-      ['5.', 'Jenis Konten: Feed, Reels, Story, Video, Shorts, Live, Carousel.'],
-      ['6.', 'Objective: Awareness, Engagement, Traffic, Conversion, Retention.'],
-      ['7.', 'Kolom angka (Reach, Engagement, Views, Likes, Comments, Shares) isi angka saja.'],
-      ['8.', 'Kolom teks kosong diperbolehkan kecuali Nama App dan Tanggal.'],
-      ['9.', 'Baris contoh di sheet "Konten Sosial Media" boleh dihapus setelah diisi.'],
+      ['1.', `Kolom "Nama App" harus cocok dengan: ${appNamesHint || '(belum ada app)'}`],
+      ['2.', 'Tanggal Upload format YYYY-MM-DD (mis. 2026-05-07). Boleh juga format Excel Date.'],
+      ['3.', `Platform: ${PLATFORM_OPTIONS.join(', ')}`],
+      ['4.', `Jenis Konten: ${JENIS_KONTEN_OPTIONS.join(', ')}`],
+      ['5.', 'Semua kolom angka isi angka saja (tanpa pemisah ribuan).'],
+      ['6.', 'Waktu tonton & rata-rata waktu tonton dalam detik (mis. 90 = 1 menit 30 detik).'],
+      ['7.', 'Caption boleh kosong. Nama App + Platform + Tanggal Upload wajib.'],
     ];
     const notesWs = XLSX.utils.aoa_to_sheet(noteRows);
     notesWs['!cols'] = [{ wch: 4 }, { wch: 100 }];
@@ -250,16 +255,20 @@ export const SocialMediaAnalysis = ({
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
 
       if (rows.length === 0) {
-        setImportStatus('❌ File kosong. Tidak ada baris yang diimpor.');
+        setImportStatus('❌ File kosong.');
         return;
       }
 
       const appByName = new Map(apps.map((a) => [a.name.toLowerCase().trim(), a]));
-
-      // Collect updates: { appId → { date → [new content...] } }
       const updates = new Map<string, Map<string, SocialMediaContent[]>>();
       let imported = 0;
       const skipped: string[] = [];
+
+      const num = (v: unknown): number => {
+        if (v === '' || v == null) return 0;
+        const n = Number(v);
+        return isNaN(n) ? 0 : n;
+      };
 
       rows.forEach((row, idx) => {
         const appName = String(row['Nama App'] ?? row['App'] ?? '').trim();
@@ -269,32 +278,33 @@ export const SocialMediaAnalysis = ({
           return;
         }
 
-        const rawDate = row['Tanggal'] ?? row['Date'] ?? row['tanggal'];
+        const rawDate = row['Tanggal Upload'] ?? row['Tanggal'] ?? row['Date'];
         const dateObj =
           typeof rawDate === 'number' ? excelDateToJSDate(rawDate) : new Date(String(rawDate));
         if (isNaN(dateObj.getTime())) {
-          skipped.push(`Baris ${idx + 2}: Tanggal tidak valid`);
+          skipped.push(`Baris ${idx + 2}: Tanggal Upload tidak valid`);
           return;
         }
         const dateKey = format(dateObj, 'yyyy-MM-dd');
 
         const content: SocialMediaContent = {
-          platform:    String(row['Platform'] ?? 'Instagram'),
-          postingTime: String(row['Jam Posting'] ?? row['Posting Time'] ?? '10:00'),
-          contentType: String(row['Jenis Konten'] ?? row['Content Type'] ?? 'Feed'),
-          title:       String(row['Judul'] ?? row['Title'] ?? ''),
-          caption:     String(row['Caption'] ?? ''),
-          cta:         String(row['CTA'] ?? ''),
-          topic:       String(row['Topik'] ?? row['Topic'] ?? ''),
-          hook:        String(row['Hook'] ?? ''),
-          link:        String(row['Link'] ?? ''),
-          objective:   String(row['Objective'] ?? 'Awareness'),
-          reach:      Number(row['Reach'])      || 0,
-          engagement: Number(row['Engagement']) || 0,
-          views:      Number(row['Views'])      || 0,
-          likes:      Number(row['Likes'])      || 0,
-          comments:   Number(row['Comments'])   || 0,
-          shares:     Number(row['Shares'])     || 0,
+          platform:              String(row['Platform'] ?? 'Instagram'),
+          jenisKonten:           String(row['Jenis Konten'] ?? 'Feed'),
+          caption:               String(row['Caption'] ?? ''),
+          tanggalUpload:         dateKey,
+          tayangan:              num(row['Tayangan']),
+          jangkauan:             num(row['Jangkauan']),
+          pemirsa:               num(row['Pemirsa']),
+          jumlahBersihInteraksi: num(row['Jumlah Bersih Interaksi']),
+          sukaTanggapan:         num(row['Suka & Tanggapan'] ?? row['Suka dan Tanggapan']),
+          komen:                 num(row['Komen']),
+          share:                 num(row['Share']),
+          save:                  num(row['Save']),
+          klikTautan:            num(row['Klik Tautan']),
+          balasan:               num(row['Balasan']),
+          mengikuti:             num(row['Mengikuti']),
+          waktuTonton:           num(row['Waktu Tonton (detik)'] ?? row['Waktu Tonton']),
+          rataRataWaktuTonton:   num(row['Rata-rata Waktu Tonton (detik)'] ?? row['Rata-rata Waktu Tonton']),
         };
 
         if (!updates.has(app.id)) updates.set(app.id, new Map());
@@ -322,19 +332,19 @@ export const SocialMediaAnalysis = ({
 
       let msg = `✅ Berhasil impor ${imported} konten.`;
       if (skipped.length > 0) {
-        msg += ` ${skipped.length} baris di-skip. Cek Console untuk detail.`;
-        logger.warn('Social media import skipped rows:', skipped);
+        msg += ` ${skipped.length} dilewat. ${skipped[0]}`;
       }
       setImportStatus(msg);
     } catch (err) {
-      logger.error('Import social media error:', err);
-      setImportStatus('❌ Gagal membaca file. Pastikan format sesuai template.');
+      const m = err instanceof Error ? err.message : String(err);
+      setImportStatus(`❌ Gagal: ${m}`);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleAddContent = (appId: string, date: string, content: SocialMediaContent) => {
+  const handleAddContent = (appId: string, content: SocialMediaContent) => {
+    const date = content.tanggalUpload;
     setApps(
       apps.map((app) => {
         if (app.id !== appId) return app;
@@ -352,11 +362,13 @@ export const SocialMediaAnalysis = ({
       }),
     );
     setShowAddModal(false);
+    toast.success('Konten ditambahkan', `${content.platform} · ${content.jenisKonten}`);
   };
 
   return (
     <div className="space-y-8">
       <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
+        {/* Header + actions */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-rose-50 rounded-xl">
@@ -367,7 +379,7 @@ export const SocialMediaAnalysis = ({
                 Repository Konten Sosial Media
               </h3>
               <p className="text-xs text-slate-400 font-medium mt-1">
-                Database seluruh konten yang telah diposting — {allContent.length} konten
+                {allContent.length} konten · 17 metrik per post
               </p>
             </div>
           </div>
@@ -377,7 +389,7 @@ export const SocialMediaAnalysis = ({
               <Search className="w-4 h-4 text-slate-400 ml-2" />
               <input
                 type="text"
-                placeholder="Cari judul, caption, hook…"
+                placeholder="Cari caption / platform / jenis…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="bg-transparent border-none text-xs font-bold text-slate-600 outline-none px-2 py-1 w-52"
@@ -386,15 +398,13 @@ export const SocialMediaAnalysis = ({
             <select
               value={platformFilter}
               onChange={(e) => setPlatformFilter(e.target.value)}
+              aria-label="Filter platform"
               className="bg-slate-50 border border-slate-100 text-xs font-bold text-slate-600 outline-none px-4 py-2.5 rounded-2xl cursor-pointer"
             >
-              {platforms.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
+              {platforms.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
             <button
+              type="button"
               onClick={handleDownloadTemplate}
               title="Download template Excel"
               className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-xs font-black uppercase tracking-widest hover:border-emerald-400 hover:text-emerald-600 transition-all"
@@ -403,6 +413,7 @@ export const SocialMediaAnalysis = ({
               <span className="hidden sm:inline">Template</span>
             </button>
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               title="Import konten dari file Excel"
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border-2 border-emerald-200 text-emerald-700 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-100 transition-all"
@@ -418,6 +429,7 @@ export const SocialMediaAnalysis = ({
               className="hidden"
             />
             <button
+              type="button"
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
             >
@@ -441,6 +453,7 @@ export const SocialMediaAnalysis = ({
             <Upload className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div className="flex-1 text-[11px] font-bold">{importStatus}</div>
             <button
+              type="button"
               onClick={() => setImportStatus(null)}
               className="text-[10px] font-black opacity-60 hover:opacity-100"
             >
@@ -449,6 +462,7 @@ export const SocialMediaAnalysis = ({
           </div>
         )}
 
+        {/* Empty state */}
         {allContent.length === 0 ? (
           <div className="py-24 text-center">
             <div className="w-20 h-20 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
@@ -456,10 +470,11 @@ export const SocialMediaAnalysis = ({
             </div>
             <h4 className="text-lg font-black text-slate-700 mb-2">Belum ada konten</h4>
             <p className="text-sm text-slate-400 font-medium mb-8 max-w-md mx-auto">
-              Mulai dokumentasikan konten sosial media Anda. Klik tombol di bawah untuk menambahkan
+              Mulai dokumentasikan konten sosial media. Klik tombol di bawah untuk menambahkan
               konten pertama.
             </p>
             <button
+              type="button"
               onClick={() => setShowAddModal(true)}
               className="inline-flex items-center gap-2 px-8 py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
             >
@@ -467,123 +482,35 @@ export const SocialMediaAnalysis = ({
               Tambah Konten Pertama
             </button>
           </div>
+        ) : filteredContent.length === 0 ? (
+          <div className="py-20 text-center">
+            <Smartphone className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+              Tidak ada konten cocok filter
+            </p>
+          </div>
         ) : (
-          <div className="overflow-x-auto -mx-4 px-4 custom-scrollbar">
-            <table className="w-full text-left min-w-[1300px] border-collapse">
-              <thead>
-                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100">
-                  <th className="py-4 px-4 rounded-tl-2xl">Platform</th>
-                  <th className="py-4 px-4">App</th>
-                  <th className="py-4 px-4">Tanggal</th>
-                  <th className="py-4 px-4">Jenis</th>
-                  <th className="py-4 px-4 text-center">Likes</th>
-                  <th className="py-4 px-4 text-center">Comments</th>
-                  <th className="py-4 px-4 text-center">Shares</th>
-                  <th className="py-4 px-4 text-center">ER (%)</th>
-                  <th className="py-4 px-4">Hook</th>
-                  <th className="py-4 px-4">CTA</th>
-                  <th className="py-4 px-4 rounded-tr-2xl text-center">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredContent.map((item, i) => {
-                  const er = item.reach > 0 ? (item.engagement / item.reach) * 100 : 0;
-                  const fromKonten = '_fromKonten' in item && item._fromKonten;
-                  return (
-                    <tr key={`${item.appId}-${item.date}-${item.contentIndex}-${i}`} className="hover:bg-rose-50/20 transition-colors group">
-                      <td className="py-5 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-full uppercase tracking-wider">
-                            {item.platform}
-                          </span>
-                          {fromKonten && (
-                            <span
-                              title="Disinkronisasi dari Skrip Konten (status published)"
-                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[8px] font-black rounded-md uppercase tracking-widest border border-indigo-100"
-                            >
-                              <Layers className="w-2.5 h-2.5" />
-                              Konten
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-5 px-4 text-[10px] font-bold text-slate-500 uppercase">
-                        {item.appName}
-                      </td>
-                      <td className="py-5 px-4 text-[11px] font-black text-slate-700">
-                        {item.date ? format(new Date(item.date), 'dd MMM yyyy') : '-'}
-                      </td>
-                      <td className="py-5 px-4">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">
-                          {item.contentType}
-                        </span>
-                      </td>
-                      <td className="py-5 px-4 text-[11px] font-bold text-slate-700 text-center">
-                        {formatNumber(item.likes || 0)}
-                      </td>
-                      <td className="py-5 px-4 text-[11px] font-bold text-slate-700 text-center">
-                        {formatNumber(item.comments || 0)}
-                      </td>
-                      <td className="py-5 px-4 text-[11px] font-bold text-slate-700 text-center">
-                        {formatNumber(item.shares || 0)}
-                      </td>
-                      <td className="py-5 px-4 text-center">
-                        <span
-                          className={cn(
-                            'text-[10px] font-black px-2 py-1 rounded-lg',
-                            er > 5 ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500',
-                          )}
-                        >
-                          {er.toFixed(2)}%
-                        </span>
-                      </td>
-                      <td className="py-5 px-4 text-[11px] text-slate-600 max-w-xs truncate" title={item.hook}>
-                        {item.hook || '-'}
-                      </td>
-                      <td className="py-5 px-4 text-[11px] font-bold text-indigo-600 max-w-[150px] truncate" title={item.cta}>
-                        {item.cta || '-'}
-                      </td>
-                      <td className="py-5 px-4">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => handleDateClick(item.date)}
-                            className="p-2 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
-                            title="Lihat di Kalender Marsel"
-                          >
-                            <Calendar className="w-4 h-4" />
-                          </button>
-                          {fromKonten ? (
-                            <button
-                              onClick={() => setActiveTab('konten')}
-                              className="p-2 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
-                              title="Edit di Skrip Konten"
-                            >
-                              <Layers className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleDelete(item.appId, item.date, item.contentIndex)}
-                              className="p-2 hover:bg-rose-50 rounded-lg transition-colors text-slate-400 hover:text-rose-600"
-                              title="Hapus konten"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {filteredContent.length === 0 && (
-              <div className="py-20 text-center">
-                <Smartphone className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-                  Tidak ada konten yang cocok dengan filter
-                </p>
-              </div>
-            )}
+          // ===================== CARD GRID =====================
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredContent.map((item, i) => {
+              const er = item.jangkauan > 0
+                ? (item.jumlahBersihInteraksi / item.jangkauan) * 100
+                : 0;
+              return (
+                <ContentCard
+                  key={`${item.appId}-${item.date}-${item.contentIndex}-${i}`}
+                  item={item}
+                  er={er}
+                  onDateClick={() => handleDateClick(item.tanggalUpload || item.date)}
+                  onEditKonten={() => setActiveTab('konten')}
+                  onDelete={
+                    item._fromKonten
+                      ? null
+                      : () => handleDelete(item.appId, item.date, item.contentIndex)
+                  }
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -599,17 +526,180 @@ export const SocialMediaAnalysis = ({
   );
 };
 
-// --- Add Content Modal ---
+// ============================================================
+// ContentCard — kartu per post dengan 17 metrik tergrup
+// ============================================================
+interface ContentCardProps {
+  item: SocialMediaContent & {
+    appName: string;
+    date: string;
+    _fromKonten: boolean;
+  };
+  er: number;
+  onDateClick: () => void;
+  onEditKonten: () => void;
+  onDelete: (() => void) | null;
+}
 
+const ContentCard = ({ item, er, onDateClick, onEditKonten, onDelete }: ContentCardProps) => {
+  const isFromKonten = item._fromKonten;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2 }}
+      className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+    >
+      {/* Card header */}
+      <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-3 border-b border-slate-50">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="px-2.5 py-1 bg-rose-100 text-rose-700 text-[9px] font-black rounded-md uppercase tracking-widest">
+            {item.platform}
+          </span>
+          <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-[9px] font-black rounded-md uppercase tracking-widest">
+            {item.jenisKonten}
+          </span>
+          {isFromKonten && (
+            <span
+              title="Disinkronisasi dari Skrip Konten"
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[8px] font-black rounded-md uppercase tracking-widest border border-indigo-100"
+            >
+              <Layers className="w-2.5 h-2.5" />
+              Skrip
+            </span>
+          )}
+          <span
+            className={cn(
+              'px-2 py-1 text-[9px] font-black rounded-md uppercase tracking-widest',
+              er > 5 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500',
+            )}
+            title="Engagement Rate (interaksi / jangkauan)"
+          >
+            ER {er.toFixed(2)}%
+          </span>
+        </div>
+      </div>
+
+      {/* Card body */}
+      <div className="px-5 py-4 space-y-4">
+        <div>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            App · {item.appName}
+          </p>
+          <p className="text-xs font-bold text-slate-700 line-clamp-2">
+            {item.caption || <span className="text-slate-300">(tanpa caption)</span>}
+          </p>
+        </div>
+
+        {/* Section: Reach */}
+        <CardMetricGroup
+          label="Reach"
+          metrics={[
+            { label: 'Tayangan', value: formatNumber(item.tayangan) },
+            { label: 'Jangkauan', value: formatNumber(item.jangkauan) },
+            { label: 'Pemirsa', value: formatNumber(item.pemirsa) },
+          ]}
+        />
+
+        {/* Section: Engagement */}
+        <CardMetricGroup
+          label="Engagement"
+          metrics={[
+            { label: 'Bersih Interaksi', value: formatNumber(item.jumlahBersihInteraksi) },
+            { label: 'Suka & Tanggapan', value: formatNumber(item.sukaTanggapan) },
+            { label: 'Komen', value: formatNumber(item.komen) },
+            { label: 'Share', value: formatNumber(item.share) },
+            { label: 'Save', value: formatNumber(item.save) },
+          ]}
+        />
+
+        {/* Section: Konversi & Watch */}
+        <CardMetricGroup
+          label="Konversi & Tonton"
+          metrics={[
+            { label: 'Klik Tautan', value: formatNumber(item.klikTautan) },
+            { label: 'Balasan', value: formatNumber(item.balasan) },
+            { label: 'Mengikuti', value: formatNumber(item.mengikuti) },
+            { label: 'Waktu Tonton', value: formatDuration(item.waktuTonton) },
+            { label: 'Rata-rata', value: formatDuration(item.rataRataWaktuTonton) },
+          ]}
+        />
+      </div>
+
+      {/* Card footer */}
+      <div className="px-5 py-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+          {item.tanggalUpload
+            ? format(new Date(item.tanggalUpload), 'dd MMM yyyy')
+            : '-'}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onDateClick}
+            className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
+            title="Lihat di Kalender"
+          >
+            <Calendar className="w-4 h-4" />
+          </button>
+          {isFromKonten ? (
+            <button
+              type="button"
+              onClick={onEditKonten}
+              className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
+              title="Edit di Skrip Konten"
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+          ) : onDelete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="p-1.5 hover:bg-rose-50 rounded-lg transition-colors text-slate-400 hover:text-rose-600"
+              title="Hapus konten"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const CardMetricGroup = ({
+  label, metrics,
+}: { label: string; metrics: Array<{ label: string; value: string }> }) => (
+  <div>
+    <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">
+      {label}
+    </p>
+    <div className="grid grid-cols-3 gap-2">
+      {metrics.map((m) => (
+        <div key={m.label} className="bg-slate-50 rounded-xl px-2 py-1.5">
+          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-tight">
+            {m.label}
+          </p>
+          <p className="text-xs font-black text-slate-900 tabular-nums leading-tight mt-0.5">
+            {m.value}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ============================================================
+// AddContentModal — form 17 field
+// ============================================================
 interface AddModalProps {
   apps: AppData[];
   onClose: () => void;
-  onSave: (appId: string, date: string, content: SocialMediaContent) => void;
+  onSave: (appId: string, content: SocialMediaContent) => void;
 }
 
 const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
   const [appId, setAppId] = useState<string>(apps[0]?.id || '');
-  const [date, setDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [content, setContent] = useState<SocialMediaContent>(emptyContent());
   const toast = useToast();
 
@@ -623,11 +713,11 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
       toast.warning('Form belum lengkap', 'Pilih aplikasi dulu.');
       return;
     }
-    if (!date) {
-      toast.warning('Form belum lengkap', 'Pilih tanggal dulu.');
+    if (!content.tanggalUpload) {
+      toast.warning('Form belum lengkap', 'Tanggal upload wajib diisi.');
       return;
     }
-    onSave(appId, date, content);
+    onSave(appId, content);
   };
 
   return (
@@ -642,7 +732,7 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
           <div>
             <h3 className="text-lg font-black text-slate-900 tracking-tight">Tambah Konten Sosial Media</h3>
             <p className="text-xs text-slate-400 font-medium mt-1">
-              Catat performa konten yang sudah di-post.
+              17 metrik per post — semua angka dalam unit aslinya.
             </p>
           </div>
           <button
@@ -656,8 +746,9 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
         </div>
 
         <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6">
-          {/* App & Tanggal */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Identitas */}
+          <SectionLabel>Identitas</SectionLabel>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Aplikasi">
               <select
                 value={appId}
@@ -665,97 +756,37 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
                 required
                 className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
               >
-                {apps.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
+                {apps.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </Field>
-            <Field label="Tanggal Post">
+            <Field label="Tanggal Upload">
               <input
                 type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+                value={content.tanggalUpload}
+                onChange={(e) => update('tanggalUpload', e.target.value)}
                 required
                 className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
               />
             </Field>
-            <Field label="Jam Posting">
-              <input
-                type="time"
-                value={content.postingTime}
-                onChange={(e) => update('postingTime', e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
-              />
-            </Field>
-          </div>
-
-          {/* Platform + Jenis + Objective */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Platform">
               <select
                 value={content.platform}
                 onChange={(e) => update('platform', e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
               >
-                <option value="Instagram">Instagram</option>
-                <option value="TikTok">TikTok</option>
-                <option value="Facebook">Facebook</option>
-                <option value="Twitter/X">Twitter/X</option>
-                <option value="YouTube">YouTube</option>
-                <option value="LinkedIn">LinkedIn</option>
+                {PLATFORM_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
             </Field>
             <Field label="Jenis Konten">
               <select
-                value={content.contentType}
-                onChange={(e) => update('contentType', e.target.value)}
+                value={content.jenisKonten}
+                onChange={(e) => update('jenisKonten', e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
               >
-                <option value="Feed">Feed</option>
-                <option value="Reels">Reels</option>
-                <option value="Story">Story</option>
-                <option value="Video">Video</option>
-                <option value="Shorts">Shorts</option>
-                <option value="Live">Live</option>
-                <option value="Carousel">Carousel</option>
-              </select>
-            </Field>
-            <Field label="Objective">
-              <select
-                value={content.objective}
-                onChange={(e) => update('objective', e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
-              >
-                <option value="Awareness">Awareness</option>
-                <option value="Engagement">Engagement</option>
-                <option value="Traffic">Traffic</option>
-                <option value="Conversion">Conversion</option>
-                <option value="Retention">Retention</option>
+                {JENIS_KONTEN_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
             </Field>
           </div>
-
-          {/* Judul, Hook, Caption */}
-          <Field label="Judul / Hook Singkat">
-            <input
-              type="text"
-              value={content.title}
-              onChange={(e) => update('title', e.target.value)}
-              placeholder="Misal: Tips Jitu Lolos Tes BUMN 2026"
-              className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-          </Field>
-          <Field label="Hook (kalimat pembuka)">
-            <input
-              type="text"
-              value={content.hook}
-              onChange={(e) => update('hook', e.target.value)}
-              placeholder="Misal: Jangan asal ikut tes — simak dulu..."
-              className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-          </Field>
           <Field label="Caption">
             <textarea
               rows={3}
@@ -766,62 +797,63 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
             />
           </Field>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="CTA (Call To Action)">
-              <input
-                type="text"
-                value={content.cta}
-                onChange={(e) => update('cta', e.target.value)}
-                placeholder="Misal: Daftar sekarang"
-                className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
-              />
+          {/* Reach */}
+          <SectionLabel>Reach</SectionLabel>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Field label="Tayangan">
+              <NumberInput value={content.tayangan} onChange={(v) => update('tayangan', v)} />
             </Field>
-            <Field label="Topik">
-              <input
-                type="text"
-                value={content.topic}
-                onChange={(e) => update('topic', e.target.value)}
-                placeholder="Misal: Tips interview"
-                className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
-              />
+            <Field label="Jangkauan">
+              <NumberInput value={content.jangkauan} onChange={(v) => update('jangkauan', v)} />
+            </Field>
+            <Field label="Pemirsa">
+              <NumberInput value={content.pemirsa} onChange={(v) => update('pemirsa', v)} />
             </Field>
           </div>
 
-          <Field label="Link Konten">
-            <input
-              type="url"
-              value={content.link}
-              onChange={(e) => update('link', e.target.value)}
-              placeholder="https://…"
-              className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-          </Field>
+          {/* Engagement */}
+          <SectionLabel>Engagement</SectionLabel>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Field label="Jumlah Bersih Interaksi">
+              <NumberInput value={content.jumlahBersihInteraksi} onChange={(v) => update('jumlahBersihInteraksi', v)} />
+            </Field>
+            <Field label="Suka & Tanggapan">
+              <NumberInput value={content.sukaTanggapan} onChange={(v) => update('sukaTanggapan', v)} />
+            </Field>
+            <Field label="Komen">
+              <NumberInput value={content.komen} onChange={(v) => update('komen', v)} />
+            </Field>
+            <Field label="Share">
+              <NumberInput value={content.share} onChange={(v) => update('share', v)} />
+            </Field>
+            <Field label="Save">
+              <NumberInput value={content.save} onChange={(v) => update('save', v)} />
+            </Field>
+          </div>
 
-          {/* Metrik */}
-          <div className="pt-4 border-t border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-              Metrik Performa
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Field label="Reach">
-                <NumberInput value={content.reach} onChange={(v) => update('reach', v)} />
-              </Field>
-              <Field label="Engagement">
-                <NumberInput value={content.engagement} onChange={(v) => update('engagement', v)} />
-              </Field>
-              <Field label="Views">
-                <NumberInput value={content.views} onChange={(v) => update('views', v)} />
-              </Field>
-              <Field label="Likes">
-                <NumberInput value={content.likes} onChange={(v) => update('likes', v)} />
-              </Field>
-              <Field label="Comments">
-                <NumberInput value={content.comments} onChange={(v) => update('comments', v)} />
-              </Field>
-              <Field label="Shares">
-                <NumberInput value={content.shares} onChange={(v) => update('shares', v)} />
-              </Field>
-            </div>
+          {/* Konversi */}
+          <SectionLabel>Konversi</SectionLabel>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Field label="Klik Tautan">
+              <NumberInput value={content.klikTautan} onChange={(v) => update('klikTautan', v)} />
+            </Field>
+            <Field label="Balasan">
+              <NumberInput value={content.balasan} onChange={(v) => update('balasan', v)} />
+            </Field>
+            <Field label="Mengikuti">
+              <NumberInput value={content.mengikuti} onChange={(v) => update('mengikuti', v)} />
+            </Field>
+          </div>
+
+          {/* Watch time */}
+          <SectionLabel>Waktu Tonton</SectionLabel>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Waktu Tonton (detik)">
+              <NumberInput value={content.waktuTonton} onChange={(v) => update('waktuTonton', v)} />
+            </Field>
+            <Field label="Rata-rata Waktu Tonton (detik)">
+              <NumberInput value={content.rataRataWaktuTonton} onChange={(v) => update('rataRataWaktuTonton', v)} />
+            </Field>
           </div>
         </div>
 
@@ -845,8 +877,9 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
   );
 };
 
-// --- tiny UI helpers ---
-
+// ============================================================
+// UI helpers
+// ============================================================
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="space-y-2">
     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
@@ -860,10 +893,18 @@ const NumberInput = ({ value, onChange }: { value: number; onChange: (v: number)
   <input
     type="number"
     min={0}
-    value={Number.isFinite(value) ? value : 0}
+    value={value}
     onChange={(e) => onChange(Number(e.target.value) || 0)}
-    className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+    className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100 tabular-nums"
   />
+);
+
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <div className="pt-2">
+    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] border-b border-indigo-100 pb-1.5">
+      {children}
+    </p>
+  </div>
 );
 
 export default SocialMediaAnalysis;
