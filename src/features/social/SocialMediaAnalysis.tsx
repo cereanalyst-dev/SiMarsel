@@ -50,7 +50,7 @@ export const SocialMediaAnalysis = ({
   const [platformFilter, setPlatformFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Konten dari Manajemen Konten yang sudah status='published'.
+  // Konten dari Skrip Konten yang sudah status='published'.
   // Auto-load on mount + auto-refresh.
   const [publishedKonten, setPublishedKonten] = useState<ContentScript[]>([]);
 
@@ -106,7 +106,7 @@ export const SocialMediaAnalysis = ({
         appId: `konten:${s.id}`,
         appName: s.platform.toUpperCase(),
         contentIndex: 0,
-        // Marker biar UI tau ini dari Manajemen Konten
+        // Marker biar UI tau ini dari Skrip Konten
         _fromKonten: true,
         _scriptId: s.id,
       };
@@ -498,7 +498,7 @@ export const SocialMediaAnalysis = ({
                           </span>
                           {fromKonten && (
                             <span
-                              title="Disinkronisasi dari Manajemen Konten (status published)"
+                              title="Disinkronisasi dari Skrip Konten (status published)"
                               className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[8px] font-black rounded-md uppercase tracking-widest border border-indigo-100"
                             >
                               <Layers className="w-2.5 h-2.5" />
@@ -556,7 +556,7 @@ export const SocialMediaAnalysis = ({
                             <button
                               onClick={() => setActiveTab('konten')}
                               className="p-2 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
-                              title="Edit di Manajemen Konten"
+                              title="Edit di Skrip Konten"
                             >
                               <Layers className="w-4 h-4" />
                             </button>

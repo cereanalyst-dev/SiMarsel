@@ -37,7 +37,7 @@ export const PackageCalendar = ({
   const [selectedApp, setSelectedApp] = useState('');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  // Konten dari Manajemen Konten yang upload_status === 'published'
+  // Konten dari Skrip Konten yang upload_status === 'published'
   // → tampil di kalender pada scheduled_date masing-masing.
   const [publishedKonten, setPublishedKonten] = useState<ContentScript[]>([]);
   // Tasks dari Tasklist yang punya due_date — di-overlay ke kalender
@@ -232,7 +232,7 @@ export const PackageCalendar = ({
           (c) => `  - [${c.platform}] ${c.title || '(tanpa judul)'} — reach ${c.reach}, eng ${c.engagement}`,
         ),
         '',
-        `Konten Manajemen Konten published (${dayKonten.length}):`,
+        `Konten Skrip Konten published (${dayKonten.length}):`,
         ...dayKonten.slice(0, 6).map(
           (k) => `  - [${k.platform}] ${k.type}: ${k.title ?? '(tanpa judul)'}`,
         ),
@@ -602,7 +602,7 @@ ${ctxLines}`;
                       </span>
                     )}
 
-                    {/* Indicator: konten Manajemen Konten yg published di tanggal ini */}
+                    {/* Indicator: konten Skrip Konten yg published di tanggal ini */}
                     {kontenCount > 0 && (
                       <span
                         title={`${kontenCount} konten terjadwal published`}
@@ -709,7 +709,7 @@ ${ctxLines}`;
 
         {/* === Daily Detail Panel ===
             Tampil ketika user pilih tanggal & ada minimal 1: transaksi
-            paket, konten Manajemen Konten published, atau task due. Semua
+            paket, konten Skrip Konten published, atau task due. Semua
             blok di dalamnya conditional jadi panel auto-shrink kalau hari
             yang dipilih cuma punya konten/task tanpa transaksi. */}
         <AnimatePresence mode="wait">
@@ -858,7 +858,7 @@ ${ctxLines}`;
 
                 {/* === Konten Hari Ini (UNIFIED) ===
                     Gabungan: konten sosial media manual (dari socialContent
-                    di Strategi & Target) + konten Manajemen Konten (status
+                    di Strategi & Target) + konten Skrip Konten (status
                     published) untuk tanggal ini. Sebelumnya 2 section
                     terpisah, sekarang 1 panel. */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
@@ -905,7 +905,7 @@ ${ctxLines}`;
                         </div>
                       ))}
 
-                      {/* Konten dari Manajemen Konten (published) */}
+                      {/* Konten dari Skrip Konten (published) */}
                       {dayKonten.map((s) => {
                         const Icon = TYPE_ICON[s.type];
                         return (

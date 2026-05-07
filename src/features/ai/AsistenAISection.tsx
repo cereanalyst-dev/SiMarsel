@@ -197,8 +197,8 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
     const result = await createContentScript(payload);
     if (result) {
       toast.success(
-        'Disimpan ke Manajemen Konten',
-        'Status: Draft. Edit detail di tab Manajemen Konten.',
+        'Disimpan ke Skrip Konten',
+        'Status: Draft. Edit detail di tab Skrip Konten.',
       );
     } else {
       toast.error('Gagal simpan', 'Coba lagi atau cek console.');
@@ -238,7 +238,7 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
             Tanya apa saja tentang data dashboard. AI bisa analisa tren,
             kasih rekomendasi paket baru, atau buatin copy iklan — langsung
-            simpan hasil ke Manajemen Konten.
+            simpan hasil ke Skrip Konten.
           </p>
         </div>
 
@@ -409,7 +409,7 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
                 onClick={() => setActiveTab?.('konten')}
                 className="text-violet-700 underline-offset-2 hover:underline font-black"
               >
-                Manajemen Konten
+                Skrip Konten
               </button> sebagai draft.
             </p>
           </div>

@@ -141,7 +141,7 @@ export interface AvailableOptions {
 }
 
 // ============================================================
-// Content Scripts (Manajemen Konten)
+// Content Scripts (Skrip Konten)
 // ============================================================
 
 export type ContentType = 'video' | 'carousel' | 'single_post';

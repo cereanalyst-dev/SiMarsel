@@ -515,7 +515,7 @@ export const clearAllTransactionsInSupabase = async (): Promise<void> => {
 };
 
 // ============================================================
-// Content Scripts (Manajemen Konten)
+// Content Scripts (Skrip Konten)
 // ============================================================
 
 export interface ContentListFilter {
