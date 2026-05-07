@@ -1,0 +1,42 @@
+# Supabase Studio (admin UI) — basic auth + proxy ke 127.0.0.1:3000
+# Replace __DOMAIN__ → marsel-base.online
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name studio.__DOMAIN__;
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    location / {
+        return 444;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name studio.__DOMAIN__;
+
+    # SSL injected by certbot
+
+    # 2-layer auth: nginx basic auth + Studio dashboard credentials.
+    # Pastikan file /etc/nginx/.htpasswd-studio dibuat sebelum reload nginx
+    # (script 05-nginx-setup.sh akan generate kalau belum ada).
+    auth_basic "Supabase Studio (admin only)";
+    auth_basic_user_file /etc/nginx/.htpasswd-studio;
+
+    access_log /var/log/nginx/studio.access.log;
+    error_log  /var/log/nginx/studio.error.log;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

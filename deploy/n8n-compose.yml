@@ -1,0 +1,44 @@
+# n8n self-hosted — attach ke network Supabase supaya bisa konek ke
+# supabase-db lewat hostname internal docker (`supabase-db:5432`).
+#
+# Folder data n8n persistent di /opt/n8n/data (di-mount ke container).
+# Auto-restart kalau crash.
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      # Bind ke 127.0.0.1 saja — public access lewat nginx reverse proxy.
+      - "127.0.0.1:5678:5678"
+    environment:
+      # Basic auth di n8n (optional kalau nginx sudah pakai basic auth juga).
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      # Public URL (untuk webhook + email link kalau ada)
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PROTOCOL=https
+      - N8N_PORT=5678
+      - WEBHOOK_URL=https://${N8N_HOST}/
+      - GENERIC_TIMEZONE=Asia/Jakarta
+      - TZ=Asia/Jakarta
+      # Encryption key untuk credential storage di n8n
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Disable telemetry (opsional, biar gak ping ke n8n.io)
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      # Trust nginx proxy (penting agar redirect/cookie HTTPS aware)
+      - N8N_PROXY_HOPS=1
+    volumes:
+      - /opt/n8n/data:/home/node/.n8n
+    networks:
+      - supabase
+
+networks:
+  # Join ke network Supabase supaya bisa resolve `supabase-db` hostname.
+  # Network ini di-create oleh `supabase/docker-compose.yml`.
+  supabase:
+    external: true
+    name: supabase_default
