@@ -236,6 +236,27 @@ export interface PromoCodeRule {
 export type NewPromoCodeRule = Pick<PromoCodeRule, 'platform' | 'category' | 'code'>;
 
 // ============================================================
+// Insight Hasil — metrik agregat per (app, platform_sosmed, tanggal)
+// ============================================================
+export interface InsightHasil {
+  id: string;
+  user_id: string;
+  app_name: string;
+  platform: string;          // Instagram, TikTok, Facebook, dll
+  date: string;              // YYYY-MM-DD
+  tayangan: number;
+  jangkauan: number;
+  interaksi_konten: number;
+  klik_tautan: number;
+  kunjungan: number;
+  pengikut: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type NewInsightHasil = Omit<InsightHasil, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
+
+// ============================================================
 // Monthly Performance — snapshot rekap bulanan per app dari upload Excel
 // ============================================================
 export type MonthlyStatusFilter = 'all' | 'berhasil' | 'pending' | 'cancel';

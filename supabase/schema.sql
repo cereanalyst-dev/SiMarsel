@@ -392,6 +392,63 @@ create policy "tasks_write_auth"
   with check (true);
 
 -- ---------------------------------------------------------------------------
+-- 7b) insight_hasil : metrik agregat per (app, platform_sosmed, tanggal).
+--     Beda dari socialContent (yang per-post) — ini hanya rekap harian
+--     untuk dashboard "Insight Hasil". User input manual / via Excel.
+-- ---------------------------------------------------------------------------
+create table if not exists public.insight_hasil (
+  id                 uuid         primary key default uuid_generate_v4(),
+  user_id            uuid         not null references auth.users(id) on delete cascade,
+  app_name           text         not null,                            -- mis. JADIBUMN
+  platform           text         not null,                            -- Instagram, TikTok, dll
+  date               date         not null,
+  tayangan           integer      not null default 0,
+  jangkauan          integer      not null default 0,
+  interaksi_konten   integer      not null default 0,
+  klik_tautan        integer      not null default 0,
+  kunjungan          integer      not null default 0,
+  pengikut           integer      not null default 0,
+  created_at         timestamptz  not null default now(),
+  updated_at         timestamptz  not null default now(),
+  unique (user_id, app_name, platform, date)
+);
+
+create index if not exists idx_insight_hasil_user_date
+  on public.insight_hasil (user_id, date desc);
+
+drop trigger if exists trg_insight_hasil_touch on public.insight_hasil;
+create trigger trg_insight_hasil_touch
+  before update on public.insight_hasil
+  for each row execute function public.touch_updated_at();
+
+alter table public.insight_hasil enable row level security;
+
+drop policy if exists "insight_hasil_select_own" on public.insight_hasil;
+create policy "insight_hasil_select_own"
+  on public.insight_hasil for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "insight_hasil_insert_own" on public.insight_hasil;
+create policy "insight_hasil_insert_own"
+  on public.insight_hasil for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "insight_hasil_update_own" on public.insight_hasil;
+create policy "insight_hasil_update_own"
+  on public.insight_hasil for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "insight_hasil_delete_own" on public.insight_hasil;
+create policy "insight_hasil_delete_own"
+  on public.insight_hasil for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
 -- 8) kpi_divisions + kpi_cards + kpi_metrics : 3 lapis KPI.
 --    Divisi (Marketing/Sales/dsb) → Card (per orang) → Metric (per perspektif).
 --    Pencapaian = achievement / target. Score = pencapaian × bobot.

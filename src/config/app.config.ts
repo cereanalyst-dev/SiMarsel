@@ -99,8 +99,9 @@ export const MENU_ITEMS: MenuItem[] = [
     label: 'Konten Hub',
     group: 'main',
     children: [
-      { id: 'konten',   icon: FileText,      label: 'Skrip Konten' },
-      { id: 'social',   icon: MessageSquare, label: 'Analisa Sosmed' },
+      { id: 'konten',         icon: FileText,        label: 'Skrip Konten' },
+      { id: 'social',         icon: MessageSquare,   label: 'Analisa Sosmed' },
+      { id: 'insight-hasil',  icon: BarChart3,       label: 'Insight Hasil' },
     ],
   },
 
