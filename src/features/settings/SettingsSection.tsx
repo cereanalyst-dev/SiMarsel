@@ -5,7 +5,6 @@ import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../components/Toast';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
-import MarkazApiCard from './MarkazApiCard';
 
 interface UploadProgress {
   current: number;
@@ -20,14 +19,10 @@ interface SettingsSectionProps {
     append: boolean,
     onProgress?: (p: UploadProgress) => void,
   ) => void | Promise<void>;
-  detectedPlatforms?: string[];
-  onMarkazSyncComplete?: () => void | Promise<void>;
 }
 
 export const SettingsSection = ({
   onDataUpdate,
-  detectedPlatforms = [],
-  onMarkazSyncComplete,
 }: SettingsSectionProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
@@ -264,11 +259,6 @@ export const SettingsSection = ({
           )}
         </div>
       </div>
-
-      <MarkazApiCard
-        detectedPlatforms={detectedPlatforms}
-        onSyncComplete={onMarkazSyncComplete}
-      />
 
       <CreateAccountCard />
     </div>

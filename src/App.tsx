@@ -380,30 +380,6 @@ export default function App() {
     saveSelectedAppIdToLocal(selectedAppId);
   }, [selectedAppId]);
 
-  // Helper buat re-fetch data dari Supabase. Dipakai setelah upload Excel
-  // SELESAI atau setelah sync Markaz API selesai — supaya state browser
-  // langsung dapet data terbaru tanpa perlu refresh manual.
-  const refetchData = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const [quick, raw] = await Promise.all([
-        fetchOverviewStats(),
-        fetchDataFromSupabase((loaded, label) => {
-          setFetchProgress((prev) => ({
-            ...prev,
-            [label === 'transactions' ? 'tx' : 'dl']: loaded,
-          }));
-        }),
-      ]);
-      if (quick) setQuickStats(quick);
-      if (raw) {
-        setData(raw.transactions);
-        setDownloaderData(raw.downloaders);
-      }
-    } catch (err) {
-      logger.error('Refetch data gagal:', err);
-    }
-  }, [userId]);
   // Preload semua chunk tab di background setelah ~1.5s.
   // requestIdleCallback (kalau browser support) lebih aman karena cuma
   // jalan saat browser idle. Fallback ke setTimeout untuk Safari.
@@ -915,7 +891,6 @@ export default function App() {
                           setCalendarFocusDate={setCalendarFocusDate}
                           transactions={data}
                           downloaders={downloaderData}
-                          onMarkazSyncComplete={refetchData}
                         />
                       </motion.div>
                     )
@@ -1032,8 +1007,6 @@ export default function App() {
                     >
                       <SettingsSection
                         onDataUpdate={handleDataUpdate}
-                        detectedPlatforms={availableOptions.source_apps}
-                        onMarkazSyncComplete={refetchData}
                       />
                     </motion.div>
                   )}
