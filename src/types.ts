@@ -31,23 +31,25 @@ export interface Downloader {
   year_month: string;
 }
 
+// 17 metrik per post yang user input manual atau via Excel.
 export interface SocialMediaContent {
-  platform: string;
-  postingTime: string;
-  contentType: string;
-  title: string;
+  platform: string;                   // Instagram, TikTok, Facebook, YouTube, X, dll
+  jenisKonten: string;                // Reel, Feed, Story, Carousel, Video, Shorts, Live
   caption: string;
-  cta: string;
-  topic: string;
-  reach: number;
-  engagement: number;
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  hook: string;
-  link: string;
-  objective: string;
+  tanggalUpload: string;              // YYYY-MM-DD
+  tayangan: number;                   // views
+  jangkauan: number;                  // reach
+  pemirsa: number;                    // unique audience
+  jumlahBersihInteraksi: number;      // net interactions
+  sukaTanggapan: number;              // likes & reactions
+  komen: number;
+  share: number;
+  save: number;
+  klikTautan: number;                 // link clicks
+  balasan: number;                    // replies
+  mengikuti: number;                  // followers gained dari konten ini
+  waktuTonton: number;                // total watch time (detik)
+  rataRataWaktuTonton: number;        // avg watch time (detik)
 }
 
 export interface DailyData {
@@ -141,7 +143,7 @@ export interface AvailableOptions {
 }
 
 // ============================================================
-// Content Scripts (Manajemen Konten)
+// Content Scripts (Skrip Konten)
 // ============================================================
 
 export type ContentType = 'video' | 'carousel' | 'single_post';
@@ -219,6 +221,42 @@ export interface ContentScript {
 export type NewContentScript = Omit<ContentScript, 'id' | 'created_at' | 'updated_at'>;
 
 // ============================================================
+// Promo Code Rules — user-defined mapping kode promo → kategori
+// ============================================================
+export interface PromoCodeRule {
+  id: string;
+  user_id: string;
+  platform: string;          // lowercase
+  category: 'Sales' | 'Marketing' | 'Aplikasi' | 'Live' | 'Artikel' | 'Lainnya';
+  code: string;              // normalized uppercase
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type NewPromoCodeRule = Pick<PromoCodeRule, 'platform' | 'category' | 'code'>;
+
+// ============================================================
+// Insight Hasil — metrik agregat per (app, platform_sosmed, tanggal)
+// ============================================================
+export interface InsightHasil {
+  id: string;
+  user_id: string;
+  app_name: string;
+  platform: string;          // Instagram, TikTok, Facebook, dll
+  date: string;              // YYYY-MM-DD
+  tayangan: number;
+  jangkauan: number;
+  interaksi_konten: number;
+  klik_tautan: number;
+  kunjungan: number;
+  pengikut: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type NewInsightHasil = Omit<InsightHasil, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
+
+// ============================================================
 // Monthly Performance — snapshot rekap bulanan per app dari upload Excel
 // ============================================================
 export type MonthlyStatusFilter = 'all' | 'berhasil' | 'pending' | 'cancel';
@@ -293,7 +331,10 @@ export interface KpiCard {
   division_id: string | null;       // nullable supaya legacy data tetap aman
   name: string;
   description: string | null;
+  period_year: number | null;       // mis. 2026
+  period_month: number | null;      // 1-12, atau null untuk KPI tahunan
   position: number;
+  is_leader: boolean;               // true = card untuk leader divisi (1 per divisi+periode)
   created_at: string;
   updated_at: string;
 }

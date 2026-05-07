@@ -159,62 +159,55 @@ create policy "downloaders_write_auth"
   with check (true);
 
 -- ---------------------------------------------------------------------------
--- 4) api_sync_state : config & status per-platform untuk auto-fetch Markaz API
---    Dipakai oleh cron Vercel (jam 12:00 & 23:59 WIB) + tombol "Fetch Sekarang"
---    di Settings. Cron jalan server-side pakai service_role key, jadi RLS
---    dibuat per-user supaya dashboard cuma lihat row miliknya sendiri.
+-- 4) promo_code_rules : mapping user-defined kode promo → kategori per platform
+--    Dipakai classifyPromo(): cek table dulu (exact match by normalized code),
+--    fallback ke regex hardcoded di src/lib/promoRules.ts kalau gak ketemu.
+--    Kode disimpan sudah ter-normalize (uppercase, no special chars).
 -- ---------------------------------------------------------------------------
-create table if not exists public.api_sync_state (
-  id                  uuid         primary key default uuid_generate_v4(),
-  user_id             uuid         not null references auth.users(id) on delete cascade,
-  platform            text         not null,                  -- lowercase: jadibumn, jadipolisi, ...
-  enabled             boolean      not null default true,
-  last_run_at         timestamptz,                            -- kapan cron/manual fetch dijalankan
-  last_synced_date    date,                                   -- TANGGAL DATA terakhir yang di-fetch (parameter date ke API)
-  last_status         text,                                   -- 'success' | 'error'
-  last_error          text,
-  last_tx_inserted    integer      not null default 0,
-  last_dl_total       integer      not null default 0,
-  created_at          timestamptz  not null default now(),
-  updated_at          timestamptz  not null default now(),
-  unique (user_id, platform)
+create table if not exists public.promo_code_rules (
+  id          uuid         primary key default uuid_generate_v4(),
+  user_id     uuid         not null references auth.users(id) on delete cascade,
+  platform    text         not null,                                 -- lowercase: cerebrum, jadiasn, ...
+  category    text         not null check (category in
+                ('Sales','Marketing','Aplikasi','Live','Artikel','Lainnya')),
+  code        text         not null,                                 -- normalized: A-Z 0-9 only
+  created_at  timestamptz  not null default now(),
+  updated_at  timestamptz  not null default now(),
+  unique (user_id, platform, code)
 );
 
--- Migration safety untuk DB yang udah ada
-alter table public.api_sync_state add column if not exists last_synced_date date;
+create index if not exists idx_promo_code_rules_user_platform
+  on public.promo_code_rules (user_id, platform);
 
-create index if not exists idx_api_sync_state_user_enabled
-  on public.api_sync_state (user_id, enabled);
-
-drop trigger if exists trg_api_sync_state_touch on public.api_sync_state;
-create trigger trg_api_sync_state_touch
-  before update on public.api_sync_state
+drop trigger if exists trg_promo_code_rules_touch on public.promo_code_rules;
+create trigger trg_promo_code_rules_touch
+  before update on public.promo_code_rules
   for each row execute function public.touch_updated_at();
 
-alter table public.api_sync_state enable row level security;
+alter table public.promo_code_rules enable row level security;
 
-drop policy if exists "api_sync_state_select_own" on public.api_sync_state;
-create policy "api_sync_state_select_own"
-  on public.api_sync_state for select
+drop policy if exists "promo_code_rules_select_own" on public.promo_code_rules;
+create policy "promo_code_rules_select_own"
+  on public.promo_code_rules for select
   to authenticated
   using (auth.uid() = user_id);
 
-drop policy if exists "api_sync_state_insert_own" on public.api_sync_state;
-create policy "api_sync_state_insert_own"
-  on public.api_sync_state for insert
+drop policy if exists "promo_code_rules_insert_own" on public.promo_code_rules;
+create policy "promo_code_rules_insert_own"
+  on public.promo_code_rules for insert
   to authenticated
   with check (auth.uid() = user_id);
 
-drop policy if exists "api_sync_state_update_own" on public.api_sync_state;
-create policy "api_sync_state_update_own"
-  on public.api_sync_state for update
+drop policy if exists "promo_code_rules_update_own" on public.promo_code_rules;
+create policy "promo_code_rules_update_own"
+  on public.promo_code_rules for update
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-drop policy if exists "api_sync_state_delete_own" on public.api_sync_state;
-create policy "api_sync_state_delete_own"
-  on public.api_sync_state for delete
+drop policy if exists "promo_code_rules_delete_own" on public.promo_code_rules;
+create policy "promo_code_rules_delete_own"
+  on public.promo_code_rules for delete
   to authenticated
   using (auth.uid() = user_id);
 
@@ -399,6 +392,63 @@ create policy "tasks_write_auth"
   with check (true);
 
 -- ---------------------------------------------------------------------------
+-- 7b) insight_hasil : metrik agregat per (app, platform_sosmed, tanggal).
+--     Beda dari socialContent (yang per-post) — ini hanya rekap harian
+--     untuk dashboard "Insight Hasil". User input manual / via Excel.
+-- ---------------------------------------------------------------------------
+create table if not exists public.insight_hasil (
+  id                 uuid         primary key default uuid_generate_v4(),
+  user_id            uuid         not null references auth.users(id) on delete cascade,
+  app_name           text         not null,                            -- mis. JADIBUMN
+  platform           text         not null,                            -- Instagram, TikTok, dll
+  date               date         not null,
+  tayangan           integer      not null default 0,
+  jangkauan          integer      not null default 0,
+  interaksi_konten   integer      not null default 0,
+  klik_tautan        integer      not null default 0,
+  kunjungan          integer      not null default 0,
+  pengikut           integer      not null default 0,
+  created_at         timestamptz  not null default now(),
+  updated_at         timestamptz  not null default now(),
+  unique (user_id, app_name, platform, date)
+);
+
+create index if not exists idx_insight_hasil_user_date
+  on public.insight_hasil (user_id, date desc);
+
+drop trigger if exists trg_insight_hasil_touch on public.insight_hasil;
+create trigger trg_insight_hasil_touch
+  before update on public.insight_hasil
+  for each row execute function public.touch_updated_at();
+
+alter table public.insight_hasil enable row level security;
+
+drop policy if exists "insight_hasil_select_own" on public.insight_hasil;
+create policy "insight_hasil_select_own"
+  on public.insight_hasil for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "insight_hasil_insert_own" on public.insight_hasil;
+create policy "insight_hasil_insert_own"
+  on public.insight_hasil for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "insight_hasil_update_own" on public.insight_hasil;
+create policy "insight_hasil_update_own"
+  on public.insight_hasil for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "insight_hasil_delete_own" on public.insight_hasil;
+create policy "insight_hasil_delete_own"
+  on public.insight_hasil for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
 -- 8) kpi_divisions + kpi_cards + kpi_metrics : 3 lapis KPI.
 --    Divisi (Marketing/Sales/dsb) → Card (per orang) → Metric (per perspektif).
 --    Pencapaian = achievement / target. Score = pencapaian × bobot.
@@ -434,8 +484,24 @@ create table if not exists public.kpi_cards (
 alter table public.kpi_cards
   add column if not exists division_id uuid references public.kpi_divisions(id) on delete cascade;
 
+-- Periode KPI — label & filter. period_month null = KPI tahunan saja.
+alter table public.kpi_cards
+  add column if not exists period_year  integer;
+alter table public.kpi_cards
+  add column if not exists period_month integer
+    check (period_month is null or (period_month between 1 and 12));
+
+-- KPI Leader: 1 leader per (user, division, periode). Leader bisa diisi
+-- metrik manual; rekap dari staff dihitung di UI.
+alter table public.kpi_cards
+  add column if not exists is_leader boolean not null default false;
+create unique index if not exists uq_kpi_cards_leader_per_division_period
+  on public.kpi_cards (user_id, division_id, period_year, period_month)
+  where is_leader = true;
+
 create index if not exists idx_kpi_cards_user_id     on public.kpi_cards (user_id);
 create index if not exists idx_kpi_cards_division_id on public.kpi_cards (division_id);
+create index if not exists idx_kpi_cards_period      on public.kpi_cards (period_year, period_month);
 
 drop trigger if exists trg_kpi_cards_touch on public.kpi_cards;
 create trigger trg_kpi_cards_touch

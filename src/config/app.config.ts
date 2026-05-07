@@ -91,7 +91,7 @@ export const MENU_ITEMS: MenuItem[] = [
   // 5b. KPI — kartu performa per orang dengan metric per perspektif
   { id: 'kpi',        icon: Gauge,           label: 'KPI',                  group: 'main' },
 
-  // 6. Group "Konten Hub" (Manajemen Konten + Analisa Sosmed — calendar
+  // 6. Group "Konten Hub" (Skrip Konten + Analisa Sosmed — calendar
   //    sudah keluar jadi standalone)
   {
     id: 'konten-group',
@@ -99,8 +99,9 @@ export const MENU_ITEMS: MenuItem[] = [
     label: 'Konten Hub',
     group: 'main',
     children: [
-      { id: 'konten',   icon: FileText,      label: 'Manajemen Konten' },
-      { id: 'social',   icon: MessageSquare, label: 'Analisa Sosmed' },
+      { id: 'konten',         icon: FileText,        label: 'Skrip Konten' },
+      { id: 'social',         icon: MessageSquare,   label: 'Analisa Sosmed' },
+      { id: 'insight-hasil',  icon: BarChart3,       label: 'Insight Hasil' },
     ],
   },
 

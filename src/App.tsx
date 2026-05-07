@@ -21,6 +21,8 @@ import {
   type QuickOverviewStats,
 } from './lib/dataAccess';
 import { processDownloaders, processTransactions } from './lib/dataProcessing';
+import { fetchPromoCodeRules } from './lib/promoCodeRulesClient';
+import { buildUserPromoRulesIndex, type UserPromoRulesIndex } from './lib/promoRules';
 import { COLORS } from './lib/constants';
 import { COMPANY_TAGLINE, DEFAULT_TAB } from './config/app.config';
 import type {
@@ -37,6 +39,7 @@ const PricingComparison = lazy(() => import('./features/pricing/PricingCompariso
 const PackageCalendar = lazy(() => import('./features/calendar/PackageCalendar'));
 const SocialMediaAnalysis = lazy(() => import('./features/social/SocialMediaAnalysis'));
 const ContentSection = lazy(() => import('./features/konten/ContentSection'));
+const InsightHasilSection = lazy(() => import('./features/insight/InsightHasilSection'));
 const PromoSection = lazy(() => import('./features/promo/PromoSection'));
 const BulananSection = lazy(() => import('./features/bulanan/BulananSection'));
 const AsistenAISection = lazy(() => import('./features/ai/AsistenAISection'));
@@ -57,6 +60,7 @@ const preloadAllTabs = () => {
   void import('./features/calendar/PackageCalendar');
   void import('./features/social/SocialMediaAnalysis');
   void import('./features/konten/ContentSection');
+  void import('./features/insight/InsightHasilSection');
   void import('./features/promo/PromoSection');
   void import('./features/bulanan/BulananSection');
   void import('./features/ai/AsistenAISection');
@@ -296,6 +300,7 @@ export default function App() {
     month: 'All',
     methode_name: 'All',
   });
+  const [promoRulesIndex, setPromoRulesIndex] = useState<UserPromoRulesIndex>(() => new Map());
   const [apps, setApps] = useState<AppData[]>(() => loadAppsFromLocal());
   const [selectedAppId, setSelectedAppId] = useState<string>(() =>
     loadSelectedAppIdFromLocal(loadAppsFromLocal()[0]?.id ?? '1'),
@@ -324,6 +329,21 @@ export default function App() {
       active = false;
     };
   }, [userId]);
+
+  // Pull user-defined kode promo rules. Re-callable lewat reloadPromoRules()
+  // setelah user edit di drawer.
+  const reloadPromoRules = useCallback(async () => {
+    if (!userId) {
+      setPromoRulesIndex(new Map());
+      return;
+    }
+    const rules = await fetchPromoCodeRules(userId);
+    setPromoRulesIndex(buildUserPromoRulesIndex(rules));
+  }, [userId]);
+
+  useEffect(() => {
+    void reloadPromoRules();
+  }, [reloadPromoRules]);
 
   // Auto-sync app cards dari source_app yang ada di DB (transactions + downloaders).
   // Daftar platform di Strategi & Target jadi auto-derived — user cuma perlu
@@ -380,30 +400,6 @@ export default function App() {
     saveSelectedAppIdToLocal(selectedAppId);
   }, [selectedAppId]);
 
-  // Helper buat re-fetch data dari Supabase. Dipakai setelah upload Excel
-  // SELESAI atau setelah sync Markaz API selesai — supaya state browser
-  // langsung dapet data terbaru tanpa perlu refresh manual.
-  const refetchData = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const [quick, raw] = await Promise.all([
-        fetchOverviewStats(),
-        fetchDataFromSupabase((loaded, label) => {
-          setFetchProgress((prev) => ({
-            ...prev,
-            [label === 'transactions' ? 'tx' : 'dl']: loaded,
-          }));
-        }),
-      ]);
-      if (quick) setQuickStats(quick);
-      if (raw) {
-        setData(raw.transactions);
-        setDownloaderData(raw.downloaders);
-      }
-    } catch (err) {
-      logger.error('Refetch data gagal:', err);
-    }
-  }, [userId]);
   // Preload semua chunk tab di background setelah ~1.5s.
   // requestIdleCallback (kalau browser support) lebih aman karena cuma
   // jalan saat browser idle. Fallback ke setTimeout untuk Safari.
@@ -915,7 +911,7 @@ export default function App() {
                           setCalendarFocusDate={setCalendarFocusDate}
                           transactions={data}
                           downloaders={downloaderData}
-                          onMarkazSyncComplete={refetchData}
+                          promoRulesIndex={promoRulesIndex}
                         />
                       </motion.div>
                     )
@@ -956,6 +952,17 @@ export default function App() {
                       />
                     </motion.div>
                   )}
+                  {activeTab === 'insight-hasil' && (
+                    <motion.div
+                      key="insight-hasil"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <InsightHasilSection userId={userId} apps={apps} />
+                    </motion.div>
+                  )}
                   {activeTab === 'konten' && (
                     <motion.div
                       key="konten"
@@ -984,7 +991,14 @@ export default function App() {
                     loadingRawData ? (
                       <RawDataSkeleton key="kode-promo" label="Performa Kode Promo" />
                     ) : (
-                      <PromoSection key="kode-promo" data={data} />
+                      <PromoSection
+                        key="kode-promo"
+                        data={data}
+                        userId={userId}
+                        knownPlatforms={apps.map((a) => a.name.trim().toLowerCase()).filter(Boolean)}
+                        promoRulesIndex={promoRulesIndex}
+                        onPromoRulesChanged={reloadPromoRules}
+                      />
                     )
                   )}
                   {activeTab === 'bulanan' && (
@@ -1032,8 +1046,6 @@ export default function App() {
                     >
                       <SettingsSection
                         onDataUpdate={handleDataUpdate}
-                        detectedPlatforms={availableOptions.source_apps}
-                        onMarkazSyncComplete={refetchData}
                       />
                     </motion.div>
                   )}

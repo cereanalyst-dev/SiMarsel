@@ -18,6 +18,13 @@ export const PROMO_CATEGORIES: PromoCategory[] = [
   'Sales', 'Marketing', 'Aplikasi', 'Live', 'Lainnya', 'Artikel', 'Tanpa Kode',
 ];
 
+// Kategori yang bisa di-assign user di UI Setting Kode Promo.
+// 'Tanpa Kode' di-exclude karena itu auto-classification (no code → Tanpa Kode).
+export type AssignablePromoCategory = Exclude<PromoCategory, 'Tanpa Kode'>;
+export const ASSIGNABLE_PROMO_CATEGORIES: AssignablePromoCategory[] = [
+  'Sales', 'Marketing', 'Aplikasi', 'Live', 'Artikel', 'Lainnya',
+];
+
 const PROMO_RULES: Record<string, Array<{ category: PromoCategory; pattern: RegExp }>> = {
   cerebrum: [
     { category: 'Sales',     pattern: /(ADMINCEREBRUM|LOLOSUTBK|MEMBERCEREBRUM|TELEGRAMCEREBRUM|PROMOCEREBRUM|DISKONCEREBRUM)/ },
@@ -119,25 +126,51 @@ export function parsePromoCode(rawCode: string | null | undefined): ParsedPromo 
 }
 
 // ==============================================================
-// Klasifikasi 1 kode (string) → kategori, berdasar regex per platform.
-// Order penting: Sales > Marketing > Artikel > Aplikasi > Live > Lainnya.
-// First match wins (sesuai logic IFS di Sheets).
+// User-defined rules index. Key = `${platform_lower}:${normalizedCode}`
+// → PromoCategory. Dipakai classifyPromo() biar user bisa override
+// klasifikasi via UI Setting Kode Promo.
+// ==============================================================
+
+export type UserPromoRulesIndex = Map<string, PromoCategory>;
+
+export function buildUserPromoRulesIndex(
+  rules: Array<{ platform: string; code: string; category: PromoCategory }>,
+): UserPromoRulesIndex {
+  const map: UserPromoRulesIndex = new Map();
+  for (const r of rules) {
+    const key = `${r.platform.toLowerCase()}:${normalizePromoKey(r.code)}`;
+    map.set(key, r.category);
+  }
+  return map;
+}
+
+// ==============================================================
+// Klasifikasi 1 kode (string) → kategori.
+// Urutan: 1) user rules (exact match) 2) regex hardcoded per platform
+//         3) 'Lainnya'.
 // ==============================================================
 
 export function classifyPromo(
   rawCode: string | null | undefined,
   platformKey: string,
+  userRulesIndex?: UserPromoRulesIndex,
 ): PromoCategory {
   const parsed = parsePromoCode(rawCode);
   if (parsed.isEmpty) return 'Tanpa Kode';
 
   const platform = platformKey.toLowerCase();
+  const checkStr = parsed.mainCode ?? '';
+
+  // 1) User rules first
+  if (userRulesIndex && checkStr) {
+    const userCat = userRulesIndex.get(`${platform}:${checkStr}`);
+    if (userCat) return userCat;
+  }
+
+  // 2) Hardcoded regex per platform
   const rules = PROMO_RULES[platform];
   if (!rules) return 'Lainnya';
 
-  // Test against normalized mainCode (no spasi/dash/dot, all uppercase).
-  // Pattern regex sudah uppercase, jadi match lebih konsisten.
-  const checkStr = parsed.mainCode ?? '';
   for (const rule of rules) {
     if (rule.pattern.test(checkStr)) return rule.category;
   }

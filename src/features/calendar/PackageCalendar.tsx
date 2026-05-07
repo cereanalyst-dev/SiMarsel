@@ -37,7 +37,7 @@ export const PackageCalendar = ({
   const [selectedApp, setSelectedApp] = useState('');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  // Konten dari Manajemen Konten yang upload_status === 'published'
+  // Konten dari Skrip Konten yang upload_status === 'published'
   // → tampil di kalender pada scheduled_date masing-masing.
   const [publishedKonten, setPublishedKonten] = useState<ContentScript[]>([]);
   // Tasks dari Tasklist yang punya due_date — di-overlay ke kalender
@@ -229,10 +229,10 @@ export const PackageCalendar = ({
         '',
         `Konten social media manual (${daySocialContent.length}):`,
         ...daySocialContent.slice(0, 6).map(
-          (c) => `  - [${c.platform}] ${c.title || '(tanpa judul)'} — reach ${c.reach}, eng ${c.engagement}`,
+          (c) => `  - [${c.platform}] ${c.jenisKonten} — jangkauan ${c.jangkauan}, interaksi ${c.jumlahBersihInteraksi}`,
         ),
         '',
-        `Konten Manajemen Konten published (${dayKonten.length}):`,
+        `Konten Skrip Konten published (${dayKonten.length}):`,
         ...dayKonten.slice(0, 6).map(
           (k) => `  - [${k.platform}] ${k.type}: ${k.title ?? '(tanpa judul)'}`,
         ),
@@ -602,7 +602,7 @@ ${ctxLines}`;
                       </span>
                     )}
 
-                    {/* Indicator: konten Manajemen Konten yg published di tanggal ini */}
+                    {/* Indicator: konten Skrip Konten yg published di tanggal ini */}
                     {kontenCount > 0 && (
                       <span
                         title={`${kontenCount} konten terjadwal published`}
@@ -709,7 +709,7 @@ ${ctxLines}`;
 
         {/* === Daily Detail Panel ===
             Tampil ketika user pilih tanggal & ada minimal 1: transaksi
-            paket, konten Manajemen Konten published, atau task due. Semua
+            paket, konten Skrip Konten published, atau task due. Semua
             blok di dalamnya conditional jadi panel auto-shrink kalau hari
             yang dipilih cuma punya konten/task tanpa transaksi. */}
         <AnimatePresence mode="wait">
@@ -858,7 +858,7 @@ ${ctxLines}`;
 
                 {/* === Konten Hari Ini (UNIFIED) ===
                     Gabungan: konten sosial media manual (dari socialContent
-                    di Strategi & Target) + konten Manajemen Konten (status
+                    di Strategi & Target) + konten Skrip Konten (status
                     published) untuk tanggal ini. Sebelumnya 2 section
                     terpisah, sekarang 1 panel. */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
@@ -887,25 +887,24 @@ ${ctxLines}`;
                               <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                                 Manual
                               </span>
-                              <span className="text-[8px] font-bold text-slate-400">{content.postingTime} WIB</span>
+                              <span className="text-[8px] font-bold text-slate-400">{content.jenisKonten}</span>
                             </div>
                           </div>
-                          <p className="text-[11px] font-bold text-slate-700 mb-2">{content.title || 'Tanpa Judul'}</p>
-                          <p className="text-[10px] text-slate-500 mb-3 line-clamp-2">{content.caption}</p>
+                          <p className="text-[10px] text-slate-500 mb-3 line-clamp-3">{content.caption || '(tanpa caption)'}</p>
                           <div className="grid grid-cols-3 gap-4 mb-2">
-                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Reach</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.reach)}</p></div>
-                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Eng</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.engagement)}</p></div>
-                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Views</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.views)}</p></div>
+                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Tayangan</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.tayangan)}</p></div>
+                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Jangkauan</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.jangkauan)}</p></div>
+                            <div><p className="text-[7px] font-bold text-slate-400 uppercase">Interaksi</p><p className="text-[10px] font-black text-slate-900">{formatNumber(content.jumlahBersihInteraksi)}</p></div>
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Type: {content.contentType}</span>
-                            {content.cta && <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">CTA: {content.cta}</span>}
-                            <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Obj: {content.objective}</span>
+                            <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Suka: {formatNumber(content.sukaTanggapan)}</span>
+                            <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Komen: {formatNumber(content.komen)}</span>
+                            <span className="text-[8px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-100">Share: {formatNumber(content.share)}</span>
                           </div>
                         </div>
                       ))}
 
-                      {/* Konten dari Manajemen Konten (published) */}
+                      {/* Konten dari Skrip Konten (published) */}
                       {dayKonten.map((s) => {
                         const Icon = TYPE_ICON[s.type];
                         return (
