@@ -21,6 +21,8 @@ import {
   type QuickOverviewStats,
 } from './lib/dataAccess';
 import { processDownloaders, processTransactions } from './lib/dataProcessing';
+import { fetchPromoCodeRules } from './lib/promoCodeRulesClient';
+import { buildUserPromoRulesIndex, type UserPromoRulesIndex } from './lib/promoRules';
 import { COLORS } from './lib/constants';
 import { COMPANY_TAGLINE, DEFAULT_TAB } from './config/app.config';
 import type {
@@ -296,6 +298,7 @@ export default function App() {
     month: 'All',
     methode_name: 'All',
   });
+  const [promoRulesIndex, setPromoRulesIndex] = useState<UserPromoRulesIndex>(() => new Map());
   const [apps, setApps] = useState<AppData[]>(() => loadAppsFromLocal());
   const [selectedAppId, setSelectedAppId] = useState<string>(() =>
     loadSelectedAppIdFromLocal(loadAppsFromLocal()[0]?.id ?? '1'),
@@ -324,6 +327,21 @@ export default function App() {
       active = false;
     };
   }, [userId]);
+
+  // Pull user-defined kode promo rules. Re-callable lewat reloadPromoRules()
+  // setelah user edit di drawer.
+  const reloadPromoRules = useCallback(async () => {
+    if (!userId) {
+      setPromoRulesIndex(new Map());
+      return;
+    }
+    const rules = await fetchPromoCodeRules(userId);
+    setPromoRulesIndex(buildUserPromoRulesIndex(rules));
+  }, [userId]);
+
+  useEffect(() => {
+    void reloadPromoRules();
+  }, [reloadPromoRules]);
 
   // Auto-sync app cards dari source_app yang ada di DB (transactions + downloaders).
   // Daftar platform di Strategi & Target jadi auto-derived — user cuma perlu
@@ -891,6 +909,7 @@ export default function App() {
                           setCalendarFocusDate={setCalendarFocusDate}
                           transactions={data}
                           downloaders={downloaderData}
+                          promoRulesIndex={promoRulesIndex}
                         />
                       </motion.div>
                     )
@@ -959,7 +978,14 @@ export default function App() {
                     loadingRawData ? (
                       <RawDataSkeleton key="kode-promo" label="Performa Kode Promo" />
                     ) : (
-                      <PromoSection key="kode-promo" data={data} />
+                      <PromoSection
+                        key="kode-promo"
+                        data={data}
+                        userId={userId}
+                        knownPlatforms={apps.map((a) => a.name.trim().toLowerCase()).filter(Boolean)}
+                        promoRulesIndex={promoRulesIndex}
+                        onPromoRulesChanged={reloadPromoRules}
+                      />
                     )
                   )}
                   {activeTab === 'bulanan' && (

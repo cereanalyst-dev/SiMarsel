@@ -1,19 +1,24 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-  Calendar, Layers, Search, Smartphone, Tag, TrendingUp, Users,
+  Calendar, Layers, Search, Settings, Smartphone, Tag, TrendingUp, Users,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import {
   buildPromoDisplayKey, classifyPromo, parsePromoCode,
   PROMO_CATEGORIES, PROMO_CATEGORY_TONE,
-  type PromoCategory,
+  type PromoCategory, type UserPromoRulesIndex,
 } from '../../lib/promoRules';
+import PromoCodeSettingsDrawer from './PromoCodeSettingsDrawer';
 import type { Transaction } from '../../types';
 
 interface Props {
   data: Transaction[];
+  userId?: string | null;
+  knownPlatforms?: string[];
+  promoRulesIndex?: UserPromoRulesIndex;
+  onPromoRulesChanged?: () => void | Promise<void>;
 }
 
 const MONTH_NAMES = [
@@ -21,12 +26,19 @@ const MONTH_NAMES = [
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ];
 
-export const PromoSection = ({ data }: Props) => {
+export const PromoSection = ({
+  data,
+  userId,
+  knownPlatforms = [],
+  promoRulesIndex,
+  onPromoRulesChanged,
+}: Props) => {
   const [appFilter, setAppFilter] = useState<string>('All');
   const [yearFilter, setYearFilter] = useState<string>('All');
   const [monthFilter, setMonthFilter] = useState<string>('All');
   const [categoryFilter, setCategoryFilter] = useState<PromoCategory | 'All'>('All');
   const [search, setSearch] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Daftar app + year yang ada di data
   const allApps = useMemo(() => {
@@ -80,7 +92,7 @@ export const PromoSection = ({ data }: Props) => {
 
     filteredTx.forEach((t) => {
       const parsed = parsePromoCode(t.promo_code);
-      const cat = classifyPromo(t.promo_code, t.source_app || '');
+      const cat = classifyPromo(t.promo_code, t.source_app || '', promoRulesIndex);
       const rev = Number(t.revenue) || 0;
       totals[cat].count += 1;
       totals[cat].revenue += rev;
@@ -110,7 +122,7 @@ export const PromoSection = ({ data }: Props) => {
         pct: grandTotalRevenue > 0 ? (resRevenue / grandTotalRevenue) * 100 : 0,
       },
     };
-  }, [filteredTx]);
+  }, [filteredTx, promoRulesIndex]);
 
   // ============================================================
   // Aggregate per kode unik (Tabel 2: Rekap Per Kode Promo)
@@ -126,7 +138,7 @@ export const PromoSection = ({ data }: Props) => {
     filteredTx.forEach((t) => {
       const parsed = parsePromoCode(t.promo_code);
       const key = buildPromoDisplayKey(parsed);
-      const cat = classifyPromo(t.promo_code, t.source_app || '');
+      const cat = classifyPromo(t.promo_code, t.source_app || '', promoRulesIndex);
       if (!acc[key]) acc[key] = { key, category: cat, count: 0, revenue: 0 };
       acc[key].count += 1;
       acc[key].revenue += Number(t.revenue) || 0;
@@ -142,7 +154,7 @@ export const PromoSection = ({ data }: Props) => {
       rows = rows.filter((r) => r.key.includes(q));
     }
     return rows.sort((a, b) => b.revenue - a.revenue);
-  }, [filteredTx, categoryFilter, search]);
+  }, [filteredTx, categoryFilter, search, promoRulesIndex]);
 
   // ============================================================
   // Detail search — saat user search, tampil breakdown per app
@@ -205,7 +217,23 @@ export const PromoSection = ({ data }: Props) => {
             Kode auto di-normalize (huruf besar/kecil/spasi/dash dianggap sama).
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 rounded-xl text-[11px] font-black text-white uppercase tracking-widest transition-colors self-start md:self-end"
+        >
+          <Settings className="w-3.5 h-3.5" />
+          Setting Kode Promo
+        </button>
       </div>
+
+      <PromoCodeSettingsDrawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        userId={userId ?? null}
+        knownPlatforms={knownPlatforms}
+        onChanged={onPromoRulesChanged}
+      />
 
       {/* Filter bar */}
       <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">

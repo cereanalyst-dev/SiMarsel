@@ -219,6 +219,21 @@ export interface ContentScript {
 export type NewContentScript = Omit<ContentScript, 'id' | 'created_at' | 'updated_at'>;
 
 // ============================================================
+// Promo Code Rules — user-defined mapping kode promo → kategori
+// ============================================================
+export interface PromoCodeRule {
+  id: string;
+  user_id: string;
+  platform: string;          // lowercase
+  category: 'Sales' | 'Marketing' | 'Aplikasi' | 'Live' | 'Artikel' | 'Lainnya';
+  code: string;              // normalized uppercase
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type NewPromoCodeRule = Pick<PromoCodeRule, 'platform' | 'category' | 'code'>;
+
+// ============================================================
 // Monthly Performance — snapshot rekap bulanan per app dari upload Excel
 // ============================================================
 export type MonthlyStatusFilter = 'all' | 'berhasil' | 'pending' | 'cancel';

@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import type { AppData, Downloader, Transaction } from '../../types';
 
-import { classifyPromo, type PromoCategory } from '../../lib/promoRules';
+import { classifyPromo, type PromoCategory, type UserPromoRulesIndex } from '../../lib/promoRules';
 
 // Helper: parse "1.000" / "1,000" / "1000" → 1000.
 const parseFormattedNumber = (s: string): number => {
@@ -29,6 +29,7 @@ interface TargetSectionProps {
   // Auto-sourced dari database — tidak perlu input manual
   transactions?: Transaction[];
   downloaders?: Downloader[];
+  promoRulesIndex?: UserPromoRulesIndex;
 }
 
 export const TargetSection = ({
@@ -42,6 +43,7 @@ export const TargetSection = ({
   setCalendarFocusDate,
   transactions = [],
   downloaders = [],
+  promoRulesIndex,
 }: TargetSectionProps) => {
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
@@ -158,12 +160,12 @@ export const TargetSection = ({
       const trxId = (t.trx_id ?? '').trim();
       if (trxId) row.trxIds.add(trxId);
       // Klasifikasi promo per transaksi → tally ke kategori-nya
-      const category = classifyPromo(t.promo_code, appName);
+      const category = classifyPromo(t.promo_code, appName, promoRulesIndex);
       row.promo[category] += 1;
     });
 
     return outer;
-  }, [transactions, downloaders]);
+  }, [transactions, downloaders, promoRulesIndex]);
 
   // Helper untuk ambil actuals per app+date
   const emptyPromoCount = (): Record<PromoCategory, number> => ({

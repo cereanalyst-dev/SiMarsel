@@ -159,6 +159,59 @@ create policy "downloaders_write_auth"
   with check (true);
 
 -- ---------------------------------------------------------------------------
+-- 4) promo_code_rules : mapping user-defined kode promo → kategori per platform
+--    Dipakai classifyPromo(): cek table dulu (exact match by normalized code),
+--    fallback ke regex hardcoded di src/lib/promoRules.ts kalau gak ketemu.
+--    Kode disimpan sudah ter-normalize (uppercase, no special chars).
+-- ---------------------------------------------------------------------------
+create table if not exists public.promo_code_rules (
+  id          uuid         primary key default uuid_generate_v4(),
+  user_id     uuid         not null references auth.users(id) on delete cascade,
+  platform    text         not null,                                 -- lowercase: cerebrum, jadiasn, ...
+  category    text         not null check (category in
+                ('Sales','Marketing','Aplikasi','Live','Artikel','Lainnya')),
+  code        text         not null,                                 -- normalized: A-Z 0-9 only
+  created_at  timestamptz  not null default now(),
+  updated_at  timestamptz  not null default now(),
+  unique (user_id, platform, code)
+);
+
+create index if not exists idx_promo_code_rules_user_platform
+  on public.promo_code_rules (user_id, platform);
+
+drop trigger if exists trg_promo_code_rules_touch on public.promo_code_rules;
+create trigger trg_promo_code_rules_touch
+  before update on public.promo_code_rules
+  for each row execute function public.touch_updated_at();
+
+alter table public.promo_code_rules enable row level security;
+
+drop policy if exists "promo_code_rules_select_own" on public.promo_code_rules;
+create policy "promo_code_rules_select_own"
+  on public.promo_code_rules for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "promo_code_rules_insert_own" on public.promo_code_rules;
+create policy "promo_code_rules_insert_own"
+  on public.promo_code_rules for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "promo_code_rules_update_own" on public.promo_code_rules;
+create policy "promo_code_rules_update_own"
+  on public.promo_code_rules for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "promo_code_rules_delete_own" on public.promo_code_rules;
+create policy "promo_code_rules_delete_own"
+  on public.promo_code_rules for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
 -- 5) content_scripts : skrip konten (video/carousel/single post) per platform
 --    Multi-user collaboration: creator + assigned_to + status workflow.
 --    Field umum di kolom; field type-specific (per video/carousel/post) di
