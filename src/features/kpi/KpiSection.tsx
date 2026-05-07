@@ -9,7 +9,7 @@ import { useToast } from '../../components/Toast';
 import {
   createKpiCard, createKpiDivision, createKpiMetric,
   deleteKpiCard, deleteKpiDivision, deleteKpiMetric,
-  fetchKpiCards, fetchKpiDivisions, fetchKpiMetrics,
+  fetchKpiCards, fetchKpiDivisions, fetchKpiMetrics, fetchKpiMetricsByCardIds,
   updateKpiCard, updateKpiDivision, updateKpiMetric,
 } from '../../lib/dataAccess';
 import { getSupabase } from '../../lib/supabase';
@@ -93,6 +93,7 @@ export const KpiSection = () => {
   const [showCreateDivision, setShowCreateDivision] = useState(false);
   const [editingDivision, setEditingDivision] = useState<KpiDivision | null>(null);
   const [showCreateCard, setShowCreateCard] = useState(false);
+  const [createAsLeader, setCreateAsLeader] = useState(false);
   const [editingCard, setEditingCard] = useState<KpiCard | null>(null);
 
   // Filter periode — global, dipakai di semua level (Lapis 1 & 2).
@@ -215,6 +216,7 @@ export const KpiSection = () => {
       division_id: string | null;
       period_year: number | null;
       period_month: number | null;
+      is_leader: boolean;
     },
     existingId: string | null,
   ) => {
@@ -237,6 +239,7 @@ export const KpiSection = () => {
         period_year: payload.period_year,
         period_month: payload.period_month,
         position: 0,
+        is_leader: payload.is_leader,
       };
       const created = await createKpiCard(full);
       if (created) { toast.success('Card dibuat'); void refresh(); }
@@ -244,6 +247,7 @@ export const KpiSection = () => {
     }
     setEditingCard(null);
     setShowCreateCard(false);
+    setCreateAsLeader(false);
   };
 
   const handleDeleteCard = async (card: KpiCard) => {
@@ -340,7 +344,8 @@ export const KpiSection = () => {
           onOpenCard={(c) => setActiveCardId(c.id)}
           onEditCard={(c) => setEditingCard(c)}
           onDeleteCard={(c) => void handleDeleteCard(c)}
-          onCreateCard={() => setShowCreateCard(true)}
+          onCreateCard={() => { setCreateAsLeader(false); setShowCreateCard(true); }}
+          onCreateLeader={() => { setCreateAsLeader(true); setShowCreateCard(true); }}
         />
       ) : (
         <DivisionListView
@@ -367,7 +372,8 @@ export const KpiSection = () => {
             card={editingCard}
             divisions={divisions}
             defaultDivisionId={activeDivisionId}
-            onClose={() => { setEditingCard(null); setShowCreateCard(false); }}
+            defaultIsLeader={createAsLeader}
+            onClose={() => { setEditingCard(null); setShowCreateCard(false); setCreateAsLeader(false); }}
             onSave={(payload) => void handleSaveCard(payload, editingCard?.id ?? null)}
           />
         )}
@@ -619,7 +625,7 @@ function DivisionListView({
 // Lapis 2 — Card list (per orang dalam 1 divisi)
 // ============================================================
 function CardListView({
-  division, cards, onBack, onOpenCard, onEditCard, onDeleteCard, onCreateCard,
+  division, cards, onBack, onOpenCard, onEditCard, onDeleteCard, onCreateCard, onCreateLeader,
 }: {
   division: KpiDivision;
   cards: KpiCard[];
@@ -628,9 +634,54 @@ function CardListView({
   onEditCard: (c: KpiCard) => void;
   onDeleteCard: (c: KpiCard) => void;
   onCreateCard: () => void;
+  onCreateLeader: () => void;
 }) {
+  // Pisahkan leader vs staff. Kalau ada >1 row dgn is_leader=true (data
+  // legacy/race), pakai yang pertama; sisanya digabung ke staff.
+  const leaderCard = cards.find((c) => c.is_leader) ?? null;
+  const staffCards = cards.filter((c) => c !== leaderCard);
+
+  // Rekap dari metrics seluruh staff cards. Load on-demand 1 query.
+  const [staffMetrics, setStaffMetrics] = useState<KpiMetric[]>([]);
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (staffCards.length === 0) { setStaffMetrics([]); return; }
+    setLoadingMetrics(true);
+    void fetchKpiMetricsByCardIds(staffCards.map((c) => c.id)).then((rows) => {
+      if (active) setStaffMetrics(rows);
+    }).finally(() => {
+      if (active) setLoadingMetrics(false);
+    });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffCards.map((c) => c.id).join(',')]);
+
+  // Hitung rekap: rata-rata pencapaian dan total score, total bobot.
+  const rekap = useMemo(() => {
+    if (staffMetrics.length === 0) {
+      return { totalMetrics: 0, avgPencapaian: 0, totalScore: 0, totalBobot: 0 };
+    }
+    let sumPencapaian = 0;
+    let totalScore = 0;
+    let totalBobot = 0;
+    staffMetrics.forEach((m) => {
+      const pencapaian = calcPencapaian(m.achievement, m.target);
+      sumPencapaian += pencapaian;
+      totalBobot += m.bobot ?? 0;
+      totalScore += calcScore(pencapaian, m.bobot ?? 0);
+    });
+    return {
+      totalMetrics: staffMetrics.length,
+      avgPencapaian: sumPencapaian / staffMetrics.length,
+      totalScore,
+      totalBobot,
+    };
+  }, [staffMetrics]);
+
   return (
     <div className="space-y-4">
+      {/* Division header */}
       <div className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center gap-3">
         <button
           type="button"
@@ -644,9 +695,7 @@ function CardListView({
           <Briefcase className="w-5 h-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-            Divisi
-          </p>
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Divisi</p>
           <h2 className="text-lg font-black text-slate-900 truncate">{division.name}</h2>
           {division.description && (
             <p className="text-[11px] text-slate-500 font-medium line-clamp-1">
@@ -656,86 +705,190 @@ function CardListView({
         </div>
       </div>
 
-      {cards.length === 0 ? (
-        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
-          <UserIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-black text-slate-700 mb-1">Belum ada KPI orang</p>
-          <p className="text-xs text-slate-400 font-medium mb-4">
-            Tambahkan card untuk anggota divisi {division.name}.
-          </p>
-          <button
-            type="button"
-            onClick={onCreateCard}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest"
-          >
-            <Plus className="w-4 h-4" />
-            Buat Card
-          </button>
+      {/* Rekap statistik dari Staff KPI */}
+      <div className="bg-gradient-to-br from-emerald-50/80 via-white to-cyan-50/40 p-6 rounded-3xl border border-emerald-100">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-1 h-7 rounded-full bg-gradient-to-b from-emerald-500 to-cyan-500" />
+          <div>
+            <p className="text-[9px] font-black text-emerald-700 uppercase tracking-[0.2em] mb-0.5">
+              Rekap Staff
+            </p>
+            <h3 className="text-sm font-black text-slate-900 tracking-tight">
+              Statistik KPI Staff Divisi
+            </h3>
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cards.map((c) => (
-            <div
-              key={c.id}
-              className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative"
-            >
+        {loadingMetrics ? (
+          <p className="text-[11px] font-bold text-slate-400">Menghitung rekap…</p>
+        ) : staffCards.length === 0 ? (
+          <p className="text-[11px] font-bold text-slate-400">Belum ada staff card.</p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <RekapTile label="Jumlah Staff" value={String(staffCards.length)} />
+            <RekapTile label="Total Metrik" value={String(rekap.totalMetrics)} />
+            <RekapTile label="Avg Pencapaian" value={fmtPct(rekap.avgPencapaian)} />
+            <RekapTile label="Total Score" value={`${rekap.totalScore.toFixed(2)} / ${rekap.totalBobot.toFixed(0)}`} />
+          </div>
+        )}
+      </div>
+
+      {/* KPI Leader card */}
+      <div>
+        <p className="text-[10px] font-black text-amber-700 uppercase tracking-[0.2em] mb-2 px-1">
+          KPI Leader
+        </p>
+        {leaderCard ? (
+          <div className="group bg-white rounded-3xl border-2 border-amber-200 p-5 hover:shadow-lg transition-all relative">
+            <button type="button" onClick={() => onOpenCard(leaderCard)} className="w-full text-left">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md">
+                  <TargetIcon className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-0.5">
+                    Leader Divisi
+                  </p>
+                  <h3 className="text-lg font-black text-slate-900 truncate">{leaderCard.name}</h3>
+                </div>
+                <ChevronRight className="w-5 h-5 text-amber-400 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              {leaderCard.description && (
+                <p className="text-[11px] text-slate-500 font-medium line-clamp-2 mb-2">
+                  {leaderCard.description}
+                </p>
+              )}
+              {leaderCard.period_year != null && (
+                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                  <Calendar className="w-2.5 h-2.5" />
+                  {fmtPeriod(leaderCard.period_year, leaderCard.period_month)}
+                </span>
+              )}
+            </button>
+            <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 type="button"
-                onClick={() => onOpenCard(c)}
-                className="w-full text-left"
+                onClick={(e) => { e.stopPropagation(); onEditCard(leaderCard); }}
+                aria-label="Edit"
+                className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100 shadow-sm"
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-white flex items-center justify-center shadow-md">
-                    <UserIcon className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
-                      KPI Owner
-                    </p>
-                    <h3 className="text-base font-black text-slate-900 truncate">
-                      {c.name}
-                    </h3>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
-                </div>
-                {c.description && (
-                  <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-snug mb-2">
-                    {c.description}
-                  </p>
-                )}
-                {c.period_year != null && (
-                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-                    <Calendar className="w-2.5 h-2.5" />
-                    {fmtPeriod(c.period_year, c.period_month)}
-                  </span>
-                )}
+                <Edit2 className="w-3 h-3" />
               </button>
-
-              <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onEditCard(c); }}
-                  aria-label="Edit"
-                  className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100 shadow-sm"
-                >
-                  <Edit2 className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onDeleteCard(c); }}
-                  aria-label="Hapus"
-                  className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 shadow-sm"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDeleteCard(leaderCard); }}
+                aria-label="Hapus"
+                className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 shadow-sm"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="bg-white p-6 rounded-3xl border-2 border-dashed border-amber-200 text-center">
+            <TargetIcon className="w-7 h-7 text-amber-300 mx-auto mb-2" />
+            <p className="text-[11px] font-bold text-slate-500 mb-3">
+              Belum ada KPI Leader untuk divisi ini.
+            </p>
+            <button
+              type="button"
+              onClick={onCreateLeader}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Buat KPI Leader
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Staff cards */}
+      <div>
+        <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em] mb-2 px-1">
+          KPI Staff
+        </p>
+        {staffCards.length === 0 ? (
+          <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
+            <UserIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-black text-slate-700 mb-1">Belum ada KPI staff</p>
+            <p className="text-xs text-slate-400 font-medium mb-4">
+              Tambahkan card untuk anggota divisi {division.name}.
+            </p>
+            <button
+              type="button"
+              onClick={onCreateCard}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest"
+            >
+              <Plus className="w-4 h-4" />
+              Buat KPI Staff
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {staffCards.map((c) => (
+              <div
+                key={c.id}
+                className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative"
+              >
+                <button type="button" onClick={() => onOpenCard(c)} className="w-full text-left">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-white flex items-center justify-center shadow-md">
+                      <UserIcon className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
+                        Staff
+                      </p>
+                      <h3 className="text-base font-black text-slate-900 truncate">{c.name}</h3>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+                  </div>
+                  {c.description && (
+                    <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-snug mb-2">
+                      {c.description}
+                    </p>
+                  )}
+                  {c.period_year != null && (
+                    <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                      <Calendar className="w-2.5 h-2.5" />
+                      {fmtPeriod(c.period_year, c.period_month)}
+                    </span>
+                  )}
+                </button>
+                <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onEditCard(c); }}
+                    aria-label="Edit"
+                    className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100 shadow-sm"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onDeleteCard(c); }}
+                    aria-label="Hapus"
+                    className="p-1.5 rounded-lg bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-100 shadow-sm"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const RekapTile = ({ label, value }: { label: string; value: string }) => (
+  <div className="bg-white rounded-2xl border border-emerald-100 px-4 py-3">
+    <p className="text-[8px] font-black text-emerald-700 uppercase tracking-widest mb-1">
+      {label}
+    </p>
+    <p className="text-base font-black text-slate-900 tabular-nums leading-tight">{value}</p>
+  </div>
+);
 
 // ============================================================
 // Lapis 3 — Card detail (metric tables per perspektif)
@@ -1248,10 +1401,11 @@ function DivisionModal({ division, onClose, onSave }: {
   );
 }
 
-function CardModal({ card, divisions, defaultDivisionId, onClose, onSave }: {
+function CardModal({ card, divisions, defaultDivisionId, defaultIsLeader, onClose, onSave }: {
   card: KpiCard | null;
   divisions: KpiDivision[];
   defaultDivisionId: string | null;
+  defaultIsLeader?: boolean;
   onClose: () => void;
   onSave: (payload: {
     name: string;
@@ -1259,12 +1413,16 @@ function CardModal({ card, divisions, defaultDivisionId, onClose, onSave }: {
     division_id: string | null;
     period_year: number | null;
     period_month: number | null;
+    is_leader: boolean;
   }) => void;
 }) {
   const [name, setName] = useState(card?.name ?? '');
   const [description, setDescription] = useState(card?.description ?? '');
   const [divisionId, setDivisionId] = useState<string>(
     card?.division_id ?? defaultDivisionId ?? (divisions[0]?.id ?? ''),
+  );
+  const [isLeader, setIsLeader] = useState<boolean>(
+    card ? card.is_leader : (defaultIsLeader ?? false),
   );
   // Periode default = tahun ini, bulan ini (kalau create new). Edit pakai
   // existing data; null artinya "Tanpa Periode".
@@ -1354,6 +1512,23 @@ function CardModal({ card, divisions, defaultDivisionId, onClose, onSave }: {
             className="form-input"
           />
         </FormField>
+        <label className="flex items-start gap-3 p-3 rounded-xl border border-amber-100 bg-amber-50/60 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isLeader}
+            onChange={(e) => setIsLeader(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-amber-600"
+          />
+          <div className="flex-1">
+            <p className="text-[11px] font-black text-amber-700 uppercase tracking-widest">
+              KPI Leader Divisi
+            </p>
+            <p className="text-[10px] text-amber-600 font-medium leading-snug mt-0.5">
+              Tandai card ini sebagai KPI Leader. Hanya 1 leader per divisi & periode.
+              Sisanya otomatis jadi card Staff.
+            </p>
+          </div>
+        </label>
       </div>
       <ModalFooter
         onClose={onClose}
@@ -1363,6 +1538,7 @@ function CardModal({ card, divisions, defaultDivisionId, onClose, onSave }: {
           division_id: divisionId,
           period_year: periodYear,
           period_month: periodYear == null ? null : periodMonth,
+          is_leader: isLeader,
         })}
         disabled={!name.trim() || !divisionId}
         submitLabel={card ? 'Simpan' : 'Buat'}

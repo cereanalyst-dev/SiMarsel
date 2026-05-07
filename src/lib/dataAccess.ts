@@ -890,6 +890,26 @@ export const fetchKpiMetrics = async (cardId: string): Promise<KpiMetric[]> => {
   return (data ?? []) as KpiMetric[];
 };
 
+// Fetch metrics untuk banyak card sekaligus (1 query). Dipakai untuk
+// rekap KPI Leader dari kumpulan staff card.
+export const fetchKpiMetricsByCardIds = async (
+  cardIds: string[],
+): Promise<KpiMetric[]> => {
+  if (cardIds.length === 0) return [];
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('kpi_metrics')
+    .select('*')
+    .in('card_id', cardIds)
+    .order('position', { ascending: true });
+  if (error) {
+    logger.error('Fetch KPI metrics (bulk) gagal:', error.message);
+    return [];
+  }
+  return (data ?? []) as KpiMetric[];
+};
+
 export const createKpiMetric = async (payload: NewKpiMetric): Promise<KpiMetric | null> => {
   const supabase = getSupabase();
   if (!supabase) return null;

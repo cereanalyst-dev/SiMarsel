@@ -334,6 +334,7 @@ export interface KpiCard {
   period_year: number | null;       // mis. 2026
   period_month: number | null;      // 1-12, atau null untuk KPI tahunan
   position: number;
+  is_leader: boolean;               // true = card untuk leader divisi (1 per divisi+periode)
   created_at: string;
   updated_at: string;
 }

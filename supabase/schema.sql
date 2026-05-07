@@ -491,6 +491,14 @@ alter table public.kpi_cards
   add column if not exists period_month integer
     check (period_month is null or (period_month between 1 and 12));
 
+-- KPI Leader: 1 leader per (user, division, periode). Leader bisa diisi
+-- metrik manual; rekap dari staff dihitung di UI.
+alter table public.kpi_cards
+  add column if not exists is_leader boolean not null default false;
+create unique index if not exists uq_kpi_cards_leader_per_division_period
+  on public.kpi_cards (user_id, division_id, period_year, period_month)
+  where is_leader = true;
+
 create index if not exists idx_kpi_cards_user_id     on public.kpi_cards (user_id);
 create index if not exists idx_kpi_cards_division_id on public.kpi_cards (division_id);
 create index if not exists idx_kpi_cards_period      on public.kpi_cards (period_year, period_month);
