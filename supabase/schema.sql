@@ -708,7 +708,7 @@ create table if not exists public.target_config (
   year_month          text         not null,
   target_downloader   integer      not null default 0,
   target_sales        numeric      not null default 0,
-  target_repeat_order integer      not null default 0,
+  target_premium      integer      not null default 0,   -- jumlah user beli
   target_conversion   numeric      not null default 0,
   avg_price           numeric      not null default 0,
   created_at          timestamptz  not null default now(),

@@ -12,7 +12,7 @@ create table if not exists public.target_config (
   year_month          text         not null,   -- 'YYYY-MM'
   target_downloader   integer      not null default 0,
   target_sales        numeric      not null default 0,
-  target_repeat_order integer      not null default 0,
+  target_premium integer      not null default 0,
   target_conversion   numeric      not null default 0,
   avg_price           numeric      not null default 0,
   created_at          timestamptz  not null default now(),
@@ -50,7 +50,7 @@ create policy target_config_write
 -- ============================================================
 insert into public.target_config (
   user_id, app_name, year_month,
-  target_downloader, target_sales, target_repeat_order,
+  target_downloader, target_sales, target_premium,
   target_conversion, avg_price
 )
 select
@@ -69,6 +69,6 @@ where app->>'name' is not null
 on conflict (user_id, app_name, year_month) do update set
   target_downloader   = excluded.target_downloader,
   target_sales        = excluded.target_sales,
-  target_repeat_order = excluded.target_repeat_order,
+  target_premium = excluded.target_premium,
   target_conversion   = excluded.target_conversion,
   avg_price           = excluded.avg_price;

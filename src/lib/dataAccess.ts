@@ -982,7 +982,7 @@ export const upsertTargetConfig = async (
         year_month: yearMonth,
         target_downloader: cfg.targetDownloader || 0,
         target_sales: cfg.targetSales || 0,
-        target_repeat_order: cfg.targetRepeatOrder || 0,
+        target_premium: cfg.targetRepeatOrder || 0,   // semantik: jumlah user beli
         target_conversion: cfg.targetConversion || 0,
         avg_price: cfg.avgPrice || 0,
       },

@@ -98,7 +98,7 @@ export interface TargetConfigRow {
   year_month: string;
   target_downloader: number;
   target_sales: number;
-  target_repeat_order: number;
+  target_premium: number;       // jumlah user beli (sebelumnya: target_repeat_order)
   target_conversion: number;
   avg_price: number;
   created_at?: string;
