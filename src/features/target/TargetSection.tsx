@@ -30,6 +30,9 @@ interface TargetSectionProps {
   transactions?: Transaction[];
   downloaders?: Downloader[];
   promoRulesIndex?: UserPromoRulesIndex;
+  // Optional: force save target ke Supabase langsung (bypass debounce 800ms).
+  // Dipanggil saat user generate sheet — biar target bulanan dijamin aman.
+  onForceSave?: (apps: AppData[]) => void;
 }
 
 export const TargetSection = ({
@@ -44,6 +47,7 @@ export const TargetSection = ({
   transactions = [],
   downloaders = [],
   promoRulesIndex,
+  onForceSave,
 }: TargetSectionProps) => {
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
@@ -222,12 +226,16 @@ export const TargetSection = ({
     const newIsTargetSet = { ...(selectedApp.isTargetSet || {}) };
     newIsTargetSet[targetMonth] = true;
 
-    setApps(apps.map(a => a.id === selectedAppId ? { 
-      ...a, 
-      targetConfig: newTargetConfig, 
+    const updatedApps = apps.map(a => a.id === selectedAppId ? {
+      ...a,
+      targetConfig: newTargetConfig,
       dailyData: newDailyData,
-      isTargetSet: newIsTargetSet
-    } : a));
+      isTargetSet: newIsTargetSet,
+    } : a);
+    setApps(updatedApps);
+    // Force save langsung — bypass debounce 800ms supaya target bulanan
+    // dijamin tersimpan walau user langsung close tab / pindah menu.
+    onForceSave?.(updatedApps);
   };
 
   const updateDailyValue = (date: string, field: string, value: any) => {
@@ -276,10 +284,17 @@ export const TargetSection = ({
       ? (totalRealRepeatOrder / totalRealDownloader) * 100
       : 0;
 
-    // Selisih Sales = total real - total target (formula simpel).
-    // - Negatif → Kekurangan (real < target)
-    // - Positif → Kelebihan (real > target)
     const selisihSales = totalRealSales - (targetConfig.targetSales || 0);
+
+    const revenueAchievement = (targetConfig.targetSales || 0) > 0
+      ? (totalRealSales / targetConfig.targetSales) * 100 : 0;
+    let revenueStatusText = 'Menunggu';
+    let revenueStatusTone: 'emerald' | 'amber' | 'rose' | 'slate' = 'slate';
+    if (totalRealSales > 0) {
+      if (revenueAchievement >= 100) { revenueStatusText = 'Melebihi'; revenueStatusTone = 'emerald'; }
+      else if (revenueAchievement >= 90) { revenueStatusText = 'Mendekati'; revenueStatusTone = 'amber'; }
+      else { revenueStatusText = 'Kurang'; revenueStatusTone = 'rose'; }
+    }
 
     return {
       totalRealDownloader,
@@ -289,6 +304,9 @@ export const TargetSection = ({
       progressSales,
       progressConversion,
       selisihSales,
+      revenueAchievement,
+      revenueStatusText,
+      revenueStatusTone,
       targetConfig,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -326,9 +344,16 @@ export const TargetSection = ({
       });
     });
 
-    // Selisih Sales = total real - total target (semua platform / app)
-    // Negatif → Kekurangan, Positif → Kelebihan
     const totalSelisihSales = totalRealSales - totalTargetSales;
+
+    const salesProgress = totalTargetSales > 0 ? (totalRealSales / totalTargetSales) * 100 : 0;
+    let revenueStatusText = 'Menunggu';
+    let revenueStatusTone: 'emerald' | 'amber' | 'rose' | 'slate' = 'slate';
+    if (totalRealSales > 0) {
+      if (salesProgress >= 100) { revenueStatusText = 'Melebihi'; revenueStatusTone = 'emerald'; }
+      else if (salesProgress >= 90) { revenueStatusText = 'Mendekati'; revenueStatusTone = 'amber'; }
+      else { revenueStatusText = 'Kurang'; revenueStatusTone = 'rose'; }
+    }
 
     return {
       totalTargetDownloader,
@@ -338,8 +363,10 @@ export const TargetSection = ({
       totalTargetRepeatOrder,
       totalRealRepeatOrder,
       totalSelisihSales,
+      revenueStatusText,
+      revenueStatusTone,
       downloaderProgress: totalTargetDownloader > 0 ? (totalRealDownloader / totalTargetDownloader) * 100 : 0,
-      salesProgress: totalTargetSales > 0 ? (totalRealSales / totalTargetSales) * 100 : 0,
+      salesProgress,
       conversionProgress: totalRealDownloader > 0 ? (totalRealRepeatOrder / totalRealDownloader) * 100 : 0
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -440,78 +467,94 @@ export const TargetSection = ({
             </div>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+            {/* Total Downloader */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-all">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Progress Downloader</p>
-              <h3 className="text-xl font-black text-indigo-600">{globalSummary.downloaderProgress.toFixed(1)}%</h3>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-3 overflow-hidden">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
+              <h3 className="text-xl font-black text-indigo-600">{formatNumber(globalSummary.totalRealDownloader)}</h3>
+              <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {formatNumber(globalSummary.totalTargetDownloader)}</p>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
                 <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.downloaderProgress)}%` }} />
               </div>
+              <p className="text-[9px] font-bold text-indigo-500 mt-1">{globalSummary.downloaderProgress.toFixed(1)}% pencapaian</p>
             </div>
+
+            {/* Total Sales */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-emerald-100 transition-all">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Progress Sales</p>
-              <h3 className="text-xl font-black text-emerald-600">{globalSummary.salesProgress.toFixed(1)}%</h3>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-3 overflow-hidden">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Sales</p>
+              <h3 className="text-xl font-black text-emerald-600">{formatCurrency(globalSummary.totalRealSales)}</h3>
+              <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {formatCurrency(globalSummary.totalTargetSales)}</p>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
                 <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.salesProgress)}%` }} />
               </div>
+              <p className="text-[9px] font-bold text-emerald-500 mt-1">{globalSummary.salesProgress.toFixed(1)}% pencapaian</p>
             </div>
+
+            {/* Konversi */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-violet-100 transition-all">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Progres Konversi</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Konversi</p>
               <h3 className="text-xl font-black text-violet-600">{globalSummary.conversionProgress.toFixed(1)}%</h3>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-3 overflow-hidden">
-                <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.conversionProgress)}%` }} />
-              </div>
+              {(() => {
+                const targetConv = filteredAppsForSummary.reduce((acc, a) => acc + (a.targetConfig?.[targetMonth]?.targetConversion || 0), 0)
+                  / Math.max(1, filteredAppsForSummary.length);
+                const pct = targetConv > 0 ? (globalSummary.conversionProgress / targetConv) * 100 : 0;
+                return (
+                  <>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {targetConv.toFixed(1)}%</p>
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                      <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${Math.min(100, pct)}%` }} />
+                    </div>
+                    <p className="text-[9px] font-bold text-violet-500 mt-1">{pct.toFixed(1)}% pencapaian</p>
+                  </>
+                );
+              })()}
             </div>
+
+            {/* Status Revenue */}
             {(() => {
-              const s = globalSummary.totalSelisihSales;
-              const isSurplus = s >= 0;
+              const tone = globalSummary.revenueStatusTone;
+              const toneCls = {
+                emerald: { bg: 'bg-emerald-50 border-emerald-100', label: 'text-emerald-500', value: 'text-emerald-600', sub: 'text-emerald-500' },
+                amber:   { bg: 'bg-amber-50 border-amber-100',     label: 'text-amber-500',   value: 'text-amber-600',   sub: 'text-amber-500' },
+                rose:    { bg: 'bg-rose-50 border-rose-100',       label: 'text-rose-500',    value: 'text-rose-600',    sub: 'text-rose-500' },
+                slate:   { bg: 'bg-slate-50 border-slate-100',     label: 'text-slate-500',   value: 'text-slate-700',   sub: 'text-slate-400' },
+              }[tone];
               return (
-                <div
-                  className={cn(
-                    'p-5 rounded-3xl border shadow-sm transition-all',
-                    isSurplus
-                      ? 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100/50'
-                      : 'bg-rose-50 border-rose-100 hover:bg-rose-100/50',
-                  )}
-                >
-                  <p
-                    className={cn(
-                      'text-[9px] font-bold uppercase tracking-widest mb-2',
-                      isSurplus ? 'text-emerald-500' : 'text-rose-400',
-                    )}
-                  >
-                    {isSurplus ? 'Kelebihan Sales' : 'Kekurangan Sales'}
-                  </p>
-                  <h3
-                    className={cn(
-                      'text-xl font-black',
-                      isSurplus ? 'text-emerald-600' : 'text-rose-600',
-                    )}
-                  >
-                    {isSurplus ? '+' : '-'}
-                    {formatCurrency(Math.abs(s))}
-                  </h3>
-                  <p
-                    className={cn(
-                      'text-[8px] font-bold mt-1',
-                      isSurplus ? 'text-emerald-500' : 'text-rose-400',
-                    )}
-                  >
-                    {isSurplus ? 'Di atas target s/d hari ini' : 'Defisit s/d hari ini'}
+                <div className={cn('p-5 rounded-3xl border shadow-sm transition-all', toneCls.bg)}>
+                  <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2', toneCls.label)}>Status Revenue</p>
+                  <h3 className={cn('text-xl font-black', toneCls.value)}>{globalSummary.revenueStatusText}</h3>
+                  <p className={cn('text-[9px] font-bold mt-2', toneCls.sub)}>{globalSummary.salesProgress.toFixed(1)}% dari target</p>
+                  <p className={cn('text-[9px] font-bold mt-1', toneCls.sub)}>
+                    {globalSummary.revenueStatusText === 'Melebihi' && 'Pencapaian di atas target'}
+                    {globalSummary.revenueStatusText === 'Mendekati' && 'Hampir mencapai target'}
+                    {globalSummary.revenueStatusText === 'Kurang' && 'Masih di bawah target'}
+                    {globalSummary.revenueStatusText === 'Menunggu' && 'Belum ada data sales'}
                   </p>
                 </div>
               );
             })()}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-slate-200 transition-all">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Real Downloader</p>
-              <h3 className="text-xl font-black text-slate-900">{formatNumber(globalSummary.totalRealDownloader)}</h3>
-              <p className="text-[8px] text-slate-400 font-bold mt-1">Target: {formatNumber(globalSummary.totalTargetDownloader)}</p>
-            </div>
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-slate-200 transition-all">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Real Sales</p>
-              <h3 className="text-xl font-black text-slate-900">{formatCurrency(globalSummary.totalRealSales)}</h3>
-              <p className="text-[8px] text-slate-400 font-bold mt-1">Target: {formatCurrency(globalSummary.totalTargetSales)}</p>
-            </div>
+
+            {/* Status Target (real - target) */}
+            {(() => {
+              const s = globalSummary.totalSelisihSales;
+              const isSurplus = s >= 0;
+              return (
+                <div className={cn('p-5 rounded-3xl border shadow-sm transition-all',
+                  isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
+                  <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2',
+                    isSurplus ? 'text-emerald-500' : 'text-rose-400')}>Status Target</p>
+                  <h3 className={cn('text-xl font-black', isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
+                    {isSurplus ? '+' : '-'}{formatCurrency(Math.abs(s))}
+                  </h3>
+                  <p className={cn('text-[9px] font-bold mt-2', isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    {isSurplus ? 'Surplus dari target' : 'Defisit dari target'}
+                  </p>
+                  <p className={cn('text-[9px] font-bold mt-1', isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    Real Sales - Target Sales
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Target Recap Table */}
@@ -817,77 +860,94 @@ export const TargetSection = ({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-8"
         >
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Summary Cards — Total Downloader, Total Sales, Konversi, Status Revenue, Status Target */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {/* Total Downloader */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Progress Downloader</p>
-              <h3 className="text-xl font-black text-indigo-600">{summary.progressDownloader.toFixed(1)}%</h3>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-3 overflow-hidden">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
+              <h3 className="text-xl font-black text-indigo-600">{formatNumber(summary.totalRealDownloader)}</h3>
+              <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {formatNumber(summary.targetConfig.targetDownloader || 0)}</p>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
                 <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, summary.progressDownloader)}%` }} />
               </div>
+              <p className="text-[9px] font-bold text-indigo-500 mt-1">{summary.progressDownloader.toFixed(1)}% pencapaian</p>
             </div>
+
+            {/* Total Sales */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Progress Sales</p>
-              <h3 className="text-xl font-black text-emerald-600">{summary.progressSales.toFixed(1)}%</h3>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-3 overflow-hidden">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Sales</p>
+              <h3 className="text-xl font-black text-emerald-600">{formatCurrency(summary.totalRealSales)}</h3>
+              <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {formatCurrency(summary.targetConfig.targetSales || 0)}</p>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
                 <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, summary.progressSales)}%` }} />
               </div>
+              <p className="text-[9px] font-bold text-emerald-500 mt-1">{summary.progressSales.toFixed(1)}% pencapaian</p>
             </div>
+
+            {/* Konversi */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Progres Konversi</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Konversi</p>
               <h3 className="text-xl font-black text-violet-600">{summary.progressConversion.toFixed(1)}%</h3>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-3 overflow-hidden">
-                <div className="h-full bg-violet-500" style={{ width: `${Math.min(100, summary.progressConversion)}%` }} />
-              </div>
+              {(() => {
+                const targetConv = summary.targetConfig.targetConversion || 0;
+                const pct = targetConv > 0 ? (summary.progressConversion / targetConv) * 100 : 0;
+                return (
+                  <>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {targetConv.toFixed(1)}%</p>
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                      <div className="h-full bg-violet-500" style={{ width: `${Math.min(100, pct)}%` }} />
+                    </div>
+                    <p className="text-[9px] font-bold text-violet-500 mt-1">{pct.toFixed(1)}% pencapaian</p>
+                  </>
+                );
+              })()}
             </div>
+
+            {/* Status Revenue */}
             {(() => {
-              const s = summary.selisihSales;
-              const isSurplus = s >= 0;
+              const tone = summary.revenueStatusTone;
+              const toneCls = {
+                emerald: { bg: 'bg-emerald-50 border-emerald-100', label: 'text-emerald-500', value: 'text-emerald-600', sub: 'text-emerald-500' },
+                amber:   { bg: 'bg-amber-50 border-amber-100',     label: 'text-amber-500',   value: 'text-amber-600',   sub: 'text-amber-500' },
+                rose:    { bg: 'bg-rose-50 border-rose-100',       label: 'text-rose-500',    value: 'text-rose-600',    sub: 'text-rose-500' },
+                slate:   { bg: 'bg-slate-50 border-slate-100',     label: 'text-slate-500',   value: 'text-slate-700',   sub: 'text-slate-400' },
+              }[tone];
               return (
-                <div
-                  className={cn(
-                    'p-5 rounded-3xl border shadow-sm',
-                    isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100',
-                  )}
-                >
-                  <p
-                    className={cn(
-                      'text-[9px] font-bold uppercase tracking-widest mb-2',
-                      isSurplus ? 'text-emerald-500' : 'text-rose-400',
-                    )}
-                  >
-                    {isSurplus ? 'Kelebihan Sales' : 'Kekurangan Sales'}
-                  </p>
-                  <h3
-                    className={cn(
-                      'text-xl font-black',
-                      isSurplus ? 'text-emerald-600' : 'text-rose-600',
-                    )}
-                  >
-                    {isSurplus ? '+' : '-'}
-                    {formatCurrency(Math.abs(s))}
-                  </h3>
-                  <p
-                    className={cn(
-                      'text-[8px] font-bold mt-1',
-                      isSurplus ? 'text-emerald-500' : 'text-rose-400',
-                    )}
-                  >
-                    {isSurplus ? 'Di atas target s/d hari ini' : 'Defisit s/d hari ini'}
+                <div className={cn('p-5 rounded-3xl border shadow-sm', toneCls.bg)}>
+                  <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2', toneCls.label)}>Status Revenue</p>
+                  <h3 className={cn('text-xl font-black', toneCls.value)}>{summary.revenueStatusText}</h3>
+                  <p className={cn('text-[9px] font-bold mt-2', toneCls.sub)}>{summary.revenueAchievement.toFixed(1)}% dari target</p>
+                  <p className={cn('text-[9px] font-bold mt-1', toneCls.sub)}>
+                    {summary.revenueStatusText === 'Melebihi' && 'Pencapaian di atas target'}
+                    {summary.revenueStatusText === 'Mendekati' && 'Hampir mencapai target'}
+                    {summary.revenueStatusText === 'Kurang' && 'Masih di bawah target'}
+                    {summary.revenueStatusText === 'Menunggu' && 'Belum ada data sales'}
                   </p>
                 </div>
               );
             })()}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Real Downloader</p>
-              <h3 className="text-xl font-black text-slate-900">{formatNumber(summary.totalRealDownloader)}</h3>
-              <p className="text-[8px] text-slate-400 font-bold mt-1">Target: {formatNumber(selectedApp.targetConfig[targetMonth]?.targetDownloader || 0)}</p>
-            </div>
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Real Sales</p>
-              <h3 className="text-xl font-black text-slate-900">{formatCurrency(summary.totalRealSales)}</h3>
-              <p className="text-[8px] text-slate-400 font-bold mt-1">Target: {formatCurrency(selectedApp.targetConfig[targetMonth]?.targetSales || 0)}</p>
-            </div>
+
+            {/* Status Target */}
+            {(() => {
+              const s = summary.selisihSales;
+              const isSurplus = s >= 0;
+              return (
+                <div className={cn('p-5 rounded-3xl border shadow-sm',
+                  isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
+                  <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2',
+                    isSurplus ? 'text-emerald-500' : 'text-rose-400')}>Status Target</p>
+                  <h3 className={cn('text-xl font-black', isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
+                    {isSurplus ? '+' : '-'}{formatCurrency(Math.abs(s))}
+                  </h3>
+                  <p className={cn('text-[9px] font-bold mt-2', isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    {isSurplus ? 'Surplus dari target' : 'Defisit dari target'}
+                  </p>
+                  <p className={cn('text-[9px] font-bold mt-1', isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    Real Sales - Target Sales
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Spreadsheet Table */}

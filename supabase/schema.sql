@@ -356,6 +356,7 @@ create table if not exists public.tasks (
                   check (priority in ('low', 'medium', 'high', 'urgent')),
   assigned_to     text,
   due_date        date,
+  due_time        time,                                       -- HH:MM (24h) — null = all-day deadline
   labels          text[],
   related_paket   text,
   related_skrip   uuid         references public.content_scripts(id) on delete set null,

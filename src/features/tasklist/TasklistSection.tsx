@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInCalendarDays, differenceInHours, differenceInMinutes } from 'date-fns';
 import {
-  Calendar, Edit2, ExternalLink, Filter, KanbanSquare,
-  Plus, Tag, Trash2, User as UserIcon, X,
+  AlertTriangle, Calendar, CheckCircle2, Clock, Edit2, ExternalLink,
+  Filter, Flame, KanbanSquare, Plus, Tag, Trash2, User as UserIcon, X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useToast } from '../../components/Toast';
@@ -36,11 +36,53 @@ const DEPT_TONE: Record<TaskDepartment, { bg: string; text: string; label: strin
   general:   { bg: 'bg-slate-100',  text: 'text-slate-600',   label: 'General' },
 };
 
-const PRIORITY_TONE: Record<TaskPriority, { bg: string; text: string; label: string }> = {
-  low:    { bg: 'bg-slate-100',  text: 'text-slate-500',   label: 'Low' },
-  medium: { bg: 'bg-blue-50',    text: 'text-blue-700',    label: 'Medium' },
-  high:   { bg: 'bg-amber-100',  text: 'text-amber-800',   label: 'High' },
-  urgent: { bg: 'bg-rose-100',   text: 'text-rose-800',    label: 'Urgent' },
+const PRIORITY_TONE: Record<TaskPriority, { bg: string; text: string; label: string; ring: string }> = {
+  low:    { bg: 'bg-slate-100',  text: 'text-slate-500',   label: 'Low',    ring: 'ring-slate-200' },
+  medium: { bg: 'bg-blue-50',    text: 'text-blue-700',    label: 'Medium', ring: 'ring-blue-200' },
+  high:   { bg: 'bg-amber-100',  text: 'text-amber-800',   label: 'High',   ring: 'ring-amber-200' },
+  urgent: { bg: 'bg-rose-100',   text: 'text-rose-800',    label: 'Urgent', ring: 'ring-rose-300' },
+};
+
+// Helper: hitung waktu relatif sampai deadline.
+// Returns { label, urgency, color }
+const formatDeadline = (
+  due_date: string | null,
+  due_time: string | null,
+  isDone: boolean,
+): { label: string; urgency: 'overdue' | 'urgent' | 'soon' | 'normal' | 'done'; color: string } => {
+  if (!due_date) return { label: '', urgency: 'normal', color: 'text-slate-400' };
+  if (isDone) return {
+    label: `Selesai · ${format(parseISO(due_date), 'dd MMM')}`,
+    urgency: 'done',
+    color: 'text-emerald-500',
+  };
+
+  const now = new Date();
+  const deadline = due_time
+    ? new Date(`${due_date}T${due_time}:00`)
+    : new Date(`${due_date}T23:59:59`);
+  const diffMin = differenceInMinutes(deadline, now);
+  const diffH = differenceInHours(deadline, now);
+  const diffDays = differenceInCalendarDays(deadline, now);
+
+  const timeStr = due_time ? ` ${due_time}` : '';
+  const dateStr = format(parseISO(due_date), 'dd MMM') + timeStr;
+
+  if (diffMin < 0) {
+    const absMin = Math.abs(diffMin);
+    const lewat = absMin < 60 ? `${absMin}m`
+      : absMin < 24 * 60 ? `${Math.floor(absMin / 60)}j`
+      : `${Math.floor(absMin / (24 * 60))}h`;
+    return { label: `Lewat ${lewat} · ${dateStr}`, urgency: 'overdue', color: 'text-rose-600' };
+  }
+  if (diffH < 24) {
+    const sisa = diffH < 1 ? `${diffMin}m lagi` : `${diffH}j lagi`;
+    return { label: `${sisa} · ${dateStr}`, urgency: 'urgent', color: 'text-rose-500' };
+  }
+  if (diffDays <= 3) {
+    return { label: `${diffDays}h lagi · ${dateStr}`, urgency: 'soon', color: 'text-amber-600' };
+  }
+  return { label: `${diffDays}h lagi · ${dateStr}`, urgency: 'normal', color: 'text-slate-500' };
 };
 
 interface TasklistSectionProps {
@@ -167,6 +209,7 @@ export const TasklistSection = ({
         priority: payload.priority ?? 'medium',
         assigned_to: payload.assigned_to ?? null,
         due_date: payload.due_date ?? null,
+        due_time: payload.due_time ?? null,
         labels: payload.labels ?? null,
         related_paket: payload.related_paket ?? null,
         related_skrip: payload.related_skrip ?? null,
@@ -200,6 +243,21 @@ export const TasklistSection = ({
     const acc: Record<TaskStatus, number> = { request: 0, todo: 0, progress: 0, done: 0 };
     filteredTasks.forEach((t) => { acc[t.status] += 1; });
     return acc;
+  }, [filteredTasks]);
+
+  // Deadline-aware stats
+  const deadlineStats = useMemo(() => {
+    let overdue = 0, dueToday = 0, dueSoon = 0, urgent = 0;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    filteredTasks.forEach((t) => {
+      if (t.priority === 'urgent' && t.status !== 'done') urgent += 1;
+      if (!t.due_date || t.status === 'done') return;
+      const info = formatDeadline(t.due_date, t.due_time, false);
+      if (info.urgency === 'overdue') overdue += 1;
+      else if (t.due_date === todayStr) dueToday += 1;
+      else if (info.urgency === 'urgent' || info.urgency === 'soon') dueSoon += 1;
+    });
+    return { overdue, dueToday, dueSoon, urgent };
   }, [filteredTasks]);
 
   // Navigasi ke Kalender Marsel pada tanggal due_date task tertentu.
@@ -245,6 +303,55 @@ export const TasklistSection = ({
           <Plus className="w-4 h-4" />
           Buat Task
         </button>
+      </div>
+
+      {/* Stats Dashboard */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className={cn(
+          'p-4 rounded-2xl border shadow-sm transition-all',
+          deadlineStats.overdue > 0 ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-100',
+        )}>
+          <div className="flex items-center justify-between mb-1">
+            <p className={cn(
+              'text-[9px] font-black uppercase tracking-widest',
+              deadlineStats.overdue > 0 ? 'text-rose-600' : 'text-slate-400',
+            )}>Terlambat</p>
+            <AlertTriangle className={cn('w-4 h-4',
+              deadlineStats.overdue > 0 ? 'text-rose-500' : 'text-slate-300')} />
+          </div>
+          <h3 className={cn(
+            'text-2xl font-black',
+            deadlineStats.overdue > 0 ? 'text-rose-700' : 'text-slate-700',
+          )}>{deadlineStats.overdue}</h3>
+          <p className="text-[9px] font-bold text-slate-400 mt-1">Past deadline</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">Hari Ini</p>
+            <Clock className="w-4 h-4 text-amber-500" />
+          </div>
+          <h3 className="text-2xl font-black text-amber-700">{deadlineStats.dueToday}</h3>
+          <p className="text-[9px] font-bold text-slate-400 mt-1">Due today</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[9px] font-black uppercase tracking-widest text-rose-500">Urgent</p>
+            <Flame className="w-4 h-4 text-rose-500" />
+          </div>
+          <h3 className="text-2xl font-black text-rose-700">{deadlineStats.urgent}</h3>
+          <p className="text-[9px] font-bold text-slate-400 mt-1">Priority urgent</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Selesai</p>
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          </div>
+          <h3 className="text-2xl font-black text-emerald-700">{counts.done}</h3>
+          <p className="text-[9px] font-bold text-slate-400 mt-1">Completed</p>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -396,28 +503,40 @@ function TaskCard({ task, isDragging, onDragStart, onDragEnd, onClick }: {
 }) {
   const dept = DEPT_TONE[task.department];
   const prio = PRIORITY_TONE[task.priority];
-  const overdue = task.due_date && task.status !== 'done'
-    && new Date(task.due_date) < new Date(new Date().toISOString().slice(0, 10));
+  const deadline = formatDeadline(task.due_date, task.due_time, task.status === 'done');
+  const isOverdue = deadline.urgency === 'overdue';
+  const isUrgent = deadline.urgency === 'urgent' || task.priority === 'urgent';
 
   return (
-    // Pakai plain <div> untuk native HTML5 drag — motion.div punya gesture
-    // system sendiri yang konflik dengan onDragStart/onDragEnd typing.
     <div
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        'bg-white rounded-xl border border-slate-200 p-3 cursor-grab active:cursor-grabbing transition-all',
-        'hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5',
+        'group relative bg-white rounded-xl border p-3 cursor-grab active:cursor-grabbing transition-all',
+        'hover:shadow-lg hover:-translate-y-0.5',
+        isOverdue ? 'border-rose-200 ring-1 ring-rose-100'
+          : isUrgent ? 'border-amber-200 ring-1 ring-amber-100'
+          : 'border-slate-200 hover:border-slate-300',
         isDragging && 'rotate-2 shadow-xl opacity-40',
       )}
     >
+      {/* Urgency accent bar */}
+      {(isOverdue || isUrgent) && (
+        <div className={cn(
+          'absolute top-0 left-0 right-0 h-1 rounded-t-xl',
+          isOverdue ? 'bg-gradient-to-r from-rose-500 to-rose-400'
+            : 'bg-gradient-to-r from-amber-500 to-amber-400',
+        )} />
+      )}
+
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className={cn('inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest', dept.bg, dept.text)}>
           {dept.label}
         </span>
-        <span className={cn('inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest', prio.bg, prio.text)}>
+        <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest', prio.bg, prio.text)}>
+          {task.priority === 'urgent' && <Flame className="w-2.5 h-2.5" />}
           {prio.label}
         </span>
       </div>
@@ -432,19 +551,32 @@ function TaskCard({ task, isDragging, onDragStart, onDragEnd, onClick }: {
         </p>
       )}
 
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Labels */}
+      {task.labels && task.labels.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap mb-2">
+          {task.labels.slice(0, 3).map((label) => (
+            <span key={label} className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-slate-100 text-slate-600">
+              #{label}
+            </span>
+          ))}
+          {task.labels.length > 3 && (
+            <span className="text-[8px] font-bold text-slate-400">+{task.labels.length - 3}</span>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
         {task.due_date && (
           <span className={cn(
             'inline-flex items-center gap-1 text-[9px] font-bold',
-            overdue ? 'text-rose-600' : 'text-slate-400',
+            deadline.color,
           )}>
-            <Calendar className="w-2.5 h-2.5" />
-            {format(parseISO(task.due_date), 'dd MMM')}
-            {overdue && <span className="font-black uppercase">· Lewat</span>}
+            {task.due_time ? <Clock className="w-2.5 h-2.5" /> : <Calendar className="w-2.5 h-2.5" />}
+            {deadline.label}
           </span>
         )}
         {task.assigned_to && (
-          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-400 truncate max-w-[120px]">
+          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-400 truncate max-w-[120px] ml-auto">
             <UserIcon className="w-2.5 h-2.5" />
             {task.assigned_to}
           </span>
@@ -473,6 +605,7 @@ function TaskModal({ task, defaultStatus, onClose, onSave, onDelete, onOpenCalen
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium');
   const [assignedTo, setAssignedTo] = useState(task?.assigned_to ?? '');
   const [dueDate, setDueDate] = useState(task?.due_date ?? '');
+  const [dueTime, setDueTime] = useState(task?.due_time ?? '');
   const [labels, setLabels] = useState((task?.labels ?? []).join(', '));
 
   const handleSubmit = () => {
@@ -485,6 +618,7 @@ function TaskModal({ task, defaultStatus, onClose, onSave, onDelete, onOpenCalen
       priority,
       assigned_to: assignedTo || null,
       due_date: dueDate || null,
+      due_time: dueDate && dueTime ? dueTime : null,
       labels: labels ? labels.split(',').map((s) => s.trim()).filter(Boolean) : null,
     });
   };
@@ -592,12 +726,23 @@ function TaskModal({ task, defaultStatus, onClose, onSave, onDelete, onOpenCalen
               </select>
             </FormField>
 
-            <FormField label="Due Date">
+            <FormField label="Deadline Tanggal">
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="form-input"
+              />
+            </FormField>
+
+            <FormField label="Deadline Jam (opsional)">
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                disabled={!dueDate}
+                placeholder="HH:MM"
+                className={cn('form-input', !dueDate && 'opacity-50 cursor-not-allowed')}
               />
             </FormField>
 

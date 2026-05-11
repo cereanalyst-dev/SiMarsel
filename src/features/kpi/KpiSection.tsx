@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ArrowLeft, Briefcase, Calendar, ChevronRight, Edit2, Filter,
-  Plus, Target as TargetIcon, Trash2, User as UserIcon, X,
+  ArrowLeft, Briefcase, Calendar, ChevronRight, Download, Edit2, FileSpreadsheet, Filter,
+  Plus, Target as TargetIcon, Trash2, Upload, User as UserIcon, X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useToast } from '../../components/Toast';
@@ -12,6 +12,7 @@ import {
   fetchKpiCards, fetchKpiDivisions, fetchKpiMetrics, fetchKpiMetricsByCardIds,
   updateKpiCard, updateKpiDivision, updateKpiMetric,
 } from '../../lib/dataAccess';
+import { bulkUploadKpi, downloadKpiTemplate } from '../../lib/kpiExcel';
 import { getSupabase } from '../../lib/supabase';
 import type {
   KpiCard, KpiDivision, KpiMetric,
@@ -81,7 +82,11 @@ const parseLocaleNumber = (s: string): number | null => {
 // ============================================================
 // Main — 3 lapis: Divisi → Orang → Metrics
 // ============================================================
-export const KpiSection = () => {
+interface KpiSectionProps {
+  canUploadExcel?: boolean;
+}
+
+export const KpiSection = ({ canUploadExcel = true }: KpiSectionProps = {}) => {
   const toast = useToast();
   const [divisions, setDivisions] = useState<KpiDivision[]>([]);
   const [allCards, setAllCards] = useState<KpiCard[]>([]);
@@ -100,6 +105,9 @@ export const KpiSection = () => {
   // 'All' = semua periode, 'none' = card tanpa periode (legacy).
   const [filterYear, setFilterYear] = useState<'All' | 'none' | number>('All');
   const [filterMonth, setFilterMonth] = useState<'All' | number>('All');
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadSummary, setUploadSummary] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -286,16 +294,85 @@ export const KpiSection = () => {
           />
         </div>
 
-        {/* Action button — beda per level */}
+        {/* Action buttons — beda per level */}
         {!activeCardId && !activeDivisionId && (
-          <button
-            type="button"
-            onClick={() => setShowCreateDivision(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Buat Divisi
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => downloadKpiTemplate()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all"
+              title="Download template Excel KPI"
+            >
+              <Download className="w-4 h-4" />
+              Template
+            </button>
+            <label
+              className={cn(
+                'inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all',
+                !canUploadExcel
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : uploading
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-100 cursor-pointer',
+              )}
+              title={!canUploadExcel ? 'Hanya Admin & Manager yang bisa upload Excel' : 'Upload Excel KPI'}
+            >
+              <Upload className="w-4 h-4" />
+              {uploading ? 'Mengupload…' : 'Upload Excel'}
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                disabled={uploading || !canUploadExcel}
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const supabase = getSupabase();
+                  if (!supabase) {
+                    toast.error('Supabase belum terkonfigurasi');
+                    return;
+                  }
+                  const { data } = await supabase.auth.getUser();
+                  const uid = data?.user?.id;
+                  if (!uid) {
+                    toast.error('Silakan login dulu');
+                    return;
+                  }
+                  setUploading(true);
+                  setUploadSummary(null);
+                  try {
+                    const res = await bulkUploadKpi(uid, file, divisions, allCards);
+                    if (res.errors.length > 0 && res.metricsInserted === 0) {
+                      toast.error(`Upload gagal: ${res.errors[0]}`);
+                    } else {
+                      toast.success(
+                        `Upload selesai: ${res.divisionsCreated} divisi baru, ${res.cardsCreated} card baru, ${res.metricsInserted} metric.`,
+                      );
+                    }
+                    setUploadSummary(
+                      `${res.divisionsCreated} divisi · ${res.cardsCreated} card · ${res.metricsInserted} metric` +
+                      (res.skipped > 0 ? ` · ${res.skipped} di-skip` : '') +
+                      (res.errors.length > 0 ? ` · ${res.errors.length} error` : ''),
+                    );
+                    await refresh();
+                  } catch (err) {
+                    toast.error(`Upload error: ${err instanceof Error ? err.message : 'unknown'}`);
+                  } finally {
+                    setUploading(false);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowCreateDivision(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-emerald-100 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Buat Divisi
+            </button>
+          </div>
         )}
         {!activeCardId && activeDivisionId && (
           <button
@@ -308,6 +385,24 @@ export const KpiSection = () => {
           </button>
         )}
       </div>
+
+      {/* Upload summary banner */}
+      {uploadSummary && !activeCardId && !activeDivisionId && (
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 flex items-center gap-3">
+          <FileSpreadsheet className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <p className="text-[11px] font-bold text-amber-700 flex-1">
+            Hasil upload terakhir: {uploadSummary}
+          </p>
+          <button
+            type="button"
+            onClick={() => setUploadSummary(null)}
+            className="p-1 rounded-md hover:bg-amber-100 text-amber-600"
+            aria-label="Tutup"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Filter periode — hanya tampil di list view (Lapis 1 & 2). */}
       {!activeCard && (

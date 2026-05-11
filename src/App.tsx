@@ -23,6 +23,7 @@ import {
 import { processDownloaders, processTransactions } from './lib/dataProcessing';
 import { fetchPromoCodeRules } from './lib/promoCodeRulesClient';
 import { buildUserPromoRulesIndex, type UserPromoRulesIndex } from './lib/promoRules';
+import { useUserRole } from './lib/useUserRole';
 import { COLORS } from './lib/constants';
 import { COMPANY_TAGLINE, DEFAULT_TAB } from './config/app.config';
 import type {
@@ -144,6 +145,9 @@ export default function App() {
 
   const userId = session?.user?.id ?? null;
   const userEmail = session?.user?.email ?? null;
+
+  // Role-based permissions — gated UI di Settings, KPI upload, dst.
+  const { role: userRole, permissions } = useUserRole(userId);
 
   // ---------- Data ----------
   // Strategi loading 2-stage:
@@ -824,6 +828,7 @@ export default function App() {
             activeTab={activeTab}
             rowsLoaded={data.length}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
+            userRole={userRole}
           />
 
           <main className="p-8 max-w-[1600px] mx-auto w-full">
@@ -912,6 +917,11 @@ export default function App() {
                           transactions={data}
                           downloaders={downloaderData}
                           promoRulesIndex={promoRulesIndex}
+                          onForceSave={
+                            userId
+                              ? (updatedApps) => void saveAppsToSupabase(userId, updatedApps)
+                              : undefined
+                          }
                         />
                       </motion.div>
                     )
@@ -1033,7 +1043,7 @@ export default function App() {
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.15 }}
                     >
-                      <KpiSection />
+                      <KpiSection canUploadExcel={permissions.canUploadKpi} />
                     </motion.div>
                   )}
                   {activeTab === 'settings' && (
@@ -1046,6 +1056,7 @@ export default function App() {
                     >
                       <SettingsSection
                         onDataUpdate={handleDataUpdate}
+                        canManageRoles={permissions.canManageRoles}
                       />
                     </motion.div>
                   )}

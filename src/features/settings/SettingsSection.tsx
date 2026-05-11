@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../components/Toast';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
+import { RoleManagement } from './RoleManagement';
 
 interface UploadProgress {
   current: number;
@@ -19,10 +20,12 @@ interface SettingsSectionProps {
     append: boolean,
     onProgress?: (p: UploadProgress) => void,
   ) => void | Promise<void>;
+  canManageRoles?: boolean;
 }
 
 export const SettingsSection = ({
   onDataUpdate,
+  canManageRoles = false,
 }: SettingsSectionProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
@@ -261,6 +264,9 @@ export const SettingsSection = ({
       </div>
 
       <CreateAccountCard />
+
+      {/* Role Management — hanya admin */}
+      {canManageRoles && <RoleManagement />}
     </div>
   );
 };

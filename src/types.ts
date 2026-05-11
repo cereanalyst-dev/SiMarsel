@@ -298,6 +298,7 @@ export interface Task {
   priority: TaskPriority;
   assigned_to: string | null;
   due_date: string | null;     // 'YYYY-MM-DD'
+  due_time: string | null;     // 'HH:MM' (24h) — null = sepanjang hari
   labels: string[] | null;
   related_paket: string | null;
   related_skrip: string | null; // FK content_scripts.id
@@ -355,3 +356,33 @@ export interface KpiMetric {
 }
 
 export type NewKpiMetric = Omit<KpiMetric, 'id' | 'created_at' | 'updated_at'>;
+
+// ============================================================
+// User Roles — hierarchy: admin > manager > asst_manager > staf
+// Permissions di-derive di client (lib/permissions.ts).
+// ============================================================
+export type UserRole = 'admin' | 'manager' | 'asst_manager' | 'staf';
+
+export interface UserRoleRow {
+  user_id: string;
+  role: UserRole;
+  full_name: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type NewUserRoleRow = Pick<UserRoleRow, 'user_id' | 'role' | 'full_name'>;
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  admin: 'Admin',
+  manager: 'Manager',
+  asst_manager: 'Asst. Manager',
+  staf: 'Staf',
+};
+
+export const ROLE_RANK: Record<UserRole, number> = {
+  admin: 4,
+  manager: 3,
+  asst_manager: 2,
+  staf: 1,
+};

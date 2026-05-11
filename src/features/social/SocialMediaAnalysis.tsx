@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { motion } from 'motion/react';
-import { format, parse } from 'date-fns';
+import { format, parse, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
 import {
-  Calendar, Download, FileSpreadsheet, Layers, Plus, Search, Smartphone,
-  Trash2, Upload,
+  Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
+  Tooltip, XAxis, YAxis,
+} from 'recharts';
+import {
+  BarChart3, Download, Eye, FileSpreadsheet, Heart, Layers,
+  LineChart as LineChartIcon, MessageCircle, Plus, Search, Share2, Smartphone,
+  TrendingUp, Trash2, Upload,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatters';
@@ -46,15 +51,6 @@ const emptyContent = (): SocialMediaContent => ({
   rataRataWaktuTonton: 0,
 });
 
-// Format detik → "1m 30s"
-const formatDuration = (sec: number): string => {
-  if (!sec || sec <= 0) return '0s';
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  if (m === 0) return `${s}s`;
-  return `${m}m ${s}s`;
-};
-
 export const SocialMediaAnalysis = ({
   apps,
   setApps,
@@ -64,6 +60,15 @@ export const SocialMediaAnalysis = ({
   const toast = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState('All');
+  const [jenisFilter, setJenisFilter] = useState('All');
+  const [appFilter, setAppFilter] = useState('All');
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    return format(d, 'yyyy-MM-dd');
+  });
+  const [dateTo, setDateTo] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [chartType, setChartType] = useState<'line' | 'bar'>('line');
+  const [chartMetric, setChartMetric] = useState<'tayangan' | 'jangkauan' | 'jumlahBersihInteraksi' | 'sukaTanggapan'>('tayangan');
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Konten dari Skrip Konten yang sudah status='published'.
@@ -156,9 +161,86 @@ export const SocialMediaAnalysis = ({
         (item.platform || '').toLowerCase().includes(needle) ||
         (item.jenisKonten || '').toLowerCase().includes(needle);
       const matchesPlatform = platformFilter === 'All' || item.platform === platformFilter;
-      return matchesSearch && matchesPlatform;
+      const matchesJenis = jenisFilter === 'All' || item.jenisKonten === jenisFilter;
+      const matchesApp = appFilter === 'All' || item.appName === appFilter;
+      const dateStr = item.tanggalUpload || item.date;
+      const matchesDate = (!dateFrom || dateStr >= dateFrom) && (!dateTo || dateStr <= dateTo);
+      return matchesSearch && matchesPlatform && matchesJenis && matchesApp && matchesDate;
     });
-  }, [allContent, searchTerm, platformFilter]);
+  }, [allContent, searchTerm, platformFilter, jenisFilter, appFilter, dateFrom, dateTo]);
+
+  // Aggregate totals untuk hero cards
+  const totals = useMemo(() => {
+    const acc = {
+      posts: 0, tayangan: 0, jangkauan: 0, pemirsa: 0,
+      jumlahBersihInteraksi: 0, sukaTanggapan: 0, komen: 0, share: 0,
+      save: 0, klikTautan: 0, mengikuti: 0,
+    };
+    filteredContent.forEach((it) => {
+      acc.posts += 1;
+      acc.tayangan += it.tayangan;
+      acc.jangkauan += it.jangkauan;
+      acc.pemirsa += it.pemirsa;
+      acc.jumlahBersihInteraksi += it.jumlahBersihInteraksi;
+      acc.sukaTanggapan += it.sukaTanggapan;
+      acc.komen += it.komen;
+      acc.share += it.share;
+      acc.save += it.save;
+      acc.klikTautan += it.klikTautan;
+      acc.mengikuti += it.mengikuti;
+    });
+    return acc;
+  }, [filteredContent]);
+
+  // Chart data: agregat metric per tanggal
+  const chartData = useMemo(() => {
+    const byDate = new Map<string, { date: string; tayangan: number; jangkauan: number; jumlahBersihInteraksi: number; sukaTanggapan: number }>();
+    filteredContent.forEach((it) => {
+      const d = (it.tanggalUpload || it.date).slice(0, 10);
+      if (!d) return;
+      const row = byDate.get(d) ?? { date: d, tayangan: 0, jangkauan: 0, jumlahBersihInteraksi: 0, sukaTanggapan: 0 };
+      row.tayangan += it.tayangan;
+      row.jangkauan += it.jangkauan;
+      row.jumlahBersihInteraksi += it.jumlahBersihInteraksi;
+      row.sukaTanggapan += it.sukaTanggapan;
+      byDate.set(d, row);
+    });
+    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [filteredContent]);
+
+  // Chart data per platform untuk bar chart breakdown
+  const platformChartData = useMemo(() => {
+    const byPlatform = new Map<string, { platform: string; tayangan: number; jangkauan: number; jumlahBersihInteraksi: number; sukaTanggapan: number }>();
+    filteredContent.forEach((it) => {
+      const p = it.platform || 'Lainnya';
+      const row = byPlatform.get(p) ?? { platform: p, tayangan: 0, jangkauan: 0, jumlahBersihInteraksi: 0, sukaTanggapan: 0 };
+      row.tayangan += it.tayangan;
+      row.jangkauan += it.jangkauan;
+      row.jumlahBersihInteraksi += it.jumlahBersihInteraksi;
+      row.sukaTanggapan += it.sukaTanggapan;
+      byPlatform.set(p, row);
+    });
+    return Array.from(byPlatform.values()).sort((a, b) => b.tayangan - a.tayangan);
+  }, [filteredContent]);
+
+  const appOptions = useMemo(() => {
+    const set = new Set<string>(apps.map((a) => a.name));
+    allContent.forEach((c) => set.add(c.appName));
+    return ['All', ...Array.from(set).sort()];
+  }, [apps, allContent]);
+
+  const jenisOptions = useMemo(() => {
+    const set = new Set<string>(JENIS_KONTEN_OPTIONS);
+    allContent.forEach((c) => set.add(c.jenisKonten));
+    return ['All', ...Array.from(set).sort()];
+  }, [allContent]);
+
+  const METRIC_LABELS: Record<typeof chartMetric, { label: string; color: string }> = {
+    tayangan: { label: 'Tayangan', color: '#8b5cf6' },
+    jangkauan: { label: 'Jangkauan', color: '#f43f5e' },
+    jumlahBersihInteraksi: { label: 'Interaksi', color: '#10b981' },
+    sukaTanggapan: { label: 'Suka & Tanggapan', color: '#f59e0b' },
+  };
 
   const platforms = useMemo(
     () => ['All', ...Array.from(new Set(allContent.map((i) => i.platform).filter(Boolean)))],
@@ -462,6 +544,45 @@ export const SocialMediaAnalysis = ({
           </div>
         )}
 
+        {/* Extra filter row: app, jenis, date range */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <select
+            value={appFilter}
+            onChange={(e) => setAppFilter(e.target.value)}
+            aria-label="Filter app"
+            className="bg-slate-50 border border-slate-100 text-[11px] font-bold text-slate-600 outline-none px-3 py-2 rounded-xl cursor-pointer"
+          >
+            {appOptions.map((a) => <option key={a} value={a}>{a === 'All' ? 'Semua App' : a}</option>)}
+          </select>
+          <select
+            value={jenisFilter}
+            onChange={(e) => setJenisFilter(e.target.value)}
+            aria-label="Filter jenis konten"
+            className="bg-slate-50 border border-slate-100 text-[11px] font-bold text-slate-600 outline-none px-3 py-2 rounded-xl cursor-pointer"
+          >
+            {jenisOptions.map((j) => <option key={j} value={j}>{j === 'All' ? 'Semua Jenis' : j}</option>)}
+          </select>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Dari</span>
+            <input
+              type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="Tanggal dari"
+              className="bg-transparent text-[11px] font-bold text-slate-700 outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sd</span>
+            <input
+              type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+              aria-label="Tanggal sampai"
+              className="bg-transparent text-[11px] font-bold text-slate-700 outline-none"
+            />
+          </div>
+          <span className="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest tabular-nums">
+            {filteredContent.length} / {allContent.length} konten
+          </span>
+        </div>
+
         {/* Empty state */}
         {allContent.length === 0 ? (
           <div className="py-24 text-center">
@@ -482,36 +603,227 @@ export const SocialMediaAnalysis = ({
               Tambah Konten Pertama
             </button>
           </div>
-        ) : filteredContent.length === 0 ? (
-          <div className="py-20 text-center">
-            <Smartphone className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-              Tidak ada konten cocok filter
-            </p>
-          </div>
         ) : (
-          // ===================== CARD GRID =====================
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredContent.map((item, i) => {
-              const er = item.jangkauan > 0
-                ? (item.jumlahBersihInteraksi / item.jangkauan) * 100
-                : 0;
-              return (
-                <ContentCard
-                  key={`${item.appId}-${item.date}-${item.contentIndex}-${i}`}
-                  item={item}
-                  er={er}
-                  onDateClick={() => handleDateClick(item.tanggalUpload || item.date)}
-                  onEditKonten={() => setActiveTab('konten')}
-                  onDelete={
-                    item._fromKonten
-                      ? null
-                      : () => handleDelete(item.appId, item.date, item.contentIndex)
-                  }
-                />
-              );
-            })}
-          </div>
+          <>
+            {/* Hero summary cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+              <HeroCard icon={Layers} label="Total Post" value={formatNumber(totals.posts)} gradient="from-indigo-500 to-violet-500" />
+              <HeroCard icon={Eye} label="Tayangan" value={formatNumber(totals.tayangan)} gradient="from-violet-500 to-indigo-500" />
+              <HeroCard icon={TrendingUp} label="Jangkauan" value={formatNumber(totals.jangkauan)} gradient="from-rose-500 to-pink-500" />
+              <HeroCard icon={Heart} label="Interaksi" value={formatNumber(totals.jumlahBersihInteraksi)} gradient="from-emerald-500 to-teal-500" />
+              <HeroCard icon={MessageCircle} label="Komen" value={formatNumber(totals.komen)} gradient="from-amber-500 to-orange-500" />
+              <HeroCard icon={Share2} label="Share" value={formatNumber(totals.share)} gradient="from-cyan-500 to-sky-500" />
+            </div>
+
+            {/* Charts */}
+            {chartData.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                {/* Timeseries */}
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
+                      <div>
+                        <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em]">Trend</p>
+                        <h4 className="text-sm font-black text-slate-900">Perkembangan Harian</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setChartType('line')}
+                        className={cn('px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest transition-all',
+                          chartType === 'line' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                      >
+                        <LineChartIcon className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChartType('bar')}
+                        className={cn('px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest transition-all',
+                          chartType === 'bar' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                      >
+                        <BarChart3 className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <select
+                      value={chartMetric}
+                      onChange={(e) => setChartMetric(e.target.value as typeof chartMetric)}
+                      aria-label="Pilih metric"
+                      className="bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-700 outline-none px-2 py-1 rounded-md uppercase tracking-widest cursor-pointer"
+                    >
+                      {Object.entries(METRIC_LABELS).map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <ResponsiveContainer width="100%" height={240}>
+                    {chartType === 'line' ? (
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }}
+                          tickFormatter={(d) => format(parseISO(d), 'd MMM')} />
+                        <YAxis stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }} />
+                        <Tooltip
+                          labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
+                          contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }}
+                        />
+                        <Line type="monotone" dataKey={chartMetric}
+                          stroke={METRIC_LABELS[chartMetric].color} strokeWidth={2.5} dot={false}
+                          name={METRIC_LABELS[chartMetric].label} />
+                      </LineChart>
+                    ) : (
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }}
+                          tickFormatter={(d) => format(parseISO(d), 'd MMM')} />
+                        <YAxis stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }} />
+                        <Tooltip
+                          labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
+                          contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }}
+                        />
+                        <Bar dataKey={chartMetric} fill={METRIC_LABELS[chartMetric].color}
+                          name={METRIC_LABELS[chartMetric].label} radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Per platform breakdown */}
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-1 h-8 rounded-full bg-gradient-to-b from-rose-500 to-pink-500" />
+                    <div>
+                      <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em]">Breakdown</p>
+                      <h4 className="text-sm font-black text-slate-900">Per Platform</h4>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={platformChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="platform" stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }} />
+                      <YAxis stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }} />
+                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }} />
+                      <Legend wrapperStyle={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }} />
+                      <Bar dataKey="tayangan" fill="#8b5cf6" name="Tayangan" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="jangkauan" fill="#f43f5e" name="Jangkauan" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="jumlahBersihInteraksi" fill="#10b981" name="Interaksi" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Table view */}
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+                <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
+                <div>
+                  <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em]">Detail</p>
+                  <h4 className="text-sm font-black text-slate-900">Tabel Konten · {filteredContent.length} baris</h4>
+                </div>
+              </div>
+              {filteredContent.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Smartphone className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tidak ada konten cocok filter</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left border-collapse min-w-[1400px]">
+                    <thead className="bg-slate-50/60 sticky top-0">
+                      <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">
+                        <th className="py-3.5 px-4">Tanggal</th>
+                        <th className="py-3.5 px-4">App</th>
+                        <th className="py-3.5 px-4">Platform</th>
+                        <th className="py-3.5 px-4">Jenis</th>
+                        <th className="py-3.5 px-4 max-w-[240px]">Caption</th>
+                        <th className="py-3.5 px-4 text-right">Tayangan</th>
+                        <th className="py-3.5 px-4 text-right">Jangkauan</th>
+                        <th className="py-3.5 px-4 text-right">Pemirsa</th>
+                        <th className="py-3.5 px-4 text-right">Interaksi</th>
+                        <th className="py-3.5 px-4 text-right">Suka</th>
+                        <th className="py-3.5 px-4 text-right">Komen</th>
+                        <th className="py-3.5 px-4 text-right">Share</th>
+                        <th className="py-3.5 px-4 text-right">Save</th>
+                        <th className="py-3.5 px-4 text-right">Klik</th>
+                        <th className="py-3.5 px-4 text-right">Mengikuti</th>
+                        <th className="py-3.5 px-4 text-right">ER%</th>
+                        <th className="py-3.5 px-4 w-16">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredContent.map((item, i) => {
+                        const er = item.jangkauan > 0
+                          ? (item.jumlahBersihInteraksi / item.jangkauan) * 100 : 0;
+                        return (
+                          <tr key={`${item.appId}-${item.date}-${item.contentIndex}-${i}`}
+                            className="border-b border-slate-50 hover:bg-slate-50/40 transition-colors">
+                            <td className="py-3 px-4 text-[11px] font-black text-slate-700 tabular-nums whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleDateClick(item.tanggalUpload || item.date)}
+                                className="hover:text-indigo-600 transition-colors"
+                                title="Lihat di Kalender"
+                              >
+                                {item.tanggalUpload ? format(new Date(item.tanggalUpload), 'dd MMM yy') : '-'}
+                              </button>
+                            </td>
+                            <td className="py-3 px-4 text-[11px] font-black text-slate-700 uppercase tracking-widest whitespace-nowrap">{item.appName}</td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[9px] font-black uppercase tracking-widest">{item.platform}</span>
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-black uppercase tracking-widest">{item.jenisKonten}</span>
+                            </td>
+                            <td className="py-3 px-4 max-w-[240px]">
+                              <p className="text-[11px] text-slate-700 font-medium line-clamp-2">{item.caption || <span className="text-slate-300">(tanpa caption)</span>}</p>
+                              {item._fromKonten && (
+                                <span className="inline-flex items-center gap-1 mt-0.5 text-[8px] font-black text-indigo-600 uppercase tracking-widest">
+                                  <Layers className="w-2.5 h-2.5" /> Skrip
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.tayangan)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.jangkauan)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.pemirsa)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.jumlahBersihInteraksi)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.sukaTanggapan)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.komen)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.share)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.save)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.klikTautan)}</td>
+                            <td className="py-3 px-4 text-right text-[11px] font-black text-slate-900 tabular-nums">{formatNumber(item.mengikuti)}</td>
+                            <td className="py-3 px-4 text-right">
+                              <span className={cn('inline-flex px-1.5 py-0.5 rounded-md text-[9px] font-black tabular-nums',
+                                er > 5 ? 'bg-emerald-100 text-emerald-700' : er > 2 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500')}>
+                                {er.toFixed(2)}%
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-1">
+                                {item._fromKonten ? (
+                                  <button type="button" onClick={() => setActiveTab('konten')}
+                                    className="p-1 hover:bg-indigo-50 rounded-md text-slate-400 hover:text-indigo-600"
+                                    title="Edit di Skrip Konten"
+                                  ><Layers className="w-3 h-3" /></button>
+                                ) : (
+                                  <button type="button" onClick={() => handleDelete(item.appId, item.date, item.contentIndex)}
+                                    className="p-1 hover:bg-rose-50 rounded-md text-slate-400 hover:text-rose-600"
+                                    title="Hapus"
+                                  ><Trash2 className="w-3 h-3" /></button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -525,169 +837,6 @@ export const SocialMediaAnalysis = ({
     </div>
   );
 };
-
-// ============================================================
-// ContentCard — kartu per post dengan 17 metrik tergrup
-// ============================================================
-interface ContentCardProps {
-  item: SocialMediaContent & {
-    appName: string;
-    date: string;
-    _fromKonten: boolean;
-  };
-  er: number;
-  onDateClick: () => void;
-  onEditKonten: () => void;
-  onDelete: (() => void) | null;
-}
-
-const ContentCard = ({ item, er, onDateClick, onEditKonten, onDelete }: ContentCardProps) => {
-  const isFromKonten = item._fromKonten;
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-    >
-      {/* Card header */}
-      <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-3 border-b border-slate-50">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="px-2.5 py-1 bg-rose-100 text-rose-700 text-[9px] font-black rounded-md uppercase tracking-widest">
-            {item.platform}
-          </span>
-          <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-[9px] font-black rounded-md uppercase tracking-widest">
-            {item.jenisKonten}
-          </span>
-          {isFromKonten && (
-            <span
-              title="Disinkronisasi dari Skrip Konten"
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[8px] font-black rounded-md uppercase tracking-widest border border-indigo-100"
-            >
-              <Layers className="w-2.5 h-2.5" />
-              Skrip
-            </span>
-          )}
-          <span
-            className={cn(
-              'px-2 py-1 text-[9px] font-black rounded-md uppercase tracking-widest',
-              er > 5 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500',
-            )}
-            title="Engagement Rate (interaksi / jangkauan)"
-          >
-            ER {er.toFixed(2)}%
-          </span>
-        </div>
-      </div>
-
-      {/* Card body */}
-      <div className="px-5 py-4 space-y-4">
-        <div>
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            App · {item.appName}
-          </p>
-          <p className="text-xs font-bold text-slate-700 line-clamp-2">
-            {item.caption || <span className="text-slate-300">(tanpa caption)</span>}
-          </p>
-        </div>
-
-        {/* Section: Reach */}
-        <CardMetricGroup
-          label="Reach"
-          metrics={[
-            { label: 'Tayangan', value: formatNumber(item.tayangan) },
-            { label: 'Jangkauan', value: formatNumber(item.jangkauan) },
-            { label: 'Pemirsa', value: formatNumber(item.pemirsa) },
-          ]}
-        />
-
-        {/* Section: Engagement */}
-        <CardMetricGroup
-          label="Engagement"
-          metrics={[
-            { label: 'Bersih Interaksi', value: formatNumber(item.jumlahBersihInteraksi) },
-            { label: 'Suka & Tanggapan', value: formatNumber(item.sukaTanggapan) },
-            { label: 'Komen', value: formatNumber(item.komen) },
-            { label: 'Share', value: formatNumber(item.share) },
-            { label: 'Save', value: formatNumber(item.save) },
-          ]}
-        />
-
-        {/* Section: Konversi & Watch */}
-        <CardMetricGroup
-          label="Konversi & Tonton"
-          metrics={[
-            { label: 'Klik Tautan', value: formatNumber(item.klikTautan) },
-            { label: 'Balasan', value: formatNumber(item.balasan) },
-            { label: 'Mengikuti', value: formatNumber(item.mengikuti) },
-            { label: 'Waktu Tonton', value: formatDuration(item.waktuTonton) },
-            { label: 'Rata-rata', value: formatDuration(item.rataRataWaktuTonton) },
-          ]}
-        />
-      </div>
-
-      {/* Card footer */}
-      <div className="px-5 py-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-          {item.tanggalUpload
-            ? format(new Date(item.tanggalUpload), 'dd MMM yyyy')
-            : '-'}
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onDateClick}
-            className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
-            title="Lihat di Kalender"
-          >
-            <Calendar className="w-4 h-4" />
-          </button>
-          {isFromKonten ? (
-            <button
-              type="button"
-              onClick={onEditKonten}
-              className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-400 hover:text-indigo-600"
-              title="Edit di Skrip Konten"
-            >
-              <Layers className="w-4 h-4" />
-            </button>
-          ) : onDelete ? (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="p-1.5 hover:bg-rose-50 rounded-lg transition-colors text-slate-400 hover:text-rose-600"
-              title="Hapus konten"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-const CardMetricGroup = ({
-  label, metrics,
-}: { label: string; metrics: Array<{ label: string; value: string }> }) => (
-  <div>
-    <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">
-      {label}
-    </p>
-    <div className="grid grid-cols-3 gap-2">
-      {metrics.map((m) => (
-        <div key={m.label} className="bg-slate-50 rounded-xl px-2 py-1.5">
-          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-tight">
-            {m.label}
-          </p>
-          <p className="text-xs font-black text-slate-900 tabular-nums leading-tight mt-0.5">
-            {m.value}
-          </p>
-        </div>
-      ))}
-    </div>
-  </div>
-);
 
 // ============================================================
 // AddContentModal — form 17 field
@@ -905,6 +1054,35 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
       {children}
     </p>
   </div>
+);
+
+// ============================================================
+// HeroCard — kartu metric kecil bergradien (untuk dashboard ringkasan)
+// ============================================================
+const HeroCard = ({ icon: Icon, label, value, gradient }: {
+  icon: typeof Eye;
+  label: string;
+  value: string;
+  gradient: string;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 6 }}
+    animate={{ opacity: 1, y: 0 }}
+    whileHover={{ y: -2 }}
+    className={cn(
+      'relative overflow-hidden p-4 rounded-2xl text-white shadow-lg bg-gradient-to-br',
+      gradient,
+    )}
+  >
+    <div className="pointer-events-none absolute -top-6 -right-6 w-20 h-20 bg-white/10 rounded-full blur-2xl" />
+    <div className="relative flex items-start justify-between mb-3">
+      <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+        <Icon className="w-4 h-4" />
+      </div>
+    </div>
+    <p className="text-[8px] font-black uppercase tracking-widest text-white/80 mb-1">{label}</p>
+    <h3 className="text-xl font-black tracking-tight tabular-nums">{value}</h3>
+  </motion.div>
 );
 
 export default SocialMediaAnalysis;
