@@ -79,22 +79,25 @@ export const Overview = ({
       {/* ============ EDITORIAL HEADER ============ */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
         <div>
-          <p className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest mb-3">
-            Live Dashboard
-          </p>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
-            Ringkasan <span className="text-orange-600">Performa</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              Live Dashboard
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            Ringkasan Performa
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-3 max-w-xl">
+          <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
             Snapshot metrik utama — revenue, konversi, repeat order, dan volume
             transaksi lintas aplikasi.
           </p>
         </div>
         <div className="text-right hidden md:block">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.25em]">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">
             Total Rows
           </p>
-          <p className="font-display text-4xl text-slate-900 mt-1">
+          <p className="text-2xl font-black text-slate-900 tracking-tight mt-1">
             {formatNumber(stats.totalTransactions)}
           </p>
         </div>
@@ -157,7 +160,7 @@ export const Overview = ({
         />
       </div>
 
-      <div className="relative tile p-8 rounded-[2rem] overflow-hidden">
+      <div className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
         {/* Decorative accents */}
         <div className="pointer-events-none absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br from-indigo-100/50 to-transparent rounded-full blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-16 w-64 h-64 bg-gradient-to-br from-amber-100/40 to-transparent rounded-full blur-3xl" />
@@ -169,7 +172,7 @@ export const Overview = ({
               <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.25em] mb-1.5">
                 Analytics
               </p>
-              <h3 className="font-display text-4xl text-slate-900 leading-tight">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
                 Analisa Tren &amp; Performa
               </h3>
               <p className="text-sm text-slate-500 font-medium mt-1 max-w-md">
@@ -243,7 +246,7 @@ export const Overview = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="tile p-8 rounded-[2rem]">
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
               <h3 className="text-lg font-black text-slate-900 tracking-tight">Metode Pembayaran</h3>
@@ -293,7 +296,7 @@ export const Overview = ({
           </div>
         </div>
 
-        <div className="tile p-8 rounded-[2rem]">
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
           <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-lg font-black text-slate-900 tracking-tight">Waktu Pembelian (Jam)</h3>
@@ -401,7 +404,7 @@ const MetricCard = ({ icon: Icon, color, label, value, sub }: MetricCardProps) =
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3 }}
-      className="tile p-6 rounded-3xl transition-all hover:-translate-y-0.5 relative overflow-hidden group"
+      className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-slate-200 transition-all relative overflow-hidden group"
     >
       {/* Accent bar */}
       <div className={cn('absolute left-0 top-0 bottom-0 w-1', tone.accent, 'opacity-80')} />
@@ -412,7 +415,7 @@ const MetricCard = ({ icon: Icon, color, label, value, sub }: MetricCardProps) =
         </div>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
       </div>
-      <h3 className="font-display text-4xl text-slate-900">{value}</h3>
+      <h3 className="text-2xl font-black text-slate-900 tracking-tight">{value}</h3>
       <p className="text-[10px] text-slate-400 font-medium mt-1">{sub}</p>
     </motion.div>
   );
@@ -435,7 +438,7 @@ const ConversionCard = ({ value, transactions, downloader }: ConversionCardProps
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3 }}
-      className="tile p-6 rounded-3xl transition-all hover:-translate-y-0.5 relative overflow-hidden group"
+      className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-slate-200 transition-all relative overflow-hidden group"
     >
       <div
         className={cn(
@@ -465,7 +468,7 @@ const ConversionCard = ({ value, transactions, downloader }: ConversionCardProps
         </span>
       </div>
 
-      <h3 className="font-display text-4xl text-slate-900">
+      <h3 className="text-2xl font-black text-slate-900 tracking-tight">
         {clamped.toFixed(2)}
         <span className="text-lg text-slate-400 font-bold">%</span>
       </h3>

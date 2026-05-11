@@ -78,7 +78,7 @@ export const RoleManagement = () => {
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="tile p-6 rounded-3xl space-y-6"
+      className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6"
     >
       <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
         <div className="p-2.5 bg-rose-50 rounded-xl">

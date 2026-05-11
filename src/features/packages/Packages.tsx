@@ -103,7 +103,7 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
               Product Analytics
             </span>
           </div>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
             Performa Produk
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">

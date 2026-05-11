@@ -399,43 +399,53 @@ export const TargetSection = ({
   if (showAppSelection) {
     return (
       <div className="space-y-10">
-        {/* Editorial header — Bento style */}
+        {/* Editorial header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
           <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-3">
-              Operasional Harian
-            </p>
-            <h1 className="font-display text-6xl text-slate-900 leading-none">
-              Strategi &amp; <span className="text-orange-600">Target</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 mb-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+                Operasional Harian
+              </span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+              Strategi &amp; Target
             </h1>
-            <p className="text-sm text-slate-500 font-medium mt-3 max-w-xl">
+            <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
               Atur target bulanan per aplikasi, tracking aktual harian, dan monitor kekurangan/kelebihan
               sales secara real-time.
             </p>
           </div>
           <div className="text-right hidden md:block">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.25em]">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">
               Periode
             </p>
-            <p className="font-display text-4xl text-slate-900 mt-1">
+            <p className="text-xl font-black text-slate-900 tracking-tight mt-1">
               {format(new Date(targetMonth + '-01'), 'MMMM yyyy')}
             </p>
           </div>
         </div>
 
         {/* Global Summary Dashboard */}
-        <div className="relative tile p-8 rounded-[2rem] overflow-hidden">
-          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-            <div>
-              <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-[0.25em] mb-1">
-                Analytics
-              </p>
-              <h3 className="font-display text-3xl text-slate-900 leading-tight">
-                Ringkasan Semua Platform
-              </h3>
-              <p className="text-xs text-slate-400 font-medium mt-1">
-                Akumulasi performa di bulan {format(new Date(targetMonth + '-01'), 'MMMM yyyy')}
-              </p>
+        <div className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 overflow-hidden">
+          {/* Subtle decorative accent */}
+          <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 bg-gradient-to-br from-indigo-100/50 to-transparent rounded-full blur-3xl" />
+
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+            <div className="flex items-start gap-4">
+              <div className="w-1 h-12 rounded-full bg-gradient-to-b from-indigo-500 via-amber-400 to-rose-500" />
+              <div>
+                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.25em] mb-1">
+                  Analytics
+                </p>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                  Ringkasan Semua Platform
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-1">
+                  Akumulasi performa dari seluruh aplikasi di bulan{' '}
+                  {format(new Date(targetMonth + '-01'), 'MMMM yyyy')}
+                </p>
+              </div>
             </div>
 
             {/* Global Filters */}
@@ -483,35 +493,32 @@ export const TargetSection = ({
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Total Downloader */}
-            <div className="tile p-6 rounded-3xl transition-all hover:-translate-y-0.5">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Total Downloader</p>
-              <h3 className="font-display text-5xl text-indigo-600 leading-none mb-4 tabular-nums">
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-all">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Downloader</p>
+              <h3 className="text-4xl font-black text-indigo-600 tracking-tight tabular-nums leading-none mb-3">
                 {formatNumber(globalSummary.totalRealDownloader)}
               </h3>
-              <div className="w-full h-1.5 bg-slate-200/50 rounded-full overflow-hidden mb-2">
-                <div className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.downloaderProgress)}%` }} />
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.downloaderProgress)}%` }} />
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="text-[11px] font-medium text-slate-400">Target {formatNumber(globalSummary.totalTargetDownloader)}</span>
-                <span className="text-[12px] font-bold text-indigo-600">{globalSummary.downloaderProgress.toFixed(1)}%</span>
+                <span className="text-[10px] font-bold text-slate-400">Target: {formatNumber(globalSummary.totalTargetDownloader)}</span>
+                <span className="text-[11px] font-black text-indigo-600">{globalSummary.downloaderProgress.toFixed(1)}%</span>
               </div>
             </div>
 
             {/* Total Sales */}
-            <div className="tile p-6 rounded-3xl transition-all hover:-translate-y-0.5 relative overflow-hidden">
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-200/40 rounded-full blur-2xl" />
-              <div className="relative">
-                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Total Sales</p>
-                <h3 className="font-display text-5xl text-emerald-600 leading-none mb-4 tabular-nums break-all">
-                  {formatCurrency(globalSummary.totalRealSales)}
-                </h3>
-                <div className="w-full h-1.5 bg-slate-200/50 rounded-full overflow-hidden mb-2">
-                  <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.salesProgress)}%` }} />
-                </div>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[11px] font-medium text-slate-400 truncate">Target {formatCurrency(globalSummary.totalTargetSales)}</span>
-                  <span className="text-[12px] font-bold text-emerald-600 flex-shrink-0">{globalSummary.salesProgress.toFixed(1)}%</span>
-                </div>
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-emerald-100 transition-all">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Sales</p>
+              <h3 className="text-3xl font-black text-emerald-600 tracking-tight tabular-nums leading-none mb-3 break-all">
+                {formatCurrency(globalSummary.totalRealSales)}
+              </h3>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.salesProgress)}%` }} />
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] font-bold text-slate-400 truncate">Target: {formatCurrency(globalSummary.totalTargetSales)}</span>
+                <span className="text-[11px] font-black text-emerald-600 flex-shrink-0">{globalSummary.salesProgress.toFixed(1)}%</span>
               </div>
             </div>
 
@@ -521,17 +528,17 @@ export const TargetSection = ({
                 / Math.max(1, filteredAppsForSummary.length);
               const pct = targetConv > 0 ? (globalSummary.conversionProgress / targetConv) * 100 : 0;
               return (
-                <div className="tile p-6 rounded-3xl transition-all hover:-translate-y-0.5">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Konversi</p>
-                  <h3 className="font-display text-5xl text-violet-600 leading-none mb-4 tabular-nums">
-                    {globalSummary.conversionProgress.toFixed(1)}<span className="text-3xl">%</span>
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-violet-100 transition-all">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Konversi</p>
+                  <h3 className="text-4xl font-black text-violet-600 tracking-tight tabular-nums leading-none mb-3">
+                    {globalSummary.conversionProgress.toFixed(1)}%
                   </h3>
-                  <div className="w-full h-1.5 bg-slate-200/50 rounded-full overflow-hidden mb-2">
-                    <div className="h-full bg-gradient-to-r from-violet-400 to-violet-600 transition-all duration-1000" style={{ width: `${Math.min(100, pct)}%` }} />
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                    <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${Math.min(100, pct)}%` }} />
                   </div>
                   <div className="flex items-baseline justify-between">
-                    <span className="text-[11px] font-medium text-slate-400">Target {targetConv.toFixed(1)}%</span>
-                    <span className="text-[12px] font-bold text-violet-600">{pct.toFixed(1)}%</span>
+                    <span className="text-[10px] font-bold text-slate-400">Target: {targetConv.toFixed(1)}%</span>
+                    <span className="text-[11px] font-black text-violet-600">{pct.toFixed(1)}%</span>
                   </div>
                 </div>
               );
@@ -543,28 +550,24 @@ export const TargetSection = ({
               const isSurplus = s >= 0;
               const hasData = Math.abs(s) > 0;
               const dailyTarget = globalSummary.totalTargetSales / Math.max(1, dates.length);
-              const accent = !hasData
-                ? { bg: 'from-slate-200/40 to-transparent', label: 'text-slate-500', value: 'text-slate-700', sub: 'text-slate-400' }
-                : isSurplus
-                ? { bg: 'from-emerald-200/40 to-transparent', label: 'text-emerald-700', value: 'text-emerald-600', sub: 'text-emerald-600' }
-                : { bg: 'from-rose-200/40 to-transparent', label: 'text-rose-700', value: 'text-rose-600', sub: 'text-rose-500' };
               return (
-                <div className="tile p-6 rounded-3xl transition-all hover:-translate-y-0.5 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                  <div className={cn('absolute inset-0 bg-gradient-to-br', accent.bg)} />
-                  <div className="relative">
-                    <p className={cn('text-[10px] font-semibold uppercase tracking-widest mb-3', accent.label)}>Status Revenue</p>
-                    <h3 className={cn('font-display text-5xl leading-none mb-2 tabular-nums break-all', accent.value)}>
-                      {!hasData ? '—' : `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))}`}
-                    </h3>
-                    <p className={cn('text-[11px] font-medium mt-2', accent.sub)}>
-                      {hasData ? `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))} dari target harian` : 'Belum ada data sales'}
-                    </p>
-                    {hasData && (
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        (target harian {formatCurrency(dailyTarget)})
-                      </p>
-                    )}
-                  </div>
+                <div className={cn('p-5 rounded-3xl border shadow-sm transition-all flex flex-col items-center justify-center text-center',
+                  !hasData ? 'bg-slate-50 border-slate-100'
+                    : isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
+                  <p className={cn('text-[10px] font-bold uppercase tracking-widest mb-3',
+                    !hasData ? 'text-slate-500'
+                      : isSurplus ? 'text-emerald-600' : 'text-rose-500')}>Status Revenue</p>
+                  <h3 className={cn('text-3xl font-black tracking-tight tabular-nums leading-none mb-2 break-all',
+                    !hasData ? 'text-slate-700'
+                      : isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
+                    {!hasData ? '—' : `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))}`}
+                  </h3>
+                  <p className={cn('text-[10px] font-bold mt-1',
+                    !hasData ? 'text-slate-400'
+                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    {isSurplus ? '+' : '-'}{formatCurrency(Math.abs(s))} dari target harian{' '}
+                    <span className="text-slate-400">({formatCurrency(dailyTarget)})</span>
+                  </p>
                 </div>
               );
             })()}
@@ -847,7 +850,7 @@ export const TargetSection = ({
           {/* Summary Cards — Total Downloader, Total Sales, Konversi, Status Revenue */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Downloader */}
-            <div className="tile p-5 rounded-3xl">
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Downloader</p>
               <h3 className="text-4xl font-black text-indigo-600 tracking-tight tabular-nums leading-none mb-3">
                 {formatNumber(summary.totalRealDownloader)}
@@ -862,7 +865,7 @@ export const TargetSection = ({
             </div>
 
             {/* Total Sales */}
-            <div className="tile p-5 rounded-3xl">
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Sales</p>
               <h3 className="text-3xl font-black text-emerald-600 tracking-tight tabular-nums leading-none mb-3 break-all">
                 {formatCurrency(summary.totalRealSales)}
@@ -881,7 +884,7 @@ export const TargetSection = ({
               const targetConv = summary.targetConfig.targetConversion || 0;
               const pct = targetConv > 0 ? (summary.progressConversion / targetConv) * 100 : 0;
               return (
-                <div className="tile p-5 rounded-3xl">
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Konversi</p>
                   <h3 className="text-4xl font-black text-violet-600 tracking-tight tabular-nums leading-none mb-3">
                     {summary.progressConversion.toFixed(1)}%

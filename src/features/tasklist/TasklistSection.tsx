@@ -314,12 +314,14 @@ export const TasklistSection = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
         <div>
-          <p className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest mb-3 inline-flex items-center gap-2">
-            <KanbanSquare className="w-3 h-3" />
-            {viewMode === 'mine' ? 'Rencana Pribadi' : 'Task Board'}
-          </p>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
-            {viewMode === 'mine' ? <>Tugas <span className="text-orange-600">Saya</span></> : <>Task<span className="text-orange-600">list</span></>}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 text-cyan-700 mb-3">
+            <KanbanSquare className="w-3 h-3 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              {viewMode === 'mine' ? 'Rencana Pribadi' : 'Task Board'}
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            {viewMode === 'mine' ? 'Tugas Saya' : 'Tasklist'}
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
             {viewMode === 'mine'
@@ -382,7 +384,7 @@ export const TasklistSection = ({
           <p className="text-[9px] font-bold text-slate-400 mt-1">Past deadline</p>
         </div>
 
-        <div className="tile p-4 rounded-2xl">
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-1">
             <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">Hari Ini</p>
             <Clock className="w-4 h-4 text-amber-500" />
@@ -391,7 +393,7 @@ export const TasklistSection = ({
           <p className="text-[9px] font-bold text-slate-400 mt-1">Due today</p>
         </div>
 
-        <div className="tile p-4 rounded-2xl">
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-1">
             <p className="text-[9px] font-black uppercase tracking-widest text-rose-500">Urgent</p>
             <Flame className="w-4 h-4 text-rose-500" />
@@ -400,7 +402,7 @@ export const TasklistSection = ({
           <p className="text-[9px] font-bold text-slate-400 mt-1">Priority urgent</p>
         </div>
 
-        <div className="tile p-4 rounded-2xl">
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-1">
             <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Selesai</p>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -411,7 +413,7 @@ export const TasklistSection = ({
       </div>
 
       {/* Filter bar */}
-      <div className="tile p-5 rounded-3xl">
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
@@ -462,7 +464,7 @@ export const TasklistSection = ({
 
       {/* Kanban board */}
       {loading ? (
-        <div className="tile p-12 rounded-3xl text-center text-[11px] font-bold text-slate-400">
+        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
           Memuat tasks…
         </div>
       ) : (

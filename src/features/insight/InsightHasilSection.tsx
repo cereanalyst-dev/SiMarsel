@@ -246,14 +246,14 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
         <div>
-          <p className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest mb-3 inline-flex items-center gap-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-600 mb-3">
             <Sparkles className="w-3 h-3" />
-            Analytics
-          </p>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
-            Insight <span className="text-orange-600">Hasil</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Insight Hasil</span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            Insight Hasil Konten
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-3 max-w-xl">
+          <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
             Rekap harian per (app · platform sosmed). Input manual atau upload Excel.
           </p>
         </div>
@@ -295,7 +295,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
       </div>
 
       {/* Filter bar */}
-      <div className="tile p-5 rounded-3xl">
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
             <Smartphone className="w-3.5 h-3.5 text-slate-400" />
@@ -359,7 +359,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
         const meta = METRIC_LABELS[chartMetric];
         const fmtY = (v: number) => meta.format === 'percent' ? `${v.toFixed(1)}%` : formatNumber(v);
         return (
-          <div className="tile p-7 rounded-3xl">
+          <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
@@ -441,7 +441,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
       })()}
 
       {/* Table */}
-      <div className="tile rounded-3xl overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="px-7 py-5 border-b border-slate-100 flex items-center gap-3">
           <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
           <div>

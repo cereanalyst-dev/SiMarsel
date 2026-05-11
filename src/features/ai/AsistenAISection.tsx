@@ -232,7 +232,7 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
               AI Assistant
             </span>
           </div>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
             Asisten AI
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -244,7 +244,7 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
 
         {/* Platform context selector */}
         {platformsList.length > 1 && (
-          <div className="flex items-center gap-2 tile p-2 rounded-2xl">
+          <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
             <Smartphone className="w-3.5 h-3.5 text-slate-400 ml-2" />
             <select
               value={platform}
@@ -300,7 +300,7 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
       )}
 
       {/* Chat container */}
-      <div className="tile rounded-3xl overflow-hidden flex flex-col" style={{ height: messages.length > 0 ? '70vh' : 'auto' }}>
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col" style={{ height: messages.length > 0 ? '70vh' : 'auto' }}>
         {messages.length > 0 && (
           <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
             <AnimatePresence>

@@ -478,19 +478,7 @@ export const SocialMediaAnalysis = ({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest mb-3">Repository</p>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
-            Analisa <span className="text-orange-600">Sosmed</span>
-          </h1>
-          <p className="text-sm text-slate-500 font-medium mt-3">
-            {allContent.length} konten · 17 metrik per post
-          </p>
-        </div>
-      </div>
-
-      <div className="tile p-8 rounded-[2rem]">
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
         {/* Header + actions */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
           <div className="flex items-center gap-3">
@@ -498,8 +486,8 @@ export const SocialMediaAnalysis = ({
               <Smartphone className="w-5 h-5 text-rose-600" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900 tracking-tight">
-                Konten Sosial Media
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                Repository Konten Sosial Media
               </h3>
               <p className="text-xs text-slate-400 font-medium mt-1">
                 {allContent.length} konten · 17 metrik per post
@@ -661,7 +649,7 @@ export const SocialMediaAnalysis = ({
               const meta = METRIC_LABELS[chartMetric];
               const fmtY = (v: number) => meta.format === 'percent' ? `${v.toFixed(1)}%` : formatNumber(v);
               return (
-                <div className="tile p-5 rounded-3xl mb-6">
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm mb-6">
                   <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
                     <div className="flex items-center gap-3">
                       <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
@@ -749,7 +737,7 @@ export const SocialMediaAnalysis = ({
             })()}
 
             {/* Table view */}
-            <div className="tile rounded-3xl overflow-hidden">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
                 <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
                 <div>

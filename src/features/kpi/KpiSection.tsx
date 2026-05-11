@@ -299,12 +299,14 @@ export const KpiSection = ({
       {/* Header dengan breadcrumb */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest mb-3 inline-flex items-center gap-2">
-            <TargetIcon className="w-3 h-3" />
-            Performance
-          </p>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
-            K<span className="text-orange-600">P</span>I
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 mb-3">
+            <TargetIcon className="w-3 h-3 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              Performance
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            KPI
           </h1>
           <Breadcrumb
             divisionName={activeDivision?.name ?? null}
@@ -441,7 +443,7 @@ export const KpiSection = ({
 
       {/* Render lapis sesuai navigasi */}
       {loading ? (
-        <div className="tile p-12 rounded-3xl text-center text-[11px] font-bold text-slate-400">
+        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
           Memuat KPI…
         </div>
       ) : activeCard ? (
@@ -573,7 +575,7 @@ function PeriodFilterBar({
     : fallbackYears;
 
   return (
-    <div className="tile p-4 rounded-3xl flex flex-wrap items-center gap-3">
+    <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
         <Filter className="w-3.5 h-3.5" />
         Filter Periode
@@ -654,7 +656,7 @@ function DivisionListView({
 }) {
   if (divisions.length === 0) {
     return (
-      <div className="tile p-12 rounded-3xl text-center">
+      <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
         <Briefcase className="w-10 h-10 text-slate-300 mx-auto mb-3" />
         <p className="text-sm font-black text-slate-700 mb-1">Belum ada Divisi</p>
         <p className="text-xs text-slate-400 font-medium mb-4">
@@ -679,7 +681,7 @@ function DivisionListView({
         return (
           <div
             key={d.id}
-            className="group tile p-5 rounded-3xl hover:-translate-y-0.5 transition-all relative"
+            className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative"
           >
             <button
               type="button"
@@ -797,7 +799,7 @@ function CardListView({
   return (
     <div className="space-y-4">
       {/* Division header */}
-      <div className="tile p-5 rounded-3xl flex items-center gap-3">
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center gap-3">
         <button
           type="button"
           onClick={onBack}
@@ -899,7 +901,7 @@ function CardListView({
             </div>
           </div>
         ) : (
-          <div className="tile p-6 rounded-3xl border-2 border-dashed border-amber-300/60 text-center">
+          <div className="bg-white p-6 rounded-3xl border-2 border-dashed border-amber-200 text-center">
             <TargetIcon className="w-7 h-7 text-amber-300 mx-auto mb-2" />
             <p className="text-[11px] font-bold text-slate-500 mb-3">
               Belum ada KPI Leader untuk divisi ini.
@@ -922,7 +924,7 @@ function CardListView({
           KPI Staff
         </p>
         {staffCards.length === 0 ? (
-          <div className="tile p-12 rounded-3xl text-center">
+          <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
             <UserIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <p className="text-sm font-black text-slate-700 mb-1">Belum ada KPI staff</p>
             <p className="text-xs text-slate-400 font-medium mb-4">
@@ -942,7 +944,7 @@ function CardListView({
             {staffCards.map((c) => (
               <div
                 key={c.id}
-                className="group tile p-5 rounded-3xl hover:-translate-y-0.5 transition-all relative"
+                className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative"
               >
                 <button type="button" onClick={() => onOpenCard(c)} className="w-full text-left">
                   <div className="flex items-center gap-3 mb-3">
@@ -1103,7 +1105,7 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
 
   return (
     <div className="space-y-6">
-      <div className="tile p-5 rounded-3xl flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -1161,11 +1163,11 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
       </div>
 
       {loading ? (
-        <div className="tile p-12 rounded-3xl text-center text-[11px] font-bold text-slate-400">
+        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
           Memuat metric…
         </div>
       ) : grouped.size === 0 ? (
-        <div className="tile p-12 rounded-3xl text-center">
+        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
           <p className="text-sm font-black text-slate-700 mb-1">Belum ada metric</p>
           <p className="text-xs text-slate-400 font-medium mb-4">
             Klik &ldquo;Tambah Perspektif&rdquo; untuk mulai isi KPI.
@@ -1249,7 +1251,7 @@ function PerspektifTable({
   );
 
   return (
-    <div className="tile rounded-3xl overflow-hidden">
+    <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
       <div className="flex items-center justify-between px-5 py-3 bg-emerald-50 border-b border-emerald-100">
         {editingName ? (
           <input
