@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
-  Activity, Calendar, ChevronDown, ChevronRight,
+  Activity, Calendar, ChevronDown, ChevronRight, GripVertical,
   MessageSquare, RefreshCw, Smartphone, Target,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -51,6 +51,22 @@ export const TargetSection = ({
 }: TargetSectionProps) => {
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
+  // Drag-and-drop reorder Rekapitulasi All Platform — track row yang lagi di-drag.
+  const [draggingAppId, setDraggingAppId] = useState<string | null>(null);
+  const [dragOverAppId, setDragOverAppId] = useState<string | null>(null);
+
+  // Reorder apps array: pindahkan source ke posisi target.
+  // Trigger setApps → auto save via debounce + persisted di apps_snapshot.
+  const handleReorderApps = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const sourceIdx = apps.findIndex((a) => a.id === sourceId);
+    const targetIdx = apps.findIndex((a) => a.id === targetId);
+    if (sourceIdx < 0 || targetIdx < 0) return;
+    const next = [...apps];
+    const [moved] = next.splice(sourceIdx, 1);
+    next.splice(targetIdx, 0, moved);
+    setApps(next);
+  };
   const selectedApp = apps.find(a => a.id === selectedAppId) || apps[0];
 
   const filteredAppsForSummary = useMemo(() => {
@@ -558,7 +574,12 @@ export const TargetSection = ({
               <div className="p-2 bg-violet-50 rounded-xl">
                 <Target className="w-4 h-4 text-violet-600" />
               </div>
-              <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Rekapitulasi Target All Platform</h4>
+              <div className="flex-1">
+                <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Rekapitulasi Target All Platform</h4>
+                <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                  Drag baris untuk atur urutan · klik baris untuk buka detail
+                </p>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -600,16 +621,56 @@ export const TargetSection = ({
                     const selisihSales = appRealSales - (target?.targetSales || 0);
                     const isSurplus = selisihSales >= 0;
 
+                    const isDragging = draggingAppId === app.id;
+                    const isDragOver = dragOverAppId === app.id && draggingAppId !== app.id;
                     return (
                       <tr
                         key={app.id}
-                        onClick={() => { setSelectedAppId(app.id); setShowAppSelection(false); }}
-                        className="border-b border-slate-50 hover:bg-indigo-50/40 cursor-pointer transition-all group"
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggingAppId(app.id);
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', app.id);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                          if (dragOverAppId !== app.id) setDragOverAppId(app.id);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverAppId === app.id) setDragOverAppId(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const src = e.dataTransfer.getData('text/plain') || draggingAppId;
+                          if (src) handleReorderApps(src, app.id);
+                          setDraggingAppId(null);
+                          setDragOverAppId(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingAppId(null);
+                          setDragOverAppId(null);
+                        }}
+                        onClick={(e) => {
+                          // Hindari trigger navigation saat user drag (drag ends with click event sometimes)
+                          if (draggingAppId) return;
+                          const tag = (e.target as HTMLElement).tagName.toLowerCase();
+                          if (tag === 'button' || tag === 'svg' || tag === 'path') return;
+                          setSelectedAppId(app.id); setShowAppSelection(false);
+                        }}
+                        className={cn(
+                          'border-b border-slate-50 transition-all group',
+                          isDragging && 'opacity-30',
+                          isDragOver && 'bg-indigo-100/60 border-t-2 border-t-indigo-400',
+                          !isDragging && 'hover:bg-indigo-50/40',
+                        )}
+                        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                       >
                         <td className="py-4 px-4 text-xs font-black text-slate-700 group-hover:text-indigo-700">
                           <div className="flex items-center gap-2">
+                            <GripVertical className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors flex-shrink-0" />
                             <span>{app.name}</span>
-                            <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                           </div>
                         </td>
                         <td className="py-4 px-4">
