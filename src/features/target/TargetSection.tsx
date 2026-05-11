@@ -427,7 +427,7 @@ export const TargetSection = ({
         </div>
 
         {/* Global Summary Dashboard */}
-        <div className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 overflow-hidden">
+        <div className="relative card-hero p-8 overflow-hidden">
           {/* Subtle decorative accent */}
           <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 bg-gradient-to-br from-indigo-100/50 to-transparent rounded-full blur-3xl" />
 
@@ -493,7 +493,7 @@ export const TargetSection = ({
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Total Downloader */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-all">
+            <div className="card-tile card-hover p-5">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Downloader</p>
               <h3 className="text-4xl font-black text-indigo-600 tracking-tight tabular-nums leading-none mb-3">
                 {formatNumber(globalSummary.totalRealDownloader)}
@@ -508,7 +508,7 @@ export const TargetSection = ({
             </div>
 
             {/* Total Sales */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-emerald-100 transition-all">
+            <div className="card-tile card-hover p-5">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Sales</p>
               <h3 className="text-3xl font-black text-emerald-600 tracking-tight tabular-nums leading-none mb-3 break-all">
                 {formatCurrency(globalSummary.totalRealSales)}
@@ -528,7 +528,7 @@ export const TargetSection = ({
                 / Math.max(1, filteredAppsForSummary.length);
               const pct = targetConv > 0 ? (globalSummary.conversionProgress / targetConv) * 100 : 0;
               return (
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-violet-100 transition-all">
+                <div className="card-tile card-hover p-5">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Konversi</p>
                   <h3 className="text-4xl font-black text-violet-600 tracking-tight tabular-nums leading-none mb-3">
                     {globalSummary.conversionProgress.toFixed(1)}%
@@ -768,7 +768,7 @@ export const TargetSection = ({
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-50 max-w-4xl mx-auto"
+          className="card-hero p-10 max-w-4xl mx-auto"
         >
           <div className="flex items-center gap-4 mb-10">
             <div className="p-3 bg-indigo-50 rounded-2xl">
@@ -850,7 +850,7 @@ export const TargetSection = ({
           {/* Summary Cards — Total Downloader, Total Sales, Konversi, Status Revenue */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Downloader */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="card-tile p-5">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Downloader</p>
               <h3 className="text-4xl font-black text-indigo-600 tracking-tight tabular-nums leading-none mb-3">
                 {formatNumber(summary.totalRealDownloader)}
@@ -865,7 +865,7 @@ export const TargetSection = ({
             </div>
 
             {/* Total Sales */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="card-tile p-5">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Sales</p>
               <h3 className="text-3xl font-black text-emerald-600 tracking-tight tabular-nums leading-none mb-3 break-all">
                 {formatCurrency(summary.totalRealSales)}
@@ -884,7 +884,7 @@ export const TargetSection = ({
               const targetConv = summary.targetConfig.targetConversion || 0;
               const pct = targetConv > 0 ? (summary.progressConversion / targetConv) * 100 : 0;
               return (
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                <div className="card-tile p-5">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Konversi</p>
                   <h3 className="text-4xl font-black text-violet-600 tracking-tight tabular-nums leading-none mb-3">
                     {summary.progressConversion.toFixed(1)}%
@@ -930,7 +930,7 @@ export const TargetSection = ({
           </div>
 
           {/* Spreadsheet Table */}
-          <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-50 overflow-hidden">
+          <div className="card-hero overflow-hidden">
             <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between bg-slate-50/30 gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-indigo-50 rounded-xl">

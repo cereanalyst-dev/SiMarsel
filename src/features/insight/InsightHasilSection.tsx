@@ -295,7 +295,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="card-tile p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
             <Smartphone className="w-3.5 h-3.5 text-slate-400" />
@@ -359,7 +359,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
         const meta = METRIC_LABELS[chartMetric];
         const fmtY = (v: number) => meta.format === 'percent' ? `${v.toFixed(1)}%` : formatNumber(v);
         return (
-          <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-sm">
+          <div className="card-tile p-7">
             <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
@@ -441,7 +441,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
       })()}
 
       {/* Table */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="card-tile overflow-hidden">
         <div className="px-7 py-5 border-b border-slate-100 flex items-center gap-3">
           <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
           <div>

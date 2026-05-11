@@ -478,7 +478,7 @@ export const SocialMediaAnalysis = ({
 
   return (
     <div className="space-y-8">
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-50">
+      <div className="card-hero p-8">
         {/* Header + actions */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
           <div className="flex items-center gap-3">
@@ -649,7 +649,7 @@ export const SocialMediaAnalysis = ({
               const meta = METRIC_LABELS[chartMetric];
               const fmtY = (v: number) => meta.format === 'percent' ? `${v.toFixed(1)}%` : formatNumber(v);
               return (
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm mb-6">
+                <div className="card-tile p-5 mb-6">
                   <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
                     <div className="flex items-center gap-3">
                       <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
@@ -737,7 +737,7 @@ export const SocialMediaAnalysis = ({
             })()}
 
             {/* Table view */}
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="card-tile overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
                 <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
                 <div>

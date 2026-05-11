@@ -133,7 +133,7 @@ export const PricingComparison = ({ data, filters }: Props) => {
       key="comparison"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white p-10 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100"
+      className="card-hero p-10"
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-12">
         <div>

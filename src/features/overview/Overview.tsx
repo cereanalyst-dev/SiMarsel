@@ -160,7 +160,7 @@ export const Overview = ({
         />
       </div>
 
-      <div className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
+      <div className="relative card-hero p-8 overflow-hidden">
         {/* Decorative accents */}
         <div className="pointer-events-none absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br from-indigo-100/50 to-transparent rounded-full blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-16 w-64 h-64 bg-gradient-to-br from-amber-100/40 to-transparent rounded-full blur-3xl" />
@@ -246,7 +246,7 @@ export const Overview = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+        <div className="card-hero p-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
               <h3 className="text-lg font-black text-slate-900 tracking-tight">Metode Pembayaran</h3>
@@ -296,7 +296,7 @@ export const Overview = ({
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+        <div className="card-hero p-8">
           <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-lg font-black text-slate-900 tracking-tight">Waktu Pembelian (Jam)</h3>
@@ -404,7 +404,7 @@ const MetricCard = ({ icon: Icon, color, label, value, sub }: MetricCardProps) =
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3 }}
-      className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-slate-200 transition-all relative overflow-hidden group"
+      className="card-tile card-hover p-6 relative overflow-hidden group"
     >
       {/* Accent bar */}
       <div className={cn('absolute left-0 top-0 bottom-0 w-1', tone.accent, 'opacity-80')} />
@@ -438,7 +438,7 @@ const ConversionCard = ({ value, transactions, downloader }: ConversionCardProps
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3 }}
-      className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-slate-200 transition-all relative overflow-hidden group"
+      className="card-tile card-hover p-6 relative overflow-hidden group"
     >
       <div
         className={cn(

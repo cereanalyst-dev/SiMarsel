@@ -384,7 +384,7 @@ export const TasklistSection = ({
           <p className="text-[9px] font-bold text-slate-400 mt-1">Past deadline</p>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="card-compact p-4">
           <div className="flex items-center justify-between mb-1">
             <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">Hari Ini</p>
             <Clock className="w-4 h-4 text-amber-500" />
@@ -393,7 +393,7 @@ export const TasklistSection = ({
           <p className="text-[9px] font-bold text-slate-400 mt-1">Due today</p>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="card-compact p-4">
           <div className="flex items-center justify-between mb-1">
             <p className="text-[9px] font-black uppercase tracking-widest text-rose-500">Urgent</p>
             <Flame className="w-4 h-4 text-rose-500" />
@@ -402,7 +402,7 @@ export const TasklistSection = ({
           <p className="text-[9px] font-bold text-slate-400 mt-1">Priority urgent</p>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="card-compact p-4">
           <div className="flex items-center justify-between mb-1">
             <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Selesai</p>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -413,7 +413,7 @@ export const TasklistSection = ({
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="card-tile p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
@@ -464,7 +464,7 @@ export const TasklistSection = ({
 
       {/* Kanban board */}
       {loading ? (
-        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
+        <div className="card-flat p-12 text-center text-[11px] font-bold text-slate-400">
           Memuat tasks…
         </div>
       ) : (

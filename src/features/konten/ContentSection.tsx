@@ -229,7 +229,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="card-tile p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
             <Smartphone className="w-3.5 h-3.5 text-slate-400" />
@@ -294,7 +294,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
       </div>
 
       {/* Spreadsheet */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="card-tile overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-[11px] font-bold text-slate-400">
             Memuat skrip…

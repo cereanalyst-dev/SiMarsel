@@ -172,7 +172,7 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
         </div>
       </div>
 
-      <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+      <div className="card-hero p-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
           <h3 className="text-xl font-black text-slate-900 tracking-tight">Detail Performa Paket</h3>
           <div className="flex flex-1 md:flex-initial items-center gap-2 flex-wrap md:flex-nowrap md:justify-end">

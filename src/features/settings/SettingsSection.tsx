@@ -43,7 +43,7 @@ export const SettingsSection = ({
 
       {/* Empty state untuk staf yang tidak punya akses apa-apa */}
       {!canCreateAccount && !canManageRoles && (
-        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
+        <div className="card-flat p-12 text-center">
           <p className="text-sm font-bold text-slate-400">
             Pengaturan terbatas. Hubungi admin untuk akses lebih lanjut.
           </p>
@@ -121,7 +121,7 @@ const CreateAccountCard = () => {
   };
 
   return (
-    <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100">
+    <div className="card-hero p-8">
       <div className="flex items-start gap-4 mb-6">
         <div className="w-1 h-12 rounded-full bg-gradient-to-b from-cyan-500 to-violet-500" />
         <div>

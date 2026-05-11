@@ -443,7 +443,7 @@ export const KpiSection = ({
 
       {/* Render lapis sesuai navigasi */}
       {loading ? (
-        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
+        <div className="card-flat p-12 text-center text-[11px] font-bold text-slate-400">
           Memuat KPI…
         </div>
       ) : activeCard ? (
@@ -575,7 +575,7 @@ function PeriodFilterBar({
     : fallbackYears;
 
   return (
-    <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-wrap items-center gap-3">
+    <div className="card-tile p-4 flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
         <Filter className="w-3.5 h-3.5" />
         Filter Periode
@@ -656,7 +656,7 @@ function DivisionListView({
 }) {
   if (divisions.length === 0) {
     return (
-      <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
+      <div className="card-flat p-12 text-center">
         <Briefcase className="w-10 h-10 text-slate-300 mx-auto mb-3" />
         <p className="text-sm font-black text-slate-700 mb-1">Belum ada Divisi</p>
         <p className="text-xs text-slate-400 font-medium mb-4">
@@ -681,7 +681,7 @@ function DivisionListView({
         return (
           <div
             key={d.id}
-            className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative"
+            className="group card-tile card-hover p-5 relative"
           >
             <button
               type="button"
@@ -799,7 +799,7 @@ function CardListView({
   return (
     <div className="space-y-4">
       {/* Division header */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center gap-3">
+      <div className="card-flat p-5 flex items-center gap-3">
         <button
           type="button"
           onClick={onBack}
@@ -924,7 +924,7 @@ function CardListView({
           KPI Staff
         </p>
         {staffCards.length === 0 ? (
-          <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
+          <div className="card-flat p-12 text-center">
             <UserIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <p className="text-sm font-black text-slate-700 mb-1">Belum ada KPI staff</p>
             <p className="text-xs text-slate-400 font-medium mb-4">
@@ -944,7 +944,7 @@ function CardListView({
             {staffCards.map((c) => (
               <div
                 key={c.id}
-                className="group bg-white rounded-3xl border border-slate-100 p-5 hover:shadow-lg hover:border-emerald-200 transition-all relative"
+                className="group card-tile card-hover p-5 relative"
               >
                 <button type="button" onClick={() => onOpenCard(c)} className="w-full text-left">
                   <div className="flex items-center gap-3 mb-3">
@@ -1105,7 +1105,7 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 flex flex-wrap items-center justify-between gap-4">
+      <div className="card-flat p-5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -1163,11 +1163,11 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
       </div>
 
       {loading ? (
-        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center text-[11px] font-bold text-slate-400">
+        <div className="card-flat p-12 text-center text-[11px] font-bold text-slate-400">
           Memuat metric…
         </div>
       ) : grouped.size === 0 ? (
-        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
+        <div className="card-flat p-12 text-center">
           <p className="text-sm font-black text-slate-700 mb-1">Belum ada metric</p>
           <p className="text-xs text-slate-400 font-medium mb-4">
             Klik &ldquo;Tambah Perspektif&rdquo; untuk mulai isi KPI.
@@ -1251,7 +1251,7 @@ function PerspektifTable({
   );
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
+    <div className="card-flat overflow-hidden shadow-sm">
       <div className="flex items-center justify-between px-5 py-3 bg-emerald-50 border-b border-emerald-100">
         {editingName ? (
           <input

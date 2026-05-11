@@ -93,3 +93,58 @@ textarea.sheet-cell {
 .neo-shadow {
   @apply shadow-[0_20px_50px_rgba(8,112,184,0.05)];
 }
+
+/* ============================================================
+   Standardized card patterns — pakai class ini di seluruh app
+   supaya konsisten visual & spacing antar halaman.
+
+   Hierarchy:
+   - .card-hero       → wrapper section besar (rounded 2.5rem, padding 8, shadow halus)
+   - .card-tile       → kartu medium (rounded 3xl, padding 6, shadow tipis)
+   - .card-compact    → metric kecil / item kecil (rounded 2xl, padding 5, shadow tipis)
+   - .card-flat       → tabel / item dalam scroll (rounded 3xl, no shadow)
+
+   Hover: tambah .card-hover di samping class di atas (kalau clickable).
+   ============================================================ */
+.card-hero {
+  @apply bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)];
+}
+.card-tile {
+  @apply bg-white rounded-3xl border border-slate-100 shadow-sm;
+}
+.card-compact {
+  @apply bg-white rounded-2xl border border-slate-100 shadow-sm;
+}
+.card-flat {
+  @apply bg-white rounded-3xl border border-slate-100;
+}
+.card-hover {
+  @apply hover:shadow-lg hover:border-slate-200 transition-all;
+}
+
+/* Standardized typography for page hero — semua halaman pakai pola sama */
+.hero-eyebrow {
+  @apply inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-[10px] font-black uppercase tracking-[0.2em];
+}
+.hero-title {
+  @apply text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight;
+}
+.hero-subtitle {
+  @apply text-sm text-slate-500 font-medium mt-1.5 max-w-xl;
+}
+
+/* Section sub-header (dipakai di dalam card-hero) */
+.section-title {
+  @apply text-base font-black text-slate-900 tracking-tight;
+}
+.section-eyebrow {
+  @apply text-[10px] font-black uppercase tracking-[0.25em];
+}
+
+/* Metric number — angka besar di kartu */
+.metric-number {
+  @apply text-3xl font-black tracking-tight tabular-nums;
+}
+.metric-label {
+  @apply text-[10px] font-black text-slate-400 uppercase tracking-widest;
+}
