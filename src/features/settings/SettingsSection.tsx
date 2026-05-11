@@ -1,102 +1,20 @@
-import { useState, type ChangeEvent } from 'react';
-import * as XLSX from 'xlsx';
-import { Download, Eye, EyeOff, RefreshCw, UserPlus } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, RefreshCw, UserPlus } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { logger } from '../../lib/logger';
 import { useToast } from '../../components/Toast';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { RoleManagement } from './RoleManagement';
 import { ROLE_LABELS, type UserRole } from '../../types';
 
-interface UploadProgress {
-  current: number;
-  total: number;
-  label: string;
-}
-
 interface SettingsSectionProps {
-  onDataUpdate: (
-    transactions: unknown[],
-    downloaders: unknown[],
-    append: boolean,
-    onProgress?: (p: UploadProgress) => void,
-  ) => void | Promise<void>;
   canManageRoles?: boolean;
+  canCreateAccount?: boolean;
 }
 
 export const SettingsSection = ({
-  onDataUpdate,
   canManageRoles = false,
+  canCreateAccount = false,
 }: SettingsSectionProps) => {
-  const [isUploading, setIsUploading] = useState(false);
-  // Upload selalu replace mode (data lama diganti) — toggle dihilangkan dari UI.
-  const [progress, setProgress] = useState<UploadProgress | null>(null);
-  const toast = useToast();
-
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setProgress({ current: 0, total: 1, label: 'Membaca file Excel…' });
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const buf = event.target?.result;
-        if (!buf) throw new Error('Failed to read file');
-        const workbook = XLSX.read(buf, { type: 'array' });
-
-        let transactions: unknown[] = [];
-        let downloaders: unknown[] = [];
-
-        workbook.SheetNames.forEach((name) => {
-          const sheet = workbook.Sheets[name];
-          const jsonData = XLSX.utils.sheet_to_json(sheet);
-          const upper = name.toUpperCase();
-          if (upper.includes('TRANSAKSI') || upper.includes('TRX') || upper.includes('PAID')) {
-            transactions = jsonData;
-          } else if (upper.includes('DOWNLOADER') || upper.includes('DOWNLOAD')) {
-            downloaders = jsonData;
-          }
-        });
-
-        if (transactions.length === 0 && workbook.SheetNames.length > 0) {
-          transactions = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        }
-        if (downloaders.length === 0 && workbook.SheetNames.length > 1) {
-          downloaders = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[1]]);
-        }
-
-        await onDataUpdate(
-          transactions,
-          downloaders,
-          false, // selalu replace mode
-          (p) => setProgress(p),
-        );
-        toast.success(
-          'Data berhasil diganti',
-          `${transactions.length.toLocaleString('id-ID')} transaksi • ${downloaders.length.toLocaleString('id-ID')} downloader row`,
-        );
-      } catch (err) {
-        logger.error('Upload error:', err);
-        toast.error(
-          'Gagal memproses file',
-          'Pastikan format Excel benar dan ada sheet TRANSAKSI / DOWNLOADER.',
-        );
-      } finally {
-        setIsUploading(false);
-        setProgress(null);
-        e.target.value = '';
-      }
-    };
-    reader.onerror = () => {
-      setIsUploading(false);
-      setProgress(null);
-      toast.error('Gagal mengunggah file', 'Coba pilih file Excel lain.');
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
   return (
     <div className="space-y-8">
       {/* Editorial header */}
@@ -109,97 +27,28 @@ export const SettingsSection = ({
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-            Pengaturan Data
+            Pengaturan
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
-            Upload file Excel untuk mengganti atau menambah data transaksi &amp; downloader di database.
+            Kelola akun anggota tim dan role-nya.
           </p>
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100">
-        <div className="flex items-start gap-4 mb-6">
-          <div className="w-1 h-12 rounded-full bg-gradient-to-b from-indigo-500 to-emerald-500" />
-          <div>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mb-1">
-              Upload Data
-            </p>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">
-              Drop File Excel
-            </h3>
-            <p className="text-xs text-slate-400 font-medium mt-1">
-              Data lama akan diganti dengan data baru (refresh bulanan).
-            </p>
-          </div>
-        </div>
-
-        <div className="max-w-xl">
-          <div
-            className="p-12 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center text-center group transition-all cursor-pointer relative hover:border-indigo-300 hover:bg-indigo-50/30 border-slate-200 bg-slate-50/50"
-          >
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              disabled={isUploading}
-              aria-label="Pilih file Excel"
-            />
-            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              {isUploading ? (
-                <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
-              ) : (
-                <Download className="w-8 h-8 text-slate-400 group-hover:text-indigo-600" />
-              )}
-            </div>
-            <h4 className="text-sm font-black text-slate-900 mb-1">
-              {isUploading
-                ? 'Memproses File...'
-                : 'Klik atau Drag file untuk MENGGANTI Data'}
-            </h4>
-            <p className="text-xs text-slate-400 font-medium">
-              Format: .xlsx atau .xls dengan sheet TRANSAKSI dan DOWNLOADER
-            </p>
-          </div>
-
-          {/* Progress bar */}
-          {progress && (
-            <div className="mt-6 p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest">
-                  {progress.label}
-                </p>
-                <p className="text-[11px] font-bold text-slate-500">
-                  {progress.total > 0
-                    ? `${Math.round((progress.current / progress.total) * 100)}%`
-                    : ''}
-                </p>
-              </div>
-              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300"
-                  style={{
-                    width: `${
-                      progress.total > 0
-                        ? Math.min(100, (progress.current / progress.total) * 100)
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium mt-2">
-                {progress.current.toLocaleString('id-ID')} / {progress.total.toLocaleString('id-ID')}{' '}
-                baris
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <CreateAccountCard />
+      {/* Buat Akun — hanya admin/manager/asst_manager */}
+      {canCreateAccount && <CreateAccountCard />}
 
       {/* Role Management — hanya admin */}
       {canManageRoles && <RoleManagement />}
+
+      {/* Empty state untuk staf yang tidak punya akses apa-apa */}
+      {!canCreateAccount && !canManageRoles && (
+        <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center">
+          <p className="text-sm font-bold text-slate-400">
+            Pengaturan terbatas. Hubungi admin untuk akses lebih lanjut.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

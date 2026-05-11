@@ -166,7 +166,9 @@ export default function App() {
   const [fetchProgress, setFetchProgress] = useState<{ tx: number; dl: number }>({ tx: 0, dl: 0 });
   const [error, setError] = useState<string | null>(null);
 
-  const handleDataUpdate = useCallback(
+  // Upload handler preserved untuk kemungkinan reuse di masa depan
+  // (UI upload sudah dihilangkan dari Settings sesuai request).
+  const _handleDataUpdate = useCallback(
     async (
       rawTransactions: unknown[],
       rawDownloaders: unknown[],
@@ -1033,6 +1035,7 @@ export default function App() {
                       <TasklistSection
                         setActiveTab={setActiveTab}
                         setCalendarFocusDate={setCalendarFocusDate}
+                        currentUserName={userFullName}
                       />
                     </motion.div>
                   )}
@@ -1060,8 +1063,8 @@ export default function App() {
                       transition={{ duration: 0.15 }}
                     >
                       <SettingsSection
-                        onDataUpdate={handleDataUpdate}
                         canManageRoles={permissions.canManageRoles}
+                        canCreateAccount={userRole === 'admin' || userRole === 'manager' || userRole === 'asst_manager'}
                       />
                     </motion.div>
                   )}

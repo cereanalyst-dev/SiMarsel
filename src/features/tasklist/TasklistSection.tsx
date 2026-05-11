@@ -88,6 +88,9 @@ const formatDeadline = (
 interface TasklistSectionProps {
   setActiveTab?: (tab: string) => void;
   setCalendarFocusDate?: (date: Date | null) => void;
+  // Nama lengkap user login — dipakai untuk filter "Tugas Saya" + default
+  // assignee saat user bikin task pribadi.
+  currentUserName?: string | null;
 }
 
 // ============================================================
@@ -96,6 +99,7 @@ interface TasklistSectionProps {
 export const TasklistSection = ({
   setActiveTab,
   setCalendarFocusDate,
+  currentUserName = null,
 }: TasklistSectionProps = {}) => {
   const toast = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -104,6 +108,9 @@ export const TasklistSection = ({
   // distinct assigned_to dari task existing (fallback kalau belum di-roles).
   const [assigneeOptions, setAssigneeOptions] = useState<string[]>([]);
 
+  // viewMode: 'all' = lihat semua task tim; 'mine' = mode personal todo
+  // (cuma task yang di-assign ke user login, dan default assignee = self).
+  const [viewMode, setViewMode] = useState<'all' | 'mine'>('all');
   const [deptFilter, setDeptFilter] = useState<'All' | TaskDepartment>('All');
   const [priorityFilter, setPriorityFilter] = useState<'All' | TaskPriority>('All');
   const [search, setSearch] = useState('');
@@ -144,7 +151,12 @@ export const TasklistSection = ({
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
+    const myName = (currentUserName ?? '').trim().toLowerCase();
     return tasks.filter((t) => {
+      if (viewMode === 'mine') {
+        if (!myName) return false;
+        if ((t.assigned_to ?? '').trim().toLowerCase() !== myName) return false;
+      }
       if (deptFilter !== 'All' && t.department !== deptFilter) return false;
       if (priorityFilter !== 'All' && t.priority !== priorityFilter) return false;
       if (search.trim()) {
@@ -154,7 +166,7 @@ export const TasklistSection = ({
       }
       return true;
     });
-  }, [tasks, deptFilter, priorityFilter, search]);
+  }, [tasks, viewMode, currentUserName, deptFilter, priorityFilter, search]);
 
   // Group by status untuk Kanban
   const tasksByStatus = useMemo(() => {
@@ -304,17 +316,40 @@ export const TasklistSection = ({
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 text-cyan-700 mb-3">
             <KanbanSquare className="w-3 h-3 animate-pulse" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-              Task Board
+              {viewMode === 'mine' ? 'Rencana Pribadi' : 'Task Board'}
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-            Tasklist
+            {viewMode === 'mine' ? 'Tugas Saya' : 'Tasklist'}
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
-            Papan kerja lintas departemen — Marketing &amp; Sales bisa share progress.
-            Drag card antar kolom untuk update status. Task dengan due date juga
-            tampil di Kalender Marsel.
+            {viewMode === 'mine'
+              ? 'Daftar tugas pribadi Anda — to-do list yang di-assign ke Anda. Buat task baru untuk rencana diri sendiri.'
+              : 'Papan kerja lintas departemen. Drag card antar kolom untuk update status. Task dengan due date juga tampil di Kalender Marsel.'}
           </p>
+
+          {/* View mode toggle */}
+          <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl mt-4">
+            <button
+              type="button"
+              onClick={() => setViewMode('all')}
+              className={cn('px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+                viewMode === 'all' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+            >
+              Semua Tim
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('mine')}
+              disabled={!currentUserName}
+              title={!currentUserName ? 'Set full_name di Manajemen Role dulu' : undefined}
+              className={cn('px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+                viewMode === 'mine' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+                !currentUserName && 'opacity-40 cursor-not-allowed')}
+            >
+              Tugas Saya
+            </button>
+          </div>
         </div>
 
         <button
@@ -499,6 +534,7 @@ export const TasklistSection = ({
             task={editingTask}
             defaultStatus={createInColumn}
             assigneeOptions={assigneeOptions}
+            defaultAssignee={viewMode === 'mine' ? (currentUserName ?? '') : ''}
             onClose={() => { setEditingTask(null); setShowCreate(false); }}
             onSave={(payload) => void handleSaveTask(payload, editingTask?.id ?? null)}
             onDelete={editingTask ? () => void handleDeleteTask(editingTask) : undefined}
@@ -612,10 +648,11 @@ function TaskCard({ task, isDragging, onDragStart, onDragEnd, onClick }: {
 // ============================================================
 // Modal — create / edit
 // ============================================================
-function TaskModal({ task, defaultStatus, assigneeOptions, onClose, onSave, onDelete, onOpenCalendar }: {
+function TaskModal({ task, defaultStatus, assigneeOptions, defaultAssignee, onClose, onSave, onDelete, onOpenCalendar }: {
   task: Task | null;
   defaultStatus: TaskStatus;
   assigneeOptions: string[];
+  defaultAssignee?: string;
   onClose: () => void;
   onSave: (payload: Partial<NewTask>) => void;
   onDelete?: () => void;
@@ -627,7 +664,7 @@ function TaskModal({ task, defaultStatus, assigneeOptions, onClose, onSave, onDe
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? defaultStatus);
   const [department, setDepartment] = useState<TaskDepartment>(task?.department ?? 'general');
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium');
-  const [assignedTo, setAssignedTo] = useState(task?.assigned_to ?? '');
+  const [assignedTo, setAssignedTo] = useState(task?.assigned_to ?? defaultAssignee ?? '');
   const [dueDate, setDueDate] = useState(task?.due_date ?? '');
   const [dueTime, setDueTime] = useState(task?.due_time ?? '');
   const [labels, setLabels] = useState((task?.labels ?? []).join(', '));
