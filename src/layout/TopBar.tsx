@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Activity, ChevronRight, Database, Menu } from 'lucide-react';
+import { Activity, ChevronRight, Database, Menu, Shield, ShieldAlert, ShieldCheck, User } from 'lucide-react';
 import { APP_NAME, LOGO_PATH, MENU_ITEMS } from '../config/app.config';
+import { ROLE_LABELS, type UserRole } from '../types';
 
 interface Props {
   activeTab: string;
   rowsLoaded?: number;
   onOpenMobileMenu?: () => void;
+  userRole?: UserRole | null;
 }
 
-export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu }: Props) => {
+const ROLE_BADGE: Record<UserRole, { bg: string; text: string; icon: typeof Shield }> = {
+  admin:        { bg: 'bg-rose-50 border-rose-100',     text: 'text-rose-700',    icon: ShieldAlert },
+  manager:      { bg: 'bg-violet-50 border-violet-100', text: 'text-violet-700',  icon: ShieldCheck },
+  asst_manager: { bg: 'bg-indigo-50 border-indigo-100', text: 'text-indigo-700',  icon: Shield },
+  staf:         { bg: 'bg-slate-100 border-slate-200',  text: 'text-slate-600',   icon: User },
+};
+
+export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu, userRole }: Props) => {
   const active = MENU_ITEMS.find((m) => m.id === activeTab);
   const [now, setNow] = useState(new Date());
 
@@ -83,6 +92,20 @@ export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu }: Props) => {
             Live
           </span>
         </div>
+
+        {/* Role badge */}
+        {userRole && (() => {
+          const badge = ROLE_BADGE[userRole];
+          const Icon = badge.icon;
+          return (
+            <div className={`hidden md:flex items-center gap-2 px-3 py-2 border rounded-xl ${badge.bg}`}>
+              <Icon className={`w-3.5 h-3.5 ${badge.text}`} />
+              <span className={`text-[10px] font-black uppercase tracking-widest ${badge.text}`}>
+                {ROLE_LABELS[userRole]}
+              </span>
+            </div>
+          );
+        })()}
 
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 ring-2 ring-slate-100 rounded-lg overflow-hidden">

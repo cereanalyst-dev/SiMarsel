@@ -1,0 +1,65 @@
+# SiMarsel frontend (static SPA)
+# Replace __DOMAIN__ → marsel-base.online
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name app.__DOMAIN__;
+
+    # certbot akan inject 443 block di bawah saat run --nginx.
+    # Sementara HTTP, return 444 (close) untuk semua request kecuali ACME challenge.
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    location / {
+        return 444;
+    }
+}
+
+server {
+    # Block ini di-enable setelah certbot setup SSL.
+    # Sebelum certbot, comment seluruh block ini.
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name app.__DOMAIN__;
+
+    root /var/www/simarsel;
+    index index.html;
+
+    # SSL config injected by certbot:
+    # ssl_certificate /etc/letsencrypt/live/.../fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/.../privkey.pem;
+    # include /etc/letsencrypt/options-ssl-nginx.conf;
+    # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Security headers
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # CSP: izinkan koneksi ke Supabase API + WebSocket realtime
+    add_header Content-Security-Policy "default-src 'self'; \
+        script-src 'self' 'unsafe-inline' 'unsafe-eval'; \
+        style-src 'self' 'unsafe-inline'; \
+        img-src 'self' data: https:; \
+        font-src 'self' data:; \
+        connect-src 'self' https://api.__DOMAIN__ wss://api.__DOMAIN__; \
+        frame-ancestors 'none';" always;
+
+    # Caching: assets (hashed by Vite) cache 1 tahun
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # SPA fallback: semua route → index.html (React Router handles)
+    location / {
+        try_files $uri $uri/ /index.html;
+        # index.html selalu fresh (no-cache) supaya update build langsung kepake
+        add_header Cache-Control "no-cache" always;
+    }
+
+    # Logs per host
+    access_log /var/log/nginx/app.access.log;
+    error_log  /var/log/nginx/app.error.log;
+}

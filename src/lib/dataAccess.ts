@@ -17,6 +17,8 @@ import type {
   NewTask,
   Task,
   Transaction,
+  UserRole,
+  UserRoleRow,
 } from '../types';
 import { getSupabase, isSupabaseConfigured } from './supabase';
 import { logger } from './logger';
@@ -953,6 +955,57 @@ export const deleteKpiMetric = async (id: string): Promise<boolean> => {
     return false;
   }
   return true;
+};
+
+// ============================================================
+// User Roles
+// ============================================================
+
+export const fetchMyRole = async (userId: string): Promise<UserRole | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) {
+    logger.warn('Failed to fetch user role:', error.message);
+    return null;
+  }
+  return (data?.role as UserRole) ?? null;
+};
+
+export const fetchAllUserRoles = async (): Promise<UserRoleRow[]> => {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('*')
+    .order('role', { ascending: true })
+    .order('full_name', { ascending: true });
+  if (error) {
+    logger.warn('Failed to fetch user roles:', error.message);
+    return [];
+  }
+  return (data ?? []) as UserRoleRow[];
+};
+
+export const upsertUserRole = async (
+  payload: { user_id: string; role: UserRole; full_name?: string | null },
+): Promise<UserRoleRow | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('user_roles')
+    .upsert(payload, { onConflict: 'user_id' })
+    .select('*')
+    .single();
+  if (error) {
+    logger.warn('Failed to upsert user role:', error.message);
+    return null;
+  }
+  return data as UserRoleRow;
 };
 
 export { isSupabaseConfigured };

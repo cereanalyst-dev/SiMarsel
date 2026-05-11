@@ -4,12 +4,12 @@ import {
 import { motion } from 'motion/react';
 import { format, parseISO } from 'date-fns';
 import {
-  CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
+  Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts';
 import {
-  BarChart3, Download, Eye, Link as LinkIcon, MousePointerClick, Plus,
-  Smartphone, Sparkles, Trash2, TrendingUp, Upload, Users,
+  BarChart3, Download, Eye, Link as LinkIcon, LineChart as LineChartIcon,
+  MousePointerClick, Plus, Smartphone, Sparkles, Trash2, TrendingUp, Upload, Users,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatters';
@@ -63,6 +63,10 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
   // Modal form state
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<NewInsightHasil>(emptyInput);
+
+  // Chart controls
+  const [chartType, setChartType] = useState<'line' | 'bar'>('line');
+  const [chartGrouping, setChartGrouping] = useState<'date' | 'app' | 'platform'>('date');
 
   const reload = useCallback(async () => {
     if (!userId) return;
@@ -128,29 +132,33 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
 
   // Chart data: timeseries per tanggal (sum across filtered platforms/apps)
   const chartData = useMemo(() => {
-    const byDate = new Map<string, {
-      date: string;
+    const byKey = new Map<string, {
+      key: string;
+      label: string;
       tayangan: number;
       jangkauan: number;
       interaksi_konten: number;
       kunjungan: number;
     }>();
     filtered.forEach((r) => {
-      const ex = byDate.get(r.date) ?? {
-        date: r.date,
-        tayangan: 0,
-        jangkauan: 0,
-        interaksi_konten: 0,
-        kunjungan: 0,
+      const key = chartGrouping === 'date' ? r.date
+        : chartGrouping === 'app' ? r.app_name
+        : r.platform;
+      const ex = byKey.get(key) ?? {
+        key, label: key,
+        tayangan: 0, jangkauan: 0, interaksi_konten: 0, kunjungan: 0,
       };
       ex.tayangan += r.tayangan;
       ex.jangkauan += r.jangkauan;
       ex.interaksi_konten += r.interaksi_konten;
       ex.kunjungan += r.kunjungan;
-      byDate.set(r.date, ex);
+      byKey.set(key, ex);
     });
-    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [filtered]);
+    const arr = Array.from(byKey.values());
+    return chartGrouping === 'date'
+      ? arr.sort((a, b) => a.key.localeCompare(b.key))
+      : arr.sort((a, b) => b.tayangan - a.tayangan);
+  }, [filtered, chartGrouping]);
 
   // ============= Handlers =============
   const handleSubmit = async () => {
@@ -330,36 +338,84 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
       {/* Chart */}
       {chartData.length > 0 && (
         <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
-            <div>
-              <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em] mb-0.5">Timeseries</p>
-              <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-slate-400" />
-                Trend Harian
-              </h3>
+          <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
+              <div>
+                <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em] mb-0.5">Visualisasi</p>
+                <h3 className="text-base font-black text-slate-900 tracking-tight">
+                  {chartGrouping === 'date' ? 'Trend Harian'
+                    : chartGrouping === 'app' ? 'Breakdown per App'
+                    : 'Breakdown per Platform'}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Grouping */}
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                {(['date', 'app', 'platform'] as const).map((g) => (
+                  <button
+                    key={g} type="button" onClick={() => setChartGrouping(g)}
+                    className={cn('px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest transition-all',
+                      chartGrouping === g ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                  >
+                    {g === 'date' ? 'Tanggal' : g === 'app' ? 'App' : 'Platform'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chart type */}
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                <button type="button" onClick={() => setChartType('line')}
+                  className={cn('px-2.5 py-1.5 rounded-md transition-all',
+                    chartType === 'line' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                  title="Line chart"
+                >
+                  <LineChartIcon className="w-3.5 h-3.5" />
+                </button>
+                <button type="button" onClick={() => setChartType('bar')}
+                  className={cn('px-2.5 py-1.5 rounded-md transition-all',
+                    chartType === 'bar' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                  title="Bar chart"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey="date"
-                stroke="#94a3b8"
-                tick={{ fontSize: 10, fontWeight: 700 }}
-                tickFormatter={(d) => format(parseISO(d), 'd MMM')}
-              />
-              <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }} />
-              <Tooltip
-                labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
-                contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }}
-              />
-              <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }} />
-              <Line type="monotone" dataKey="tayangan" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Tayangan" />
-              <Line type="monotone" dataKey="jangkauan" stroke="#f43f5e" strokeWidth={2} dot={false} name="Jangkauan" />
-              <Line type="monotone" dataKey="interaksi_konten" stroke="#10b981" strokeWidth={2} dot={false} name="Interaksi" />
-              <Line type="monotone" dataKey="kunjungan" stroke="#0ea5e9" strokeWidth={2} dot={false} name="Kunjungan" />
-            </LineChart>
+          <ResponsiveContainer width="100%" height={300}>
+            {chartType === 'line' && chartGrouping === 'date' ? (
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="key" stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
+                  tickFormatter={(d) => format(parseISO(d), 'd MMM')} />
+                <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }} />
+                <Tooltip
+                  labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
+                  contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }} />
+                <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }} />
+                <Line type="monotone" dataKey="tayangan" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Tayangan" />
+                <Line type="monotone" dataKey="jangkauan" stroke="#f43f5e" strokeWidth={2} dot={false} name="Jangkauan" />
+                <Line type="monotone" dataKey="interaksi_konten" stroke="#10b981" strokeWidth={2} dot={false} name="Interaksi" />
+                <Line type="monotone" dataKey="kunjungan" stroke="#0ea5e9" strokeWidth={2} dot={false} name="Kunjungan" />
+              </LineChart>
+            ) : (
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="key" stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
+                  tickFormatter={(d) => chartGrouping === 'date' ? format(parseISO(d), 'd MMM') : String(d)} />
+                <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }} />
+                <Tooltip
+                  labelFormatter={(d) => chartGrouping === 'date' ? format(parseISO(String(d)), 'dd MMM yyyy') : String(d)}
+                  contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }} />
+                <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }} />
+                <Bar dataKey="tayangan" fill="#8b5cf6" name="Tayangan" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="jangkauan" fill="#f43f5e" name="Jangkauan" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="interaksi_konten" fill="#10b981" name="Interaksi" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="kunjungan" fill="#0ea5e9" name="Kunjungan" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
       )}
