@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>SiMarsel — Dark Cockpit Mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background: #0A0E1A; color: #E5E7EB; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  .panel { background: #131829; border: 1px solid #232A40; }
+  .panel-elevated { background: linear-gradient(180deg, #161B2E 0%, #131829 100%); border: 1px solid #2A3148; }
+  .glow-cyan { box-shadow: 0 0 30px rgba(0, 229, 255, 0.15); }
+  .glow-lime { box-shadow: 0 0 30px rgba(163, 230, 53, 0.15); }
+  .text-neon-cyan { color: #00E5FF; }
+  .text-neon-lime { color: #A3E635; }
+  .text-neon-pink { color: #FF3E9D; }
+  .text-neon-amber { color: #FFB020; }
+  .bg-neon-cyan { background-color: #00E5FF; }
+  .gradient-text { background: linear-gradient(135deg, #00E5FF 0%, #A3E635 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div class="flex">
+  <!-- Sidebar -->
+  <aside class="w-60 min-h-screen border-r border-[#232A40] bg-[#0D1220] flex flex-col">
+    <div class="p-5 border-b border-[#232A40] flex items-center gap-3">
+      <div class="w-9 h-9 rounded-md bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center text-black font-black text-sm">M</div>
+      <div>
+        <p class="text-xs font-bold text-white">MARSEL</p>
+        <p class="text-[9px] text-slate-500 uppercase tracking-widest">v2.4 · prod</p>
+      </div>
+    </div>
+
+    <nav class="p-3 space-y-1 text-xs flex-1">
+      <div class="px-2 py-1.5 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Analytics</div>
+      <button class="w-full text-left px-3 py-2 rounded-md bg-[#1A2138] text-neon-cyan flex items-center gap-2 font-semibold">
+        <span class="w-1.5 h-1.5 rounded-full bg-neon-cyan"></span> Overview
+      </button>
+      <button class="w-full text-left px-3 py-2 rounded-md hover:bg-[#1A2138] text-slate-400">▶ Strategi & Target</button>
+      <button class="w-full text-left px-3 py-2 rounded-md hover:bg-[#1A2138] text-slate-400">▶ Tasklist</button>
+      <button class="w-full text-left px-3 py-2 rounded-md hover:bg-[#1A2138] text-slate-400">▶ KPI</button>
+      <div class="px-2 py-1.5 mt-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Content</div>
+      <button class="w-full text-left px-3 py-2 rounded-md hover:bg-[#1A2138] text-slate-400">▶ Konten</button>
+      <button class="w-full text-left px-3 py-2 rounded-md hover:bg-[#1A2138] text-slate-400">▶ Sosmed</button>
+      <button class="w-full text-left px-3 py-2 rounded-md hover:bg-[#1A2138] text-slate-400">▶ Insight</button>
+      <div class="px-2 py-1.5 mt-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest">System</div>
+      <button class="w-full text-left px-3 py-2 rounded-md hover:bg-[#1A2138] text-slate-400">▶ Promo Rules</button>
+      <button class="w-full text-left px-3 py-2 rounded-md hover:bg-[#1A2138] text-slate-400">▶ Settings</button>
+    </nav>
+
+    <div class="p-4 border-t border-[#232A40] panel m-3 rounded-md">
+      <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Logged in</p>
+      <p class="text-xs font-bold text-white truncate">admin@marsel.id</p>
+      <div class="flex items-center gap-1 mt-2">
+        <span class="w-1.5 h-1.5 rounded-full bg-neon-lime animate-pulse"></span>
+        <span class="text-[10px] text-neon-lime font-bold uppercase tracking-wider">Admin</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 p-6">
+    <!-- TopBar -->
+    <div class="flex items-center justify-between mb-6 pb-4 border-b border-[#232A40]">
+      <div class="flex items-center gap-3 text-xs font-mono text-slate-500">
+        <span>MARSEL</span><span>/</span><span class="text-white">Strategi & Target</span><span>/</span><span class="text-neon-cyan">Mei 2026</span>
+      </div>
+      <div class="flex items-center gap-3 text-[10px] font-mono">
+        <span class="text-slate-400">LAST UPDATE: 2026-05-15 09:42</span>
+        <span class="px-2 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">● LIVE</span>
+        <span class="text-neon-cyan">42.847 ROWS</span>
+      </div>
+    </div>
+
+    <!-- KPI Strip -->
+    <div class="grid grid-cols-4 gap-3 mb-6">
+      <div class="panel rounded-md p-4 relative overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 h-0.5 bg-neon-cyan"></div>
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">TOTAL DOWNLOADER</p>
+        <h3 class="font-mono text-3xl text-neon-cyan font-bold leading-none mb-2">85,000</h3>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="flex-1 h-1 bg-[#232A40] rounded">
+            <div class="h-full bg-neon-cyan rounded" style="width: 85%"></div>
+          </div>
+          <span class="text-[10px] font-mono text-neon-cyan">85%</span>
+        </div>
+        <p class="text-[10px] text-slate-500 font-mono">TGT: 100,000</p>
+      </div>
+
+      <div class="panel rounded-md p-4 relative overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 h-0.5 bg-neon-lime"></div>
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">TOTAL SALES</p>
+        <h3 class="font-mono text-3xl text-neon-lime font-bold leading-none mb-2">Rp 42M</h3>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="flex-1 h-1 bg-[#232A40] rounded">
+            <div class="h-full bg-neon-lime rounded" style="width: 84%"></div>
+          </div>
+          <span class="text-[10px] font-mono text-neon-lime">84%</span>
+        </div>
+        <p class="text-[10px] text-slate-500 font-mono">TGT: Rp 50M</p>
+      </div>
+
+      <div class="panel rounded-md p-4 relative overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 h-0.5 bg-neon-pink"></div>
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">KONVERSI</p>
+        <h3 class="font-mono text-3xl text-neon-pink font-bold leading-none mb-2">5.20%</h3>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="flex-1 h-1 bg-[#232A40] rounded">
+            <div class="h-full bg-neon-pink rounded" style="width: 74%"></div>
+          </div>
+          <span class="text-[10px] font-mono text-neon-pink">74%</span>
+        </div>
+        <p class="text-[10px] text-slate-500 font-mono">TGT: 7.00%</p>
+      </div>
+
+      <div class="panel rounded-md p-4 relative overflow-hidden glow-lime">
+        <div class="absolute top-0 left-0 right-0 h-0.5 bg-emerald-400"></div>
+        <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2">STATUS REVENUE</p>
+        <h3 class="font-mono text-3xl text-emerald-400 font-bold leading-none mb-2">+Rp 4.0M</h3>
+        <p class="text-[10px] text-emerald-400/70 font-mono mt-2">SURPLUS ↗ DAILY TGT Rp 1.6M</p>
+      </div>
+    </div>
+
+    <!-- Chart panel + Side stats -->
+    <div class="grid grid-cols-3 gap-3 mb-6">
+      <!-- Chart -->
+      <div class="col-span-2 panel rounded-md p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">TIMESERIES</p>
+            <h4 class="font-mono text-sm text-white mt-0.5">SALES_TREND_DAILY[2026-05]</h4>
+          </div>
+          <div class="flex gap-1">
+            <button class="text-[10px] font-mono px-2 py-1 bg-[#1A2138] text-neon-cyan rounded">1W</button>
+            <button class="text-[10px] font-mono px-2 py-1 hover:bg-[#1A2138] text-slate-500 rounded">2W</button>
+            <button class="text-[10px] font-mono px-2 py-1 hover:bg-[#1A2138] text-slate-500 rounded">1M</button>
+            <button class="text-[10px] font-mono px-2 py-1 hover:bg-[#1A2138] text-slate-500 rounded">ALL</button>
+          </div>
+        </div>
+        <svg viewBox="0 0 600 200" class="w-full h-48">
+          <!-- grid -->
+          <line x1="0" y1="50" x2="600" y2="50" stroke="#232A40" stroke-dasharray="2,4"/>
+          <line x1="0" y1="100" x2="600" y2="100" stroke="#232A40" stroke-dasharray="2,4"/>
+          <line x1="0" y1="150" x2="600" y2="150" stroke="#232A40" stroke-dasharray="2,4"/>
+          <!-- area -->
+          <path d="M0,160 L40,140 L80,120 L120,130 L160,90 L200,100 L240,70 L280,50 L320,75 L360,40 L400,55 L440,35 L480,25 L520,45 L560,30 L600,20 L600,200 L0,200 Z" fill="url(#cyangrad)"/>
+          <path d="M0,160 L40,140 L80,120 L120,130 L160,90 L200,100 L240,70 L280,50 L320,75 L360,40 L400,55 L440,35 L480,25 L520,45 L560,30 L600,20" stroke="#00E5FF" stroke-width="2" fill="none"/>
+          <path d="M0,170 L40,165 L80,155 L120,160 L160,140 L200,145 L240,130 L280,120 L320,135 L360,110 L400,120 L440,105 L480,100 L520,115 L560,108 L600,100" stroke="#A3E635" stroke-width="2" fill="none" stroke-dasharray="4,2"/>
+          <defs>
+            <linearGradient id="cyangrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#00E5FF" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="flex gap-4 mt-2 text-[10px] font-mono">
+          <span class="text-neon-cyan">━ ACTUAL</span>
+          <span class="text-neon-lime">┄ TARGET</span>
+        </div>
+      </div>
+
+      <!-- Per platform breakdown -->
+      <div class="panel rounded-md p-5">
+        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">PER PLATFORM</p>
+        <div class="space-y-4">
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-mono text-white">JADIBUMN</span>
+              <span class="font-mono text-neon-cyan">Rp 18M</span>
+            </div>
+            <div class="h-2 bg-[#232A40] rounded">
+              <div class="h-full bg-neon-cyan rounded" style="width: 90%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-mono text-white">CEREBRUM</span>
+              <span class="font-mono text-neon-lime">Rp 14M</span>
+            </div>
+            <div class="h-2 bg-[#232A40] rounded">
+              <div class="h-full bg-neon-lime rounded" style="width: 87%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-mono text-white">LMS-X</span>
+              <span class="font-mono text-neon-pink">Rp 10M</span>
+            </div>
+            <div class="h-2 bg-[#232A40] rounded">
+              <div class="h-full bg-neon-pink rounded" style="width: 66%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-mono text-slate-400">EDUMARSEL</span>
+              <span class="font-mono text-slate-400">Rp 5M</span>
+            </div>
+            <div class="h-2 bg-[#232A40] rounded">
+              <div class="h-full bg-slate-600 rounded" style="width: 25%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table panel -->
+    <div class="panel rounded-md overflow-hidden">
+      <div class="px-5 py-3 border-b border-[#232A40] flex items-center justify-between">
+        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">REKAPITULASI_ALL_PLATFORM[2026-05]</h4>
+        <span class="text-[10px] font-mono text-slate-500">12 ROWS · DRAG TO REORDER</span>
+      </div>
+      <table class="w-full text-xs font-mono">
+        <thead class="bg-[#0D1220]">
+          <tr class="text-[10px] text-slate-500 uppercase">
+            <th class="text-left py-2.5 px-5">PLATFORM</th>
+            <th class="text-right py-2.5 px-3">DOWNLOADER</th>
+            <th class="text-right py-2.5 px-3">SALES</th>
+            <th class="text-right py-2.5 px-3">KONVERSI</th>
+            <th class="text-right py-2.5 px-5">STATUS_REV</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-t border-[#232A40] hover:bg-[#1A2138]">
+            <td class="py-3 px-5 text-white">⋮⋮ JADIBUMN</td>
+            <td class="py-3 px-3 text-right text-neon-cyan">42,000</td>
+            <td class="py-3 px-3 text-right text-neon-lime">Rp 18.0M</td>
+            <td class="py-3 px-3 text-right text-neon-pink">5.80%</td>
+            <td class="py-3 px-5 text-right text-emerald-400">+Rp 1.8M</td>
+          </tr>
+          <tr class="border-t border-[#232A40] hover:bg-[#1A2138]">
+            <td class="py-3 px-5 text-white">⋮⋮ CEREBRUM</td>
+            <td class="py-3 px-3 text-right text-neon-cyan">28,000</td>
+            <td class="py-3 px-3 text-right text-neon-lime">Rp 14.0M</td>
+            <td class="py-3 px-3 text-right text-neon-pink">5.00%</td>
+            <td class="py-3 px-5 text-right text-emerald-400">+Rp 1.2M</td>
+          </tr>
+          <tr class="border-t border-[#232A40] hover:bg-[#1A2138]">
+            <td class="py-3 px-5 text-white">⋮⋮ LMS-X</td>
+            <td class="py-3 px-3 text-right text-neon-cyan">15,000</td>
+            <td class="py-3 px-3 text-right text-neon-lime">Rp 10.0M</td>
+            <td class="py-3 px-3 text-right text-neon-pink">4.50%</td>
+            <td class="py-3 px-5 text-right text-rose-400">-Rp 0.8M</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</body>
+</html>
