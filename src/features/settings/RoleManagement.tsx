@@ -139,7 +139,7 @@ export const RoleManagement = () => {
           <thead>
             <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
               <th className="py-3 px-3">User</th>
-              <th className="py-3 px-3">User ID</th>
+              <th className="py-3 px-3">Email</th>
               <th className="py-3 px-3">Role</th>
               <th className="py-3 px-3">Update</th>
             </tr>
@@ -165,7 +165,9 @@ export const RoleManagement = () => {
                       </span>
                     </div>
                   </td>
-                  <td className="py-3 px-3 font-mono text-[10px] text-slate-500">{row.user_id.slice(0, 8)}…</td>
+                  <td className="py-3 px-3 text-[11px] font-bold text-slate-600 truncate max-w-[240px]" title={row.email ?? ''}>
+                    {row.email || <span className="text-slate-400 italic">(email belum di-set)</span>}
+                  </td>
                   <td className="py-3 px-3">
                     <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest',
                       tone.bg, tone.text)}>

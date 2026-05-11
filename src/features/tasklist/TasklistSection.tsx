@@ -88,9 +88,9 @@ const formatDeadline = (
 interface TasklistSectionProps {
   setActiveTab?: (tab: string) => void;
   setCalendarFocusDate?: (date: Date | null) => void;
-  // Nama lengkap user login — dipakai untuk filter "Tugas Saya" + default
-  // assignee saat user bikin task pribadi.
-  currentUserName?: string | null;
+  // Email user login — dipakai untuk filter "Tugas Saya" + default
+  // assignee saat user bikin task pribadi. Email lebih stabil dari nama.
+  currentUserEmail?: string | null;
 }
 
 // ============================================================
@@ -99,7 +99,7 @@ interface TasklistSectionProps {
 export const TasklistSection = ({
   setActiveTab,
   setCalendarFocusDate,
-  currentUserName = null,
+  currentUserEmail = null,
 }: TasklistSectionProps = {}) => {
   const toast = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -130,7 +130,8 @@ export const TasklistSection = ({
     void refresh();
   }, [refresh]);
 
-  // Load user list dari user_roles + existing assignees. Refresh kalau tasks berubah.
+  // Load user list dari user_roles + existing assignees. Sekarang pakai EMAIL
+  // (lebih unik & stabil) — bukan full_name yang bisa kosong/duplikat.
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -138,7 +139,7 @@ export const TasklistSection = ({
       if (!active) return;
       const set = new Set<string>();
       roles.forEach((r) => {
-        if (r.full_name && r.full_name.trim()) set.add(r.full_name.trim());
+        if (r.email && r.email.trim()) set.add(r.email.trim());
       });
       tasks.forEach((t) => {
         if (t.assigned_to && t.assigned_to.trim()) set.add(t.assigned_to.trim());
@@ -149,13 +150,13 @@ export const TasklistSection = ({
     return () => { active = false; };
   }, [tasks]);
 
-  // Filter tasks
+  // Filter tasks. Mode 'mine' = task yang assigned_to = email user login.
   const filteredTasks = useMemo(() => {
-    const myName = (currentUserName ?? '').trim().toLowerCase();
+    const myEmail = (currentUserEmail ?? '').trim().toLowerCase();
     return tasks.filter((t) => {
       if (viewMode === 'mine') {
-        if (!myName) return false;
-        if ((t.assigned_to ?? '').trim().toLowerCase() !== myName) return false;
+        if (!myEmail) return false;
+        if ((t.assigned_to ?? '').trim().toLowerCase() !== myEmail) return false;
       }
       if (deptFilter !== 'All' && t.department !== deptFilter) return false;
       if (priorityFilter !== 'All' && t.priority !== priorityFilter) return false;
@@ -166,7 +167,7 @@ export const TasklistSection = ({
       }
       return true;
     });
-  }, [tasks, viewMode, currentUserName, deptFilter, priorityFilter, search]);
+  }, [tasks, viewMode, currentUserEmail, deptFilter, priorityFilter, search]);
 
   // Group by status untuk Kanban
   const tasksByStatus = useMemo(() => {
@@ -341,11 +342,11 @@ export const TasklistSection = ({
             <button
               type="button"
               onClick={() => setViewMode('mine')}
-              disabled={!currentUserName}
-              title={!currentUserName ? 'Set full_name di Manajemen Role dulu' : undefined}
+              disabled={!currentUserEmail}
+              title={!currentUserEmail ? 'Email user belum terdeteksi' : undefined}
               className={cn('px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
                 viewMode === 'mine' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-700',
-                !currentUserName && 'opacity-40 cursor-not-allowed')}
+                !currentUserEmail && 'opacity-40 cursor-not-allowed')}
             >
               Tugas Saya
             </button>
@@ -534,7 +535,7 @@ export const TasklistSection = ({
             task={editingTask}
             defaultStatus={createInColumn}
             assigneeOptions={assigneeOptions}
-            defaultAssignee={viewMode === 'mine' ? (currentUserName ?? '') : ''}
+            defaultAssignee={viewMode === 'mine' ? (currentUserEmail ?? '') : ''}
             onClose={() => { setEditingTask(null); setShowCreate(false); }}
             onSave={(payload) => void handleSaveTask(payload, editingTask?.id ?? null)}
             onDelete={editingTask ? () => void handleDeleteTask(editingTask) : undefined}
