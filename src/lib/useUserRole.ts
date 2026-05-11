@@ -12,6 +12,7 @@ import type { UserRole } from '../types';
 export interface UseUserRoleResult {
   role: UserRole | null;
   fullName: string | null;
+  email: string | null;
   permissions: Permissions;
   loading: boolean;
   refresh: () => Promise<void>;
@@ -20,12 +21,14 @@ export interface UseUserRoleResult {
 export const useUserRole = (userId: string | null): UseUserRoleResult => {
   const [role, setRole] = useState<UserRole | null>(null);
   const [fullName, setFullName] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     if (!userId) {
       setRole(null);
       setFullName(null);
+      setEmail(null);
       setLoading(false);
       return;
     }
@@ -37,7 +40,7 @@ export const useUserRole = (userId: string | null): UseUserRoleResult => {
     }
     const { data, error } = await supabase
       .from('user_roles')
-      .select('role, full_name')
+      .select('role, full_name, email')
       .eq('user_id', userId)
       .maybeSingle();
     if (error) {
@@ -45,6 +48,7 @@ export const useUserRole = (userId: string | null): UseUserRoleResult => {
     }
     setRole((data?.role as UserRole) ?? null);
     setFullName((data?.full_name as string | null) ?? null);
+    setEmail((data?.email as string | null) ?? null);
     setLoading(false);
   };
 
@@ -56,6 +60,7 @@ export const useUserRole = (userId: string | null): UseUserRoleResult => {
   return {
     role,
     fullName,
+    email,
     permissions: permissionsFor(role),
     loading,
     refresh: load,

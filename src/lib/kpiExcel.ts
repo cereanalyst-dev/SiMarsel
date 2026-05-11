@@ -254,7 +254,7 @@ export const downloadKpiTemplate = (): void => {
   const sample = [
     {
       'Divisi': 'Marketing',
-      'Nama Card': 'Budi Santoso',
+      'Nama Card': 'budi@perusahaan.com',
       'Deskripsi': 'Spesialis konten Instagram',
       'Tahun': currentYear,
       'Bulan': 5,
@@ -267,7 +267,7 @@ export const downloadKpiTemplate = (): void => {
     },
     {
       'Divisi': 'Marketing',
-      'Nama Card': 'Budi Santoso',
+      'Nama Card': 'budi@perusahaan.com',
       'Deskripsi': 'Spesialis konten Instagram',
       'Tahun': currentYear,
       'Bulan': 5,
@@ -280,7 +280,7 @@ export const downloadKpiTemplate = (): void => {
     },
     {
       'Divisi': 'Marketing',
-      'Nama Card': 'Ani Wijaya',
+      'Nama Card': 'ani@perusahaan.com',
       'Deskripsi': 'Leader divisi marketing',
       'Tahun': currentYear,
       'Bulan': 5,
@@ -293,7 +293,7 @@ export const downloadKpiTemplate = (): void => {
     },
     {
       'Divisi': 'Sales',
-      'Nama Card': 'Citra Dewi',
+      'Nama Card': 'citra@perusahaan.com',
       'Deskripsi': '',
       'Tahun': currentYear,
       'Bulan': 5,
@@ -326,7 +326,7 @@ export const downloadKpiTemplate = (): void => {
     [''],
     ['KOLOM WAJIB:'],
     ['•', 'Divisi — nama divisi (mis. Marketing, Sales, Operations).'],
-    ['•', 'Nama Card — nama orang / unit yang di-KPI-kan.'],
+    ['•', 'Nama Card — EMAIL user (sama dengan email login). Staf hanya lihat card yang emailnya cocok.'],
     ['•', 'Perspektif — kategori KPI (mis. Revenue, Brand Awareness, Customer Satisfaction).'],
     ['•', 'Indikator — nama metric spesifik.'],
     ['•', 'Bobot — persentase 0–100 (jumlah bobot semua metric per card idealnya 100).'],

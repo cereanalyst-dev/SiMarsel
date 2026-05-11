@@ -84,16 +84,16 @@ const parseLocaleNumber = (s: string): number | null => {
 // ============================================================
 interface KpiSectionProps {
   canUploadExcel?: boolean;
-  // Staf mode: cuma boleh lihat card miliknya (matched by name).
+  // Staf mode: cuma boleh lihat card miliknya (matched by email).
   // null/false = bisa lihat semua (admin/manager/asst_manager).
   isStafOnly?: boolean;
-  currentUserName?: string | null;
+  currentUserEmail?: string | null;
 }
 
 export const KpiSection = ({
   canUploadExcel = true,
   isStafOnly = false,
-  currentUserName = null,
+  currentUserEmail = null,
 }: KpiSectionProps = {}) => {
   const toast = useToast();
   const [divisions, setDivisions] = useState<KpiDivision[]>([]);
@@ -151,12 +151,13 @@ export const KpiSection = ({
   }, [allCards]);
 
   // Apply filter — cards yang lolos kriteria periode + role.
-  // Staf: cuma card yang name-nya match dengan full_name user (case-insensitive).
+  // Staf: cuma card yang name-nya berisi email user (case-insensitive).
+  // Admin set card 'name' = email staf saat bikin card-nya.
   const filteredCards = useMemo(() => {
-    const nameLower = (currentUserName ?? '').trim().toLowerCase();
+    const emailLower = (currentUserEmail ?? '').trim().toLowerCase();
     return allCards.filter((c) => {
       if (isStafOnly) {
-        if (!nameLower || c.name.trim().toLowerCase() !== nameLower) return false;
+        if (!emailLower || c.name.trim().toLowerCase() !== emailLower) return false;
       }
       if (filterYear === 'none') {
         if (c.period_year != null) return false;
@@ -170,7 +171,7 @@ export const KpiSection = ({
       }
       return true;
     });
-  }, [allCards, filterYear, filterMonth, isStafOnly, currentUserName]);
+  }, [allCards, filterYear, filterMonth, isStafOnly, currentUserEmail]);
 
   // Untuk staf: divisi yang ditampilkan hanya divisi yang punya minimal 1 card user.
   const visibleDivisions = useMemo(() => {
@@ -1572,14 +1573,17 @@ function CardModal({ card, divisions, defaultDivisionId, defaultIsLeader, onClos
             ))}
           </select>
         </FormField>
-        <FormField label="Nama Orang *">
+        <FormField label="Email Orang *">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="mis. John Doe"
+            placeholder="mis. budi@perusahaan.com"
             autoFocus
             className="form-input"
           />
+          <p className="text-[10px] font-medium text-slate-400 mt-1">
+            Pakai email user (sama dengan email login). Staf hanya bisa lihat card yang email-nya sama dengan mereka.
+          </p>
         </FormField>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Tahun">

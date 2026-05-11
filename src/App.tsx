@@ -147,7 +147,11 @@ export default function App() {
   const userEmail = session?.user?.email ?? null;
 
   // Role-based permissions — gated UI di Settings, KPI upload, dst.
-  const { role: userRole, fullName: userFullName, permissions } = useUserRole(userId);
+  // userRoleEmail dipakai untuk matching (assignee Tasklist, KPI staf filter)
+  // karena lebih unik dan stabil daripada full_name. Fallback ke session email
+  // kalau user_roles.email kosong.
+  const { role: userRole, fullName: userFullName, email: userRoleEmail, permissions } = useUserRole(userId);
+  const userMatchEmail = userRoleEmail ?? userEmail ?? null;
 
   // ---------- Data ----------
   // Strategi loading 2-stage:
@@ -1035,7 +1039,7 @@ export default function App() {
                       <TasklistSection
                         setActiveTab={setActiveTab}
                         setCalendarFocusDate={setCalendarFocusDate}
-                        currentUserName={userFullName}
+                        currentUserEmail={userMatchEmail}
                       />
                     </motion.div>
                   )}
@@ -1050,7 +1054,7 @@ export default function App() {
                       <KpiSection
                         canUploadExcel={permissions.canUploadKpi}
                         isStafOnly={userRole === 'staf'}
-                        currentUserName={userFullName}
+                        currentUserEmail={userMatchEmail}
                       />
                     </motion.div>
                   )}

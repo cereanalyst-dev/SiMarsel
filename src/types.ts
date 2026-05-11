@@ -367,11 +367,12 @@ export interface UserRoleRow {
   user_id: string;
   role: UserRole;
   full_name: string | null;
+  email: string | null;
   created_at?: string;
   updated_at?: string;
 }
 
-export type NewUserRoleRow = Pick<UserRoleRow, 'user_id' | 'role' | 'full_name'>;
+export type NewUserRoleRow = Pick<UserRoleRow, 'user_id' | 'role' | 'full_name' | 'email'>;
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
