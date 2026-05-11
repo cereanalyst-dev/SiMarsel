@@ -8,7 +8,7 @@ import {
 import { cn } from '../../lib/utils';
 import { useToast } from '../../components/Toast';
 import {
-  createTask, deleteTask, fetchTasks, updateTask,
+  createTask, deleteTask, fetchAllUserRoles, fetchTasks, updateTask,
 } from '../../lib/dataAccess';
 import { getSupabase } from '../../lib/supabase';
 import type {
@@ -100,6 +100,9 @@ export const TasklistSection = ({
   const toast = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  // Daftar user yang bisa di-assign — gabungan user_roles (full_name) +
+  // distinct assigned_to dari task existing (fallback kalau belum di-roles).
+  const [assigneeOptions, setAssigneeOptions] = useState<string[]>([]);
 
   const [deptFilter, setDeptFilter] = useState<'All' | TaskDepartment>('All');
   const [priorityFilter, setPriorityFilter] = useState<'All' | TaskPriority>('All');
@@ -119,6 +122,25 @@ export const TasklistSection = ({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Load user list dari user_roles + existing assignees. Refresh kalau tasks berubah.
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const roles = await fetchAllUserRoles();
+      if (!active) return;
+      const set = new Set<string>();
+      roles.forEach((r) => {
+        if (r.full_name && r.full_name.trim()) set.add(r.full_name.trim());
+      });
+      tasks.forEach((t) => {
+        if (t.assigned_to && t.assigned_to.trim()) set.add(t.assigned_to.trim());
+      });
+      setAssigneeOptions(Array.from(set).sort());
+    };
+    void load();
+    return () => { active = false; };
+  }, [tasks]);
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
@@ -476,6 +498,7 @@ export const TasklistSection = ({
           <TaskModal
             task={editingTask}
             defaultStatus={createInColumn}
+            assigneeOptions={assigneeOptions}
             onClose={() => { setEditingTask(null); setShowCreate(false); }}
             onSave={(payload) => void handleSaveTask(payload, editingTask?.id ?? null)}
             onDelete={editingTask ? () => void handleDeleteTask(editingTask) : undefined}
@@ -589,9 +612,10 @@ function TaskCard({ task, isDragging, onDragStart, onDragEnd, onClick }: {
 // ============================================================
 // Modal — create / edit
 // ============================================================
-function TaskModal({ task, defaultStatus, onClose, onSave, onDelete, onOpenCalendar }: {
+function TaskModal({ task, defaultStatus, assigneeOptions, onClose, onSave, onDelete, onOpenCalendar }: {
   task: Task | null;
   defaultStatus: TaskStatus;
+  assigneeOptions: string[];
   onClose: () => void;
   onSave: (payload: Partial<NewTask>) => void;
   onDelete?: () => void;
@@ -747,12 +771,32 @@ function TaskModal({ task, defaultStatus, onClose, onSave, onDelete, onOpenCalen
             </FormField>
 
             <FormField label="Assigned To" wide>
-              <input
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                placeholder="email atau nama..."
-                className="form-input"
-              />
+              {assigneeOptions.length > 0 ? (
+                <div className="flex gap-2 flex-wrap">
+                  <select
+                    value={assignedTo}
+                    onChange={(e) => setAssignedTo(e.target.value)}
+                    className="form-input flex-1 min-w-[200px]"
+                  >
+                    <option value="">— Tidak di-assign —</option>
+                    {assigneeOptions.map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  {assignedTo && !assigneeOptions.includes(assignedTo) && (
+                    <span className="text-[10px] font-bold text-amber-600 self-center">
+                      (Custom: "{assignedTo}")
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <input
+                  value={assignedTo}
+                  onChange={(e) => setAssignedTo(e.target.value)}
+                  placeholder="Belum ada user di Manajemen Role. Isi manual atau set role dulu di Settings."
+                  className="form-input"
+                />
+              )}
             </FormField>
 
             <FormField label="Labels (pisahkan koma)" wide>
