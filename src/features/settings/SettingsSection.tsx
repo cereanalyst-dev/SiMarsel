@@ -26,7 +26,7 @@ export const SettingsSection = ({
               System
             </span>
           </div>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
             Pengaturan
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -43,7 +43,7 @@ export const SettingsSection = ({
 
       {/* Empty state untuk staf yang tidak punya akses apa-apa */}
       {!canCreateAccount && !canManageRoles && (
-        <div className="tile p-12 rounded-3xl text-center">
+        <div className="card-flat p-12 text-center">
           <p className="text-sm font-bold text-slate-400">
             Pengaturan terbatas. Hubungi admin untuk akses lebih lanjut.
           </p>
@@ -121,7 +121,7 @@ const CreateAccountCard = () => {
   };
 
   return (
-    <div className="tile p-8 rounded-[2rem]">
+    <div className="card-hero p-8">
       <div className="flex items-start gap-4 mb-6">
         <div className="w-1 h-12 rounded-full bg-gradient-to-b from-cyan-500 to-violet-500" />
         <div>

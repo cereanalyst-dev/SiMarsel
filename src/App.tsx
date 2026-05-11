@@ -820,11 +820,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="flex min-h-screen text-slate-900 font-sans selection:bg-orange-100 relative" style={{ background: '#FAF7F2' }}>
-        {/* Decorative background orbs — Bento warm accent */}
-        <div className="gradient-orb w-[600px] h-[600px] bg-orange-300 -top-40 -left-40" />
-        <div className="gradient-orb w-[500px] h-[500px] bg-purple-300 top-1/3 -right-40" />
-        <div className="gradient-orb w-[400px] h-[400px] bg-emerald-300 bottom-0 left-1/3" />
+      <div className="flex min-h-screen bg-[#f8fafc] text-slate-900 font-sans selection:bg-indigo-100">
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}

@@ -296,7 +296,7 @@ export const BulananSection = () => {
               Monthly Snapshot
             </span>
           </div>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
             Performa Bulanan
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -307,7 +307,7 @@ export const BulananSection = () => {
       </div>
 
       {/* Controls */}
-      <div className="tile p-5 rounded-3xl">
+      <div className="card-tile p-5">
         <div className="flex flex-wrap items-end gap-3">
           {/* Year-month */}
           <div>
@@ -408,7 +408,7 @@ export const BulananSection = () => {
       )}
 
       {/* Saved snapshots dari DB */}
-      <div className="tile rounded-3xl overflow-hidden">
+      <div className="card-tile overflow-hidden">
         <div className="px-7 py-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-1 h-8 rounded-full bg-gradient-to-b from-indigo-500 to-violet-500" />

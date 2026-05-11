@@ -132,7 +132,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
               Pricing Intelligence
             </span>
           </div>
-          <h1 className="font-display text-6xl text-slate-900 leading-none">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
             Optimasi Harga
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -144,7 +144,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative tile p-8 rounded-[2rem] overflow-hidden"
+        className="relative card-hero p-8 overflow-hidden"
       >
         {/* Decorative */}
         <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 bg-gradient-to-br from-violet-100/50 to-transparent rounded-full blur-3xl" />
@@ -319,7 +319,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="tile p-8 rounded-[2rem]">
+        <div className="card-hero p-8">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-indigo-50 rounded-xl">
@@ -385,7 +385,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
         </div>
 
         {buyerDistribution.length > 0 && (
-          <div className="tile p-8 rounded-[2rem]">
+          <div className="card-hero p-8">
             <h3 className="text-lg font-black text-slate-900 mb-6">Buyer Distribution</h3>
             <div className="h-[350px]">
               <ResponsiveContainer width="100%" height="100%">

@@ -1,67 +1,14 @@
 @import "tailwindcss";
 
-/* ===== Bento Grid design tokens ===== */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-
-  /* Warm cream background — basis Bento */
-  --color-bento-bg: #FAF7F2;
-  --color-bento-bg-elevated: rgba(255, 255, 255, 0.7);
 }
 
 @layer base {
-  html {
-    background-color: #FAF7F2;
-  }
   body {
-    @apply text-slate-900;
-    background-color: transparent;
-    letter-spacing: -0.011em;
+    @apply bg-slate-50/50 text-slate-900;
   }
-}
-
-/* ===== Bento utility classes ===== */
-.font-display {
-  font-family: var(--font-serif);
-  font-weight: 400;
-  letter-spacing: -0.025em;
-}
-
-/* Glassmorphic tile — basis tampilan card di seluruh app */
-.tile {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow:
-    0 1px 3px rgba(15, 23, 42, 0.04),
-    0 8px 24px rgba(15, 23, 42, 0.03),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-}
-.tile:hover {
-  box-shadow:
-    0 1px 3px rgba(15, 23, 42, 0.04),
-    0 12px 32px rgba(15, 23, 42, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-}
-
-/* Tile yang lebih solid (no transparency) untuk konteks data padat */
-.tile-solid {
-  background: #ffffff;
-  border: 1px solid rgb(226 232 240 / 0.7);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-}
-
-/* Gradient orb dekoratif — pakai di background hero/page */
-.gradient-orb {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(80px);
-  opacity: 0.25;
-  pointer-events: none;
-  z-index: 0;
 }
 
 /* Konten editor — input style shared */
@@ -145,4 +92,59 @@ textarea.sheet-cell {
 
 .neo-shadow {
   @apply shadow-[0_20px_50px_rgba(8,112,184,0.05)];
+}
+
+/* ============================================================
+   Standardized card patterns — pakai class ini di seluruh app
+   supaya konsisten visual & spacing antar halaman.
+
+   Hierarchy:
+   - .card-hero       → wrapper section besar (rounded 2.5rem, padding 8, shadow halus)
+   - .card-tile       → kartu medium (rounded 3xl, padding 6, shadow tipis)
+   - .card-compact    → metric kecil / item kecil (rounded 2xl, padding 5, shadow tipis)
+   - .card-flat       → tabel / item dalam scroll (rounded 3xl, no shadow)
+
+   Hover: tambah .card-hover di samping class di atas (kalau clickable).
+   ============================================================ */
+.card-hero {
+  @apply bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)];
+}
+.card-tile {
+  @apply bg-white rounded-3xl border border-slate-100 shadow-sm;
+}
+.card-compact {
+  @apply bg-white rounded-2xl border border-slate-100 shadow-sm;
+}
+.card-flat {
+  @apply bg-white rounded-3xl border border-slate-100;
+}
+.card-hover {
+  @apply hover:shadow-lg hover:border-slate-200 transition-all;
+}
+
+/* Standardized typography for page hero — semua halaman pakai pola sama */
+.hero-eyebrow {
+  @apply inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-[10px] font-black uppercase tracking-[0.2em];
+}
+.hero-title {
+  @apply text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight;
+}
+.hero-subtitle {
+  @apply text-sm text-slate-500 font-medium mt-1.5 max-w-xl;
+}
+
+/* Section sub-header (dipakai di dalam card-hero) */
+.section-title {
+  @apply text-base font-black text-slate-900 tracking-tight;
+}
+.section-eyebrow {
+  @apply text-[10px] font-black uppercase tracking-[0.25em];
+}
+
+/* Metric number — angka besar di kartu */
+.metric-number {
+  @apply text-3xl font-black tracking-tight tabular-nums;
+}
+.metric-label {
+  @apply text-[10px] font-black text-slate-400 uppercase tracking-widest;
 }
