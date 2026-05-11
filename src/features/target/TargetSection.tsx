@@ -33,6 +33,8 @@ interface TargetSectionProps {
   // Optional: force save target ke Supabase langsung (bypass debounce 800ms).
   // Dipanggil saat user generate sheet — biar target bulanan dijamin aman.
   onForceSave?: (apps: AppData[]) => void;
+  // Dual-write target ke tabel target_config (untuk inspeksi DB langsung).
+  onSaveTargetToTable?: (appName: string, yearMonth: string, cfg: import('../../types').TargetConfigMonth) => void;
 }
 
 export const TargetSection = ({
@@ -48,6 +50,7 @@ export const TargetSection = ({
   downloaders = [],
   promoRulesIndex,
   onForceSave,
+  onSaveTargetToTable,
 }: TargetSectionProps) => {
   const [showAppSelection, setShowAppSelection] = useState(true);
   const [platformFilter, setPlatformFilter] = useState('All');
@@ -252,6 +255,8 @@ export const TargetSection = ({
     // Force save langsung — bypass debounce 800ms supaya target bulanan
     // dijamin tersimpan walau user langsung close tab / pindah menu.
     onForceSave?.(updatedApps);
+    // Dual-write ke tabel target_config (flat table untuk inspeksi DB)
+    onSaveTargetToTable?.(selectedApp.name, targetMonth, form);
   };
 
   const updateDailyValue = (date: string, field: string, value: any) => {

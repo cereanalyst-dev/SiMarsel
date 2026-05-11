@@ -89,6 +89,24 @@ export interface TargetConfigMonth {
   avgPrice: number;
 }
 
+// Row di tabel target_config (DB) — flat schema untuk inspeksi mudah.
+// Di-mirror dari TargetConfigMonth.
+export interface TargetConfigRow {
+  id: string;
+  user_id: string;
+  app_name: string;
+  year_month: string;
+  target_downloader: number;
+  target_sales: number;
+  target_repeat_order: number;
+  target_conversion: number;
+  avg_price: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type NewTargetConfigRow = Omit<TargetConfigRow, 'id' | 'created_at' | 'updated_at'>;
+
 export interface AppData {
   id: string;
   name: string;
