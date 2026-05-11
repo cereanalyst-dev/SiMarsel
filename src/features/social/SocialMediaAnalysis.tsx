@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { format, parse, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
 import {
-  Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
+  Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts';
 import {
@@ -68,7 +68,13 @@ export const SocialMediaAnalysis = ({
   });
   const [dateTo, setDateTo] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
-  const [chartMetric, setChartMetric] = useState<'tayangan' | 'jangkauan' | 'jumlahBersihInteraksi' | 'sukaTanggapan'>('tayangan');
+  // Semua metrik yang bisa dipilih untuk chart (mengikuti kolom tabel + ER%)
+  type ChartMetric =
+    | 'tayangan' | 'jangkauan' | 'pemirsa'
+    | 'jumlahBersihInteraksi' | 'sukaTanggapan' | 'komen'
+    | 'share' | 'save' | 'klikTautan' | 'mengikuti' | 'er';
+  const [chartMetric, setChartMetric] = useState<ChartMetric>('tayangan');
+  const [chartPlatform, setChartPlatform] = useState<string>('All');
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Konten dari Skrip Konten yang sudah status='published'.
@@ -192,36 +198,45 @@ export const SocialMediaAnalysis = ({
     return acc;
   }, [filteredContent]);
 
-  // Chart data: agregat metric per tanggal
+  // Chart data: agregat selectedMetric per tanggal.
+  // ER% dihitung dari sum(interaksi) / sum(jangkauan) × 100 per hari.
   const chartData = useMemo(() => {
-    const byDate = new Map<string, { date: string; tayangan: number; jangkauan: number; jumlahBersihInteraksi: number; sukaTanggapan: number }>();
-    filteredContent.forEach((it) => {
+    const source = chartPlatform === 'All'
+      ? filteredContent
+      : filteredContent.filter((it) => it.platform === chartPlatform);
+    const byDate = new Map<string, {
+      date: string;
+      tayangan: number; jangkauan: number; pemirsa: number;
+      jumlahBersihInteraksi: number; sukaTanggapan: number; komen: number;
+      share: number; save: number; klikTautan: number; mengikuti: number;
+    }>();
+    source.forEach((it) => {
       const d = (it.tanggalUpload || it.date).slice(0, 10);
       if (!d) return;
-      const row = byDate.get(d) ?? { date: d, tayangan: 0, jangkauan: 0, jumlahBersihInteraksi: 0, sukaTanggapan: 0 };
+      const row = byDate.get(d) ?? {
+        date: d, tayangan: 0, jangkauan: 0, pemirsa: 0,
+        jumlahBersihInteraksi: 0, sukaTanggapan: 0, komen: 0,
+        share: 0, save: 0, klikTautan: 0, mengikuti: 0,
+      };
       row.tayangan += it.tayangan;
       row.jangkauan += it.jangkauan;
+      row.pemirsa += it.pemirsa;
       row.jumlahBersihInteraksi += it.jumlahBersihInteraksi;
       row.sukaTanggapan += it.sukaTanggapan;
+      row.komen += it.komen;
+      row.share += it.share;
+      row.save += it.save;
+      row.klikTautan += it.klikTautan;
+      row.mengikuti += it.mengikuti;
       byDate.set(d, row);
     });
-    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [filteredContent]);
-
-  // Chart data per platform untuk bar chart breakdown
-  const platformChartData = useMemo(() => {
-    const byPlatform = new Map<string, { platform: string; tayangan: number; jangkauan: number; jumlahBersihInteraksi: number; sukaTanggapan: number }>();
-    filteredContent.forEach((it) => {
-      const p = it.platform || 'Lainnya';
-      const row = byPlatform.get(p) ?? { platform: p, tayangan: 0, jangkauan: 0, jumlahBersihInteraksi: 0, sukaTanggapan: 0 };
-      row.tayangan += it.tayangan;
-      row.jangkauan += it.jangkauan;
-      row.jumlahBersihInteraksi += it.jumlahBersihInteraksi;
-      row.sukaTanggapan += it.sukaTanggapan;
-      byPlatform.set(p, row);
-    });
-    return Array.from(byPlatform.values()).sort((a, b) => b.tayangan - a.tayangan);
-  }, [filteredContent]);
+    return Array.from(byDate.values())
+      .map((r) => ({
+        ...r,
+        er: r.jangkauan > 0 ? (r.jumlahBersihInteraksi / r.jangkauan) * 100 : 0,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [filteredContent, chartPlatform]);
 
   const appOptions = useMemo(() => {
     const set = new Set<string>(apps.map((a) => a.name));
@@ -235,12 +250,26 @@ export const SocialMediaAnalysis = ({
     return ['All', ...Array.from(set).sort()];
   }, [allContent]);
 
-  const METRIC_LABELS: Record<typeof chartMetric, { label: string; color: string }> = {
-    tayangan: { label: 'Tayangan', color: '#8b5cf6' },
-    jangkauan: { label: 'Jangkauan', color: '#f43f5e' },
-    jumlahBersihInteraksi: { label: 'Interaksi', color: '#10b981' },
-    sukaTanggapan: { label: 'Suka & Tanggapan', color: '#f59e0b' },
+  const METRIC_LABELS: Record<ChartMetric, { label: string; color: string; format: 'number' | 'percent' }> = {
+    tayangan:              { label: 'Tayangan',         color: '#8b5cf6', format: 'number' },
+    jangkauan:             { label: 'Jangkauan',        color: '#f43f5e', format: 'number' },
+    pemirsa:               { label: 'Pemirsa',          color: '#0ea5e9', format: 'number' },
+    jumlahBersihInteraksi: { label: 'Interaksi',        color: '#10b981', format: 'number' },
+    sukaTanggapan:         { label: 'Suka',             color: '#f59e0b', format: 'number' },
+    komen:                 { label: 'Komen',            color: '#ec4899', format: 'number' },
+    share:                 { label: 'Share',            color: '#06b6d4', format: 'number' },
+    save:                  { label: 'Save',             color: '#a855f7', format: 'number' },
+    klikTautan:            { label: 'Klik',             color: '#eab308', format: 'number' },
+    mengikuti:             { label: 'Mengikuti',        color: '#14b8a6', format: 'number' },
+    er:                    { label: 'ER%',              color: '#22c55e', format: 'percent' },
   };
+
+  // Daftar platform unik untuk filter chart (drop "All" placeholder + dedupe)
+  const platformsForChart = useMemo(() => {
+    const set = new Set<string>();
+    allContent.forEach((c) => { if (c.platform) set.add(c.platform); });
+    return ['All', ...Array.from(set).sort()];
+  }, [allContent]);
 
   const platforms = useMemo(
     () => ['All', ...Array.from(new Set(allContent.map((i) => i.platform).filter(Boolean)))],
@@ -615,104 +644,97 @@ export const SocialMediaAnalysis = ({
               <HeroCard icon={Share2} label="Share" value={formatNumber(totals.share)} gradient="from-cyan-500 to-sky-500" />
             </div>
 
-            {/* Charts */}
-            {chartData.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-                {/* Timeseries */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            {/* Chart — 1 chart dengan filter metric + platform */}
+            {chartData.length > 0 && (() => {
+              const meta = METRIC_LABELS[chartMetric];
+              const fmtY = (v: number) => meta.format === 'percent' ? `${v.toFixed(1)}%` : formatNumber(v);
+              return (
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm mb-6">
                   <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
                     <div className="flex items-center gap-3">
                       <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
                       <div>
-                        <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em]">Trend</p>
-                        <h4 className="text-sm font-black text-slate-900">Perkembangan Harian</h4>
+                        <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em]">Visualisasi</p>
+                        <h4 className="text-sm font-black text-slate-900">
+                          {meta.label}
+                          {chartPlatform !== 'All' && <span className="text-slate-400"> · {chartPlatform}</span>}
+                        </h4>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
-                      <button
-                        type="button"
-                        onClick={() => setChartType('line')}
-                        className={cn('px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest transition-all',
-                          chartType === 'line' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        value={chartMetric}
+                        onChange={(e) => setChartMetric(e.target.value as ChartMetric)}
+                        aria-label="Pilih metric"
+                        className="bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-700 outline-none px-3 py-1.5 rounded-lg uppercase tracking-widest cursor-pointer"
                       >
-                        <LineChartIcon className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChartType('bar')}
-                        className={cn('px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest transition-all',
-                          chartType === 'bar' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                        {Object.entries(METRIC_LABELS).map(([k, v]) => (
+                          <option key={k} value={k}>{v.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={chartPlatform}
+                        onChange={(e) => setChartPlatform(e.target.value)}
+                        aria-label="Filter platform untuk chart"
+                        className="bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-700 outline-none px-3 py-1.5 rounded-lg uppercase tracking-widest cursor-pointer"
                       >
-                        <BarChart3 className="w-3 h-3" />
-                      </button>
+                        {platformsForChart.map((p) => (
+                          <option key={p} value={p}>{p === 'All' ? 'Semua Platform' : p}</option>
+                        ))}
+                      </select>
+                      <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => setChartType('line')}
+                          className={cn('px-2 py-1.5 rounded-md transition-all',
+                            chartType === 'line' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                          title="Line chart"
+                        ><LineChartIcon className="w-3.5 h-3.5" /></button>
+                        <button
+                          type="button"
+                          onClick={() => setChartType('bar')}
+                          className={cn('px-2 py-1.5 rounded-md transition-all',
+                            chartType === 'bar' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                          title="Bar chart"
+                        ><BarChart3 className="w-3.5 h-3.5" /></button>
+                      </div>
                     </div>
-                    <select
-                      value={chartMetric}
-                      onChange={(e) => setChartMetric(e.target.value as typeof chartMetric)}
-                      aria-label="Pilih metric"
-                      className="bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-700 outline-none px-2 py-1 rounded-md uppercase tracking-widest cursor-pointer"
-                    >
-                      {Object.entries(METRIC_LABELS).map(([k, v]) => (
-                        <option key={k} value={k}>{v.label}</option>
-                      ))}
-                    </select>
                   </div>
-                  <ResponsiveContainer width="100%" height={240}>
+                  <ResponsiveContainer width="100%" height={300}>
                     {chartType === 'line' ? (
                       <LineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                        <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }}
+                        <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
                           tickFormatter={(d) => format(parseISO(d), 'd MMM')} />
-                        <YAxis stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }} />
+                        <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
+                          tickFormatter={(v) => meta.format === 'percent' ? `${v}%` : String(v)} />
                         <Tooltip
                           labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
+                          formatter={(v) => [fmtY(Number(v)), meta.label]}
                           contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }}
                         />
                         <Line type="monotone" dataKey={chartMetric}
-                          stroke={METRIC_LABELS[chartMetric].color} strokeWidth={2.5} dot={false}
-                          name={METRIC_LABELS[chartMetric].label} />
+                          stroke={meta.color} strokeWidth={2.5} dot={false} name={meta.label} />
                       </LineChart>
                     ) : (
                       <BarChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                        <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }}
+                        <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
                           tickFormatter={(d) => format(parseISO(d), 'd MMM')} />
-                        <YAxis stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }} />
+                        <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
+                          tickFormatter={(v) => meta.format === 'percent' ? `${v}%` : String(v)} />
                         <Tooltip
                           labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
+                          formatter={(v) => [fmtY(Number(v)), meta.label]}
                           contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }}
                         />
-                        <Bar dataKey={chartMetric} fill={METRIC_LABELS[chartMetric].color}
-                          name={METRIC_LABELS[chartMetric].label} radius={[6, 6, 0, 0]} />
+                        <Bar dataKey={chartMetric} fill={meta.color} name={meta.label} radius={[6, 6, 0, 0]} />
                       </BarChart>
                     )}
                   </ResponsiveContainer>
                 </div>
-
-                {/* Per platform breakdown */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-1 h-8 rounded-full bg-gradient-to-b from-rose-500 to-pink-500" />
-                    <div>
-                      <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em]">Breakdown</p>
-                      <h4 className="text-sm font-black text-slate-900">Per Platform</h4>
-                    </div>
-                  </div>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={platformChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="platform" stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }} />
-                      <YAxis stroke="#94a3b8" tick={{ fontSize: 9, fontWeight: 700 }} />
-                      <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }} />
-                      <Legend wrapperStyle={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }} />
-                      <Bar dataKey="tayangan" fill="#8b5cf6" name="Tayangan" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="jangkauan" fill="#f43f5e" name="Jangkauan" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="jumlahBersihInteraksi" fill="#10b981" name="Interaksi" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Table view */}
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">

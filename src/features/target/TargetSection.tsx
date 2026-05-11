@@ -284,17 +284,8 @@ export const TargetSection = ({
       ? (totalRealRepeatOrder / totalRealDownloader) * 100
       : 0;
 
+    // Selisih sales = real - target. Negatif → defisit (rose), positif → surplus (emerald).
     const selisihSales = totalRealSales - (targetConfig.targetSales || 0);
-
-    const revenueAchievement = (targetConfig.targetSales || 0) > 0
-      ? (totalRealSales / targetConfig.targetSales) * 100 : 0;
-    let revenueStatusText = 'Menunggu';
-    let revenueStatusTone: 'emerald' | 'amber' | 'rose' | 'slate' = 'slate';
-    if (totalRealSales > 0) {
-      if (revenueAchievement >= 100) { revenueStatusText = 'Melebihi'; revenueStatusTone = 'emerald'; }
-      else if (revenueAchievement >= 90) { revenueStatusText = 'Mendekati'; revenueStatusTone = 'amber'; }
-      else { revenueStatusText = 'Kurang'; revenueStatusTone = 'rose'; }
-    }
 
     return {
       totalRealDownloader,
@@ -304,9 +295,6 @@ export const TargetSection = ({
       progressSales,
       progressConversion,
       selisihSales,
-      revenueAchievement,
-      revenueStatusText,
-      revenueStatusTone,
       targetConfig,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -345,15 +333,7 @@ export const TargetSection = ({
     });
 
     const totalSelisihSales = totalRealSales - totalTargetSales;
-
     const salesProgress = totalTargetSales > 0 ? (totalRealSales / totalTargetSales) * 100 : 0;
-    let revenueStatusText = 'Menunggu';
-    let revenueStatusTone: 'emerald' | 'amber' | 'rose' | 'slate' = 'slate';
-    if (totalRealSales > 0) {
-      if (salesProgress >= 100) { revenueStatusText = 'Melebihi'; revenueStatusTone = 'emerald'; }
-      else if (salesProgress >= 90) { revenueStatusText = 'Mendekati'; revenueStatusTone = 'amber'; }
-      else { revenueStatusText = 'Kurang'; revenueStatusTone = 'rose'; }
-    }
 
     return {
       totalTargetDownloader,
@@ -363,8 +343,6 @@ export const TargetSection = ({
       totalTargetRepeatOrder,
       totalRealRepeatOrder,
       totalSelisihSales,
-      revenueStatusText,
-      revenueStatusTone,
       downloaderProgress: totalTargetDownloader > 0 ? (totalRealDownloader / totalTargetDownloader) * 100 : 0,
       salesProgress,
       conversionProgress: totalRealDownloader > 0 ? (totalRealRepeatOrder / totalRealDownloader) * 100 : 0
@@ -467,7 +445,7 @@ export const TargetSection = ({
             </div>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Total Downloader */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-all">
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
@@ -510,47 +488,34 @@ export const TargetSection = ({
               })()}
             </div>
 
-            {/* Status Revenue */}
-            {(() => {
-              const tone = globalSummary.revenueStatusTone;
-              const toneCls = {
-                emerald: { bg: 'bg-emerald-50 border-emerald-100', label: 'text-emerald-500', value: 'text-emerald-600', sub: 'text-emerald-500' },
-                amber:   { bg: 'bg-amber-50 border-amber-100',     label: 'text-amber-500',   value: 'text-amber-600',   sub: 'text-amber-500' },
-                rose:    { bg: 'bg-rose-50 border-rose-100',       label: 'text-rose-500',    value: 'text-rose-600',    sub: 'text-rose-500' },
-                slate:   { bg: 'bg-slate-50 border-slate-100',     label: 'text-slate-500',   value: 'text-slate-700',   sub: 'text-slate-400' },
-              }[tone];
-              return (
-                <div className={cn('p-5 rounded-3xl border shadow-sm transition-all', toneCls.bg)}>
-                  <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2', toneCls.label)}>Status Revenue</p>
-                  <h3 className={cn('text-xl font-black', toneCls.value)}>{globalSummary.revenueStatusText}</h3>
-                  <p className={cn('text-[9px] font-bold mt-2', toneCls.sub)}>{globalSummary.salesProgress.toFixed(1)}% dari target</p>
-                  <p className={cn('text-[9px] font-bold mt-1', toneCls.sub)}>
-                    {globalSummary.revenueStatusText === 'Melebihi' && 'Pencapaian di atas target'}
-                    {globalSummary.revenueStatusText === 'Mendekati' && 'Hampir mencapai target'}
-                    {globalSummary.revenueStatusText === 'Kurang' && 'Masih di bawah target'}
-                    {globalSummary.revenueStatusText === 'Menunggu' && 'Belum ada data sales'}
-                  </p>
-                </div>
-              );
-            })()}
-
-            {/* Status Target (real - target) */}
+            {/* Status Revenue — angka selisih (real - target). Negatif = merah, positif = hijau. */}
             {(() => {
               const s = globalSummary.totalSelisihSales;
               const isSurplus = s >= 0;
+              const hasData = globalSummary.totalRealSales > 0 || globalSummary.totalTargetSales > 0;
               return (
                 <div className={cn('p-5 rounded-3xl border shadow-sm transition-all',
-                  isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
+                  !hasData ? 'bg-slate-50 border-slate-100'
+                    : isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
                   <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2',
-                    isSurplus ? 'text-emerald-500' : 'text-rose-400')}>Status Target</p>
-                  <h3 className={cn('text-xl font-black', isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
-                    {isSurplus ? '+' : '-'}{formatCurrency(Math.abs(s))}
+                    !hasData ? 'text-slate-500'
+                      : isSurplus ? 'text-emerald-600' : 'text-rose-500')}>Status Revenue</p>
+                  <h3 className={cn('text-xl font-black',
+                    !hasData ? 'text-slate-700'
+                      : isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
+                    {!hasData ? '—' : `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))}`}
                   </h3>
-                  <p className={cn('text-[9px] font-bold mt-2', isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
-                    {isSurplus ? 'Surplus dari target' : 'Defisit dari target'}
+                  <p className={cn('text-[9px] font-bold mt-2',
+                    !hasData ? 'text-slate-400'
+                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    Target: {formatCurrency(globalSummary.totalTargetSales)}
                   </p>
-                  <p className={cn('text-[9px] font-bold mt-1', isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
-                    Real Sales - Target Sales
+                  <p className={cn('text-[9px] font-bold mt-1',
+                    !hasData ? 'text-slate-400'
+                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    {!hasData ? 'Belum ada data sales'
+                      : isSurplus ? 'Surplus · di atas target'
+                      : 'Defisit · kurang dari target'}
                   </p>
                 </div>
               );
@@ -606,8 +571,17 @@ export const TargetSection = ({
                     const isSurplus = selisihSales >= 0;
 
                     return (
-                      <tr key={app.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all group">
-                        <td className="py-4 px-4 text-xs font-black text-slate-700">{app.name}</td>
+                      <tr
+                        key={app.id}
+                        onClick={() => { setSelectedAppId(app.id); setShowAppSelection(false); }}
+                        className="border-b border-slate-50 hover:bg-indigo-50/40 cursor-pointer transition-all group"
+                      >
+                        <td className="py-4 px-4 text-xs font-black text-slate-700 group-hover:text-indigo-700">
+                          <div className="flex items-center gap-2">
+                            <span>{app.name}</span>
+                            <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-indigo-600">{progressDownloader.toFixed(1)}%</span>
@@ -650,89 +624,6 @@ export const TargetSection = ({
               </table>
             </div>
           </div>
-        </div>
-
-        <div className="flex items-start gap-4 mt-2">
-          <div className="w-1 h-12 rounded-full bg-gradient-to-b from-emerald-500 via-amber-400 to-rose-500" />
-          <div>
-            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.25em] mb-1">
-              Operasional
-            </p>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-              Pilih Aplikasi
-            </h2>
-            <p className="text-sm text-slate-400 font-medium mt-1">
-              Daftar aplikasi auto-sync dari database. Klik kartu untuk mengatur target.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {apps.map((app, idx) => {
-            const configuredMonths = Object.keys(app.targetConfig || {}).length;
-            // Rotate accent color for visual variety
-            const accents = [
-              { gradient: 'from-indigo-500 to-violet-500', bg: 'bg-indigo-50', text: 'text-indigo-600' },
-              { gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-              { gradient: 'from-rose-500 to-pink-500', bg: 'bg-rose-50', text: 'text-rose-600' },
-              { gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', text: 'text-amber-600' },
-              { gradient: 'from-cyan-500 to-blue-500', bg: 'bg-cyan-50', text: 'text-cyan-600' },
-            ];
-            const accent = accents[idx % accents.length];
-
-            return (
-              <motion.div
-                key={app.id}
-                whileHover={{ y: -4 }}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="group bg-white rounded-3xl border border-slate-100 overflow-hidden cursor-pointer hover:shadow-xl hover:border-slate-200 transition-all relative"
-              >
-                <div
-                  onClick={() => {
-                    setSelectedAppId(app.id);
-                    setShowAppSelection(false);
-                  }}
-                  className="absolute inset-0 z-0"
-                  role="button"
-                  aria-label={`Pilih aplikasi ${app.name}`}
-                />
-
-                {/* Top accent bar */}
-                <div className={cn('h-1 bg-gradient-to-r', accent.gradient)} />
-
-                <div className="relative z-10 p-6">
-                  <div className="flex items-start justify-between mb-5">
-                    <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110', accent.bg)}>
-                      <Smartphone className={cn('w-6 h-6', accent.text)} />
-                    </div>
-                    <span className={cn('text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg', accent.bg, accent.text)}>
-                      {configuredMonths > 0 ? `${configuredMonths} Bulan` : 'Kosong'}
-                    </span>
-                  </div>
-
-                  <h3 className="text-base font-black text-slate-900 mb-1 px-1 truncate">
-                    {app.name}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3">
-                    Klik untuk atur target
-                  </p>
-
-                  <div
-                    onClick={() => {
-                      setSelectedAppId(app.id);
-                      setShowAppSelection(false);
-                    }}
-                    className={cn('flex items-center justify-between pt-3 mt-3 border-t border-slate-100', accent.text)}
-                  >
-                    <span className="text-[10px] font-black uppercase tracking-widest">Atur Target</span>
-                    <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
         </div>
       </div>
     );
@@ -860,8 +751,8 @@ export const TargetSection = ({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-8"
         >
-          {/* Summary Cards — Total Downloader, Total Sales, Konversi, Status Revenue, Status Target */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* Summary Cards — Total Downloader, Total Sales, Konversi, Status Revenue */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Downloader */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
@@ -903,47 +794,34 @@ export const TargetSection = ({
               })()}
             </div>
 
-            {/* Status Revenue */}
-            {(() => {
-              const tone = summary.revenueStatusTone;
-              const toneCls = {
-                emerald: { bg: 'bg-emerald-50 border-emerald-100', label: 'text-emerald-500', value: 'text-emerald-600', sub: 'text-emerald-500' },
-                amber:   { bg: 'bg-amber-50 border-amber-100',     label: 'text-amber-500',   value: 'text-amber-600',   sub: 'text-amber-500' },
-                rose:    { bg: 'bg-rose-50 border-rose-100',       label: 'text-rose-500',    value: 'text-rose-600',    sub: 'text-rose-500' },
-                slate:   { bg: 'bg-slate-50 border-slate-100',     label: 'text-slate-500',   value: 'text-slate-700',   sub: 'text-slate-400' },
-              }[tone];
-              return (
-                <div className={cn('p-5 rounded-3xl border shadow-sm', toneCls.bg)}>
-                  <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2', toneCls.label)}>Status Revenue</p>
-                  <h3 className={cn('text-xl font-black', toneCls.value)}>{summary.revenueStatusText}</h3>
-                  <p className={cn('text-[9px] font-bold mt-2', toneCls.sub)}>{summary.revenueAchievement.toFixed(1)}% dari target</p>
-                  <p className={cn('text-[9px] font-bold mt-1', toneCls.sub)}>
-                    {summary.revenueStatusText === 'Melebihi' && 'Pencapaian di atas target'}
-                    {summary.revenueStatusText === 'Mendekati' && 'Hampir mencapai target'}
-                    {summary.revenueStatusText === 'Kurang' && 'Masih di bawah target'}
-                    {summary.revenueStatusText === 'Menunggu' && 'Belum ada data sales'}
-                  </p>
-                </div>
-              );
-            })()}
-
-            {/* Status Target */}
+            {/* Status Revenue — angka selisih (real - target). Negatif = merah, positif = hijau. */}
             {(() => {
               const s = summary.selisihSales;
               const isSurplus = s >= 0;
+              const hasData = summary.totalRealSales > 0 || (summary.targetConfig.targetSales || 0) > 0;
               return (
                 <div className={cn('p-5 rounded-3xl border shadow-sm',
-                  isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
+                  !hasData ? 'bg-slate-50 border-slate-100'
+                    : isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
                   <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2',
-                    isSurplus ? 'text-emerald-500' : 'text-rose-400')}>Status Target</p>
-                  <h3 className={cn('text-xl font-black', isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
-                    {isSurplus ? '+' : '-'}{formatCurrency(Math.abs(s))}
+                    !hasData ? 'text-slate-500'
+                      : isSurplus ? 'text-emerald-600' : 'text-rose-500')}>Status Revenue</p>
+                  <h3 className={cn('text-xl font-black',
+                    !hasData ? 'text-slate-700'
+                      : isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
+                    {!hasData ? '—' : `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))}`}
                   </h3>
-                  <p className={cn('text-[9px] font-bold mt-2', isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
-                    {isSurplus ? 'Surplus dari target' : 'Defisit dari target'}
+                  <p className={cn('text-[9px] font-bold mt-2',
+                    !hasData ? 'text-slate-400'
+                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    Target: {formatCurrency(summary.targetConfig.targetSales || 0)}
                   </p>
-                  <p className={cn('text-[9px] font-bold mt-1', isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
-                    Real Sales - Target Sales
+                  <p className={cn('text-[9px] font-bold mt-1',
+                    !hasData ? 'text-slate-400'
+                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    {!hasData ? 'Belum ada data sales'
+                      : isSurplus ? 'Surplus · di atas target'
+                      : 'Defisit · kurang dari target'}
                   </p>
                 </div>
               );

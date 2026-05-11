@@ -4,7 +4,7 @@ import {
 import { motion } from 'motion/react';
 import { format, parseISO } from 'date-fns';
 import {
-  Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
+  Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts';
 import {
@@ -64,9 +64,14 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<NewInsightHasil>(emptyInput);
 
-  // Chart controls
+  // Chart controls — 1 chart dengan filter metric + platform.
+  // Metric mengikuti semua kolom InsightHasil + ER% (interaksi / jangkauan).
+  type ChartMetric =
+    | 'tayangan' | 'jangkauan' | 'interaksi_konten' | 'klik_tautan'
+    | 'kunjungan' | 'pengikut' | 'er';
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
-  const [chartGrouping, setChartGrouping] = useState<'date' | 'app' | 'platform'>('date');
+  const [chartMetric, setChartMetric] = useState<ChartMetric>('tayangan');
+  const [chartPlatform, setChartPlatform] = useState<string>('All');
 
   const reload = useCallback(async () => {
     if (!userId) return;
@@ -131,34 +136,48 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
   }, [filtered]);
 
   // Chart data: timeseries per tanggal (sum across filtered platforms/apps)
+  // Chart data — agregat per tanggal, optional filter per platform.
+  // ER% dihitung dari sum(interaksi) / sum(jangkauan) × 100 per hari.
   const chartData = useMemo(() => {
-    const byKey = new Map<string, {
-      key: string;
-      label: string;
-      tayangan: number;
-      jangkauan: number;
-      interaksi_konten: number;
-      kunjungan: number;
+    const source = chartPlatform === 'All'
+      ? filtered
+      : filtered.filter((r) => r.platform === chartPlatform);
+    const byDate = new Map<string, {
+      date: string;
+      tayangan: number; jangkauan: number; interaksi_konten: number;
+      klik_tautan: number; kunjungan: number; pengikut: number;
     }>();
-    filtered.forEach((r) => {
-      const key = chartGrouping === 'date' ? r.date
-        : chartGrouping === 'app' ? r.app_name
-        : r.platform;
-      const ex = byKey.get(key) ?? {
-        key, label: key,
-        tayangan: 0, jangkauan: 0, interaksi_konten: 0, kunjungan: 0,
+    source.forEach((r) => {
+      const ex = byDate.get(r.date) ?? {
+        date: r.date,
+        tayangan: 0, jangkauan: 0, interaksi_konten: 0,
+        klik_tautan: 0, kunjungan: 0, pengikut: 0,
       };
       ex.tayangan += r.tayangan;
       ex.jangkauan += r.jangkauan;
       ex.interaksi_konten += r.interaksi_konten;
+      ex.klik_tautan += r.klik_tautan;
       ex.kunjungan += r.kunjungan;
-      byKey.set(key, ex);
+      ex.pengikut += r.pengikut;
+      byDate.set(r.date, ex);
     });
-    const arr = Array.from(byKey.values());
-    return chartGrouping === 'date'
-      ? arr.sort((a, b) => a.key.localeCompare(b.key))
-      : arr.sort((a, b) => b.tayangan - a.tayangan);
-  }, [filtered, chartGrouping]);
+    return Array.from(byDate.values())
+      .map((r) => ({
+        ...r,
+        er: r.jangkauan > 0 ? (r.interaksi_konten / r.jangkauan) * 100 : 0,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [filtered, chartPlatform]);
+
+  const METRIC_LABELS: Record<ChartMetric, { label: string; color: string; format: 'number' | 'percent' }> = {
+    tayangan:         { label: 'Tayangan',         color: '#8b5cf6', format: 'number' },
+    jangkauan:        { label: 'Jangkauan',        color: '#f43f5e', format: 'number' },
+    interaksi_konten: { label: 'Interaksi',        color: '#10b981', format: 'number' },
+    klik_tautan:      { label: 'Klik Tautan',      color: '#f59e0b', format: 'number' },
+    kunjungan:        { label: 'Kunjungan',        color: '#0ea5e9', format: 'number' },
+    pengikut:         { label: 'Pengikut',         color: '#a855f7', format: 'number' },
+    er:               { label: 'ER%',              color: '#22c55e', format: 'percent' },
+  };
 
   // ============= Handlers =============
   const handleSubmit = async () => {
@@ -335,90 +354,91 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
         <HeroCard icon={Users} label="Pengikut Baru" value={formatNumber(totals.pengikut)} gradient="from-fuchsia-500 to-purple-500" />
       </div>
 
-      {/* Chart */}
-      {chartData.length > 0 && (
-        <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
-              <div>
-                <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em] mb-0.5">Visualisasi</p>
-                <h3 className="text-base font-black text-slate-900 tracking-tight">
-                  {chartGrouping === 'date' ? 'Trend Harian'
-                    : chartGrouping === 'app' ? 'Breakdown per App'
-                    : 'Breakdown per Platform'}
-                </h3>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Grouping */}
-              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
-                {(['date', 'app', 'platform'] as const).map((g) => (
-                  <button
-                    key={g} type="button" onClick={() => setChartGrouping(g)}
-                    className={cn('px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest transition-all',
-                      chartGrouping === g ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
-                  >
-                    {g === 'date' ? 'Tanggal' : g === 'app' ? 'App' : 'Platform'}
-                  </button>
-                ))}
+      {/* Chart — 1 chart dengan filter metric + platform */}
+      {chartData.length > 0 && (() => {
+        const meta = METRIC_LABELS[chartMetric];
+        const fmtY = (v: number) => meta.format === 'percent' ? `${v.toFixed(1)}%` : formatNumber(v);
+        return (
+          <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
+                <div>
+                  <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em] mb-0.5">Visualisasi</p>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">
+                    {meta.label}
+                    {chartPlatform !== 'All' && <span className="text-slate-400"> · {chartPlatform}</span>}
+                  </h3>
+                </div>
               </div>
 
-              {/* Chart type */}
-              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
-                <button type="button" onClick={() => setChartType('line')}
-                  className={cn('px-2.5 py-1.5 rounded-md transition-all',
-                    chartType === 'line' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
-                  title="Line chart"
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={chartMetric}
+                  onChange={(e) => setChartMetric(e.target.value as ChartMetric)}
+                  aria-label="Pilih metric"
+                  className="bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-700 outline-none px-3 py-1.5 rounded-lg uppercase tracking-widest cursor-pointer"
                 >
-                  <LineChartIcon className="w-3.5 h-3.5" />
-                </button>
-                <button type="button" onClick={() => setChartType('bar')}
-                  className={cn('px-2.5 py-1.5 rounded-md transition-all',
-                    chartType === 'bar' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
-                  title="Bar chart"
+                  {Object.entries(METRIC_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={chartPlatform}
+                  onChange={(e) => setChartPlatform(e.target.value)}
+                  aria-label="Filter platform untuk chart"
+                  className="bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-700 outline-none px-3 py-1.5 rounded-lg uppercase tracking-widest cursor-pointer"
                 >
-                  <BarChart3 className="w-3.5 h-3.5" />
-                </button>
+                  <option value="All">Semua Platform</option>
+                  {platformOptions.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                  <button type="button" onClick={() => setChartType('line')}
+                    className={cn('px-2.5 py-1.5 rounded-md transition-all',
+                      chartType === 'line' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                    title="Line chart"
+                  ><LineChartIcon className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => setChartType('bar')}
+                    className={cn('px-2.5 py-1.5 rounded-md transition-all',
+                      chartType === 'bar' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500')}
+                    title="Bar chart"
+                  ><BarChart3 className="w-3.5 h-3.5" /></button>
+                </div>
               </div>
             </div>
+            <ResponsiveContainer width="100%" height={300}>
+              {chartType === 'line' ? (
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
+                    tickFormatter={(d) => format(parseISO(d), 'd MMM')} />
+                  <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
+                    tickFormatter={(v) => meta.format === 'percent' ? `${v}%` : String(v)} />
+                  <Tooltip
+                    labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
+                    formatter={(v) => [fmtY(Number(v)), meta.label]}
+                    contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }} />
+                  <Line type="monotone" dataKey={chartMetric}
+                    stroke={meta.color} strokeWidth={2.5} dot={false} name={meta.label} />
+                </LineChart>
+              ) : (
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
+                    tickFormatter={(d) => format(parseISO(d), 'd MMM')} />
+                  <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
+                    tickFormatter={(v) => meta.format === 'percent' ? `${v}%` : String(v)} />
+                  <Tooltip
+                    labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
+                    formatter={(v) => [fmtY(Number(v)), meta.label]}
+                    contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }} />
+                  <Bar dataKey={chartMetric} fill={meta.color} name={meta.label} radius={[6, 6, 0, 0]} />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            {chartType === 'line' && chartGrouping === 'date' ? (
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="key" stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
-                  tickFormatter={(d) => format(parseISO(d), 'd MMM')} />
-                <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }} />
-                <Tooltip
-                  labelFormatter={(d) => format(parseISO(String(d)), 'dd MMM yyyy')}
-                  contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }} />
-                <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }} />
-                <Line type="monotone" dataKey="tayangan" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Tayangan" />
-                <Line type="monotone" dataKey="jangkauan" stroke="#f43f5e" strokeWidth={2} dot={false} name="Jangkauan" />
-                <Line type="monotone" dataKey="interaksi_konten" stroke="#10b981" strokeWidth={2} dot={false} name="Interaksi" />
-                <Line type="monotone" dataKey="kunjungan" stroke="#0ea5e9" strokeWidth={2} dot={false} name="Kunjungan" />
-              </LineChart>
-            ) : (
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="key" stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }}
-                  tickFormatter={(d) => chartGrouping === 'date' ? format(parseISO(d), 'd MMM') : String(d)} />
-                <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fontWeight: 700 }} />
-                <Tooltip
-                  labelFormatter={(d) => chartGrouping === 'date' ? format(parseISO(String(d)), 'dd MMM yyyy') : String(d)}
-                  contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11 }} />
-                <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }} />
-                <Bar dataKey="tayangan" fill="#8b5cf6" name="Tayangan" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="jangkauan" fill="#f43f5e" name="Jangkauan" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="interaksi_konten" fill="#10b981" name="Interaksi" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="kunjungan" fill="#0ea5e9" name="Kunjungan" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            )}
-          </ResponsiveContainer>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Table */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
