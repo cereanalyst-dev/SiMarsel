@@ -16,6 +16,8 @@ import type {
   NewMonthlyPerformance,
   NewTask,
   Task,
+  TargetConfigMonth,
+  TargetConfigRow,
   Transaction,
   UserRole,
   UserRoleRow,
@@ -955,6 +957,58 @@ export const deleteKpiMetric = async (id: string): Promise<boolean> => {
     return false;
   }
   return true;
+};
+
+// ============================================================
+// Target Config — penyimpanan target bulanan per app di tabel flat.
+// Di-mirror dari apps_snapshot.apps[].targetConfig (JSONB) tiap save,
+// supaya bisa di-query langsung dari DB tanpa parse JSON.
+// ============================================================
+
+export const upsertTargetConfig = async (
+  userId: string,
+  appName: string,
+  yearMonth: string,
+  cfg: TargetConfigMonth,
+): Promise<boolean> => {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('target_config')
+    .upsert(
+      {
+        user_id: userId,
+        app_name: appName,
+        year_month: yearMonth,
+        target_downloader: cfg.targetDownloader || 0,
+        target_sales: cfg.targetSales || 0,
+        target_repeat_order: cfg.targetRepeatOrder || 0,
+        target_conversion: cfg.targetConversion || 0,
+        avg_price: cfg.avgPrice || 0,
+      },
+      { onConflict: 'user_id,app_name,year_month' },
+    );
+  if (error) {
+    logger.warn('Failed to upsert target_config:', error.message);
+    return false;
+  }
+  return true;
+};
+
+export const fetchAllTargetConfigs = async (userId: string): Promise<TargetConfigRow[]> => {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('target_config')
+    .select('*')
+    .eq('user_id', userId)
+    .order('year_month', { ascending: false })
+    .order('app_name', { ascending: true });
+  if (error) {
+    logger.warn('Failed to fetch target_config:', error.message);
+    return [];
+  }
+  return (data ?? []) as TargetConfigRow[];
 };
 
 // ============================================================

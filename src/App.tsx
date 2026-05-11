@@ -16,6 +16,7 @@ import {
   saveAppsToLocal,
   saveAppsToSupabase,
   saveSelectedAppIdToLocal,
+  upsertTargetConfig,
   uploadDownloadersToSupabase,
   uploadTransactionsToSupabase,
   type QuickOverviewStats,
@@ -927,6 +928,11 @@ export default function App() {
                           onForceSave={
                             userId
                               ? (updatedApps) => void saveAppsToSupabase(userId, updatedApps)
+                              : undefined
+                          }
+                          onSaveTargetToTable={
+                            userId
+                              ? (appName, ym, cfg) => void upsertTargetConfig(userId, appName, ym, cfg)
                               : undefined
                           }
                         />
