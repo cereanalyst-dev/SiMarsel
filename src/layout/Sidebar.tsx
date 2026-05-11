@@ -20,10 +20,10 @@ interface Props {
 }
 
 const ROLE_BADGE: Record<UserRole, { bg: string; text: string; icon: typeof Shield }> = {
-  admin:        { bg: 'bg-rose-500/20 border-rose-400/30',     text: 'text-rose-300',    icon: ShieldAlert },
-  manager:      { bg: 'bg-violet-500/20 border-violet-400/30', text: 'text-violet-300',  icon: ShieldCheck },
-  asst_manager: { bg: 'bg-indigo-500/20 border-indigo-400/30', text: 'text-indigo-300',  icon: Shield },
-  staf:         { bg: 'bg-slate-500/20 border-slate-400/30',   text: 'text-slate-300',   icon: User },
+  admin:        { bg: 'bg-rose-50 border-rose-200',     text: 'text-rose-700',    icon: ShieldAlert },
+  manager:      { bg: 'bg-violet-50 border-violet-200', text: 'text-violet-700',  icon: ShieldCheck },
+  asst_manager: { bg: 'bg-indigo-50 border-indigo-200', text: 'text-indigo-700',  icon: Shield },
+  staf:         { bg: 'bg-slate-100 border-slate-200',  text: 'text-slate-700',   icon: User },
 };
 
 export const Sidebar = ({
@@ -76,27 +76,27 @@ export const Sidebar = ({
         key={item.id}
         onClick={() => handleNavClick(item.id)}
         className={cn(
-          'group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200',
+          'group relative w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200',
           isActive
-            ? 'bg-white text-slate-900 shadow-[0_6px_20px_-6px_rgba(0,0,0,0.4)]'
-            : 'text-slate-300 hover:text-white hover:bg-white/5',
+            ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-white/60',
         )}
       >
         {isActive && (
           <motion.span
             layoutId="sidebar-indicator"
-            className="absolute inset-y-1.5 -left-4 w-1 rounded-full bg-amber-400"
+            className="absolute inset-y-2 -left-4 w-1 rounded-full bg-orange-500"
           />
         )}
         <item.icon
           className={cn(
-            'w-4.5 h-4.5 flex-shrink-0 transition-colors',
-            isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-amber-300',
+            'w-4 h-4 flex-shrink-0 transition-colors',
+            isActive ? 'text-orange-300' : 'text-slate-400 group-hover:text-slate-700',
           )}
           strokeWidth={isActive ? 2.5 : 2}
         />
         <span className="flex-1 text-left">{item.label}</span>
-        {isActive && <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+        {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/60" />}
       </button>
     );
   };
@@ -110,16 +110,16 @@ export const Sidebar = ({
         <button
           onClick={() => toggleGroup(item.id)}
           className={cn(
-            'group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200',
+            'group relative w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200',
             hasActiveChild
-              ? 'text-white bg-white/5'
-              : 'text-slate-300 hover:text-white hover:bg-white/5',
+              ? 'text-slate-900 bg-white/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60',
           )}
         >
           <item.icon
             className={cn(
-              'w-4.5 h-4.5 flex-shrink-0 transition-colors',
-              hasActiveChild ? 'text-amber-300' : 'text-slate-400 group-hover:text-amber-300',
+              'w-4 h-4 flex-shrink-0 transition-colors',
+              hasActiveChild ? 'text-orange-600' : 'text-slate-400 group-hover:text-slate-700',
             )}
             strokeWidth={hasActiveChild ? 2.5 : 2}
           />
@@ -138,7 +138,7 @@ export const Sidebar = ({
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="overflow-hidden ml-4 mt-0.5 mb-1 pl-3 border-l border-white/5 space-y-0.5"
+              className="overflow-hidden ml-4 mt-0.5 mb-1 pl-3 border-l border-slate-200/70 space-y-0.5"
             >
               {item.children.map((child) => {
                 const ChildIcon = child.icon;
@@ -148,22 +148,22 @@ export const Sidebar = ({
                     key={child.id}
                     onClick={() => handleNavClick(child.id)}
                     className={cn(
-                      'group relative w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-bold transition-all',
+                      'group relative w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all',
                       isActive
-                        ? 'bg-white/95 text-slate-900 shadow-[0_4px_14px_-4px_rgba(0,0,0,0.3)]'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5',
+                        ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-white/60',
                     )}
                   >
                     {isActive && (
                       <motion.span
                         layoutId="sidebar-indicator"
-                        className="absolute inset-y-1 -left-3 w-0.5 rounded-full bg-amber-400"
+                        className="absolute inset-y-1 -left-3 w-0.5 rounded-full bg-orange-500"
                       />
                     )}
                     <ChildIcon
                       className={cn(
                         'w-3.5 h-3.5 flex-shrink-0',
-                        isActive ? 'text-indigo-600' : 'text-slate-500 group-hover:text-amber-300',
+                        isActive ? 'text-orange-300' : 'text-slate-400 group-hover:text-slate-700',
                       )}
                     />
                     <span className="flex-1 text-left">{child.label}</span>
@@ -182,39 +182,38 @@ export const Sidebar = ({
 
   const sidebarContent = (
     <aside
-      className="w-72 flex flex-col h-full overflow-hidden"
-      style={{
-        background:
-          'linear-gradient(180deg, #0f172a 0%, #111c36 50%, #0b1424 100%)',
-      }}
+      className="w-72 flex flex-col h-full overflow-hidden relative"
+      style={{ background: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(24px) saturate(1.5)' }}
     >
-      {/* Decorative layer */}
+      {/* Decorative gradient orbs — warm Bento accent */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-indigo-500/10 to-transparent" />
-        <div className="absolute top-20 -right-10 w-40 h-40 bg-amber-400/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 -left-20 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-32 -right-10 w-40 h-40 bg-orange-200 rounded-full blur-3xl opacity-30" />
+        <div className="absolute bottom-32 -left-20 w-56 h-56 bg-purple-200 rounded-full blur-3xl opacity-25" />
       </div>
+
+      {/* Right edge hairline */}
+      <div className="absolute top-0 bottom-0 right-0 w-px bg-slate-200/60" />
 
       {/* Brand */}
       <div className="relative px-7 pt-8 pb-6">
         <div className="flex items-center gap-3">
-          <div className="w-16 h-16 relative flex-shrink-0">
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-amber-400 via-rose-500 to-indigo-500 blur-md opacity-50" />
+          <div className="w-14 h-14 relative flex-shrink-0">
+            <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-br from-orange-300 via-rose-300 to-violet-400 blur-md opacity-50" />
             <img
               src={LOGO_PATH}
               alt={APP_NAME}
-              className="relative w-full h-full object-contain rounded-2xl ring-2 ring-white/10"
+              className="relative w-full h-full object-contain rounded-2xl ring-1 ring-white/80"
               referrerPolicy="no-referrer"
             />
           </div>
           <div className="leading-none">
-            <h1 className="text-[22px] font-black text-white tracking-tight">
+            <h1 className="font-display text-3xl text-slate-900 tracking-tight">
               {APP_NAME}
               {APP_ACCENT_SUFFIX && (
-                <span className="text-amber-400">{APP_ACCENT_SUFFIX}</span>
+                <span className="text-orange-600">{APP_ACCENT_SUFFIX}</span>
               )}
             </h1>
-            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1.5">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1.5">
               {COMPANY_NAME}
             </p>
           </div>
@@ -222,11 +221,11 @@ export const Sidebar = ({
       </div>
 
       {/* Divider with label */}
-      <div className="relative px-7 flex items-center gap-3 mb-5">
-        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em]">
+      <div className="relative px-7 flex items-center gap-3 mb-3">
+        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.25em]">
           Navigasi
         </p>
-        <span className="flex-1 h-px bg-gradient-to-r from-slate-700/50 to-transparent" />
+        <span className="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent" />
       </div>
 
       <nav className="relative flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
@@ -235,18 +234,18 @@ export const Sidebar = ({
         {systemItems.length > 0 && (
           <>
             <div className="flex items-center gap-3 px-3 pt-6 pb-2">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em]">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.25em]">
                 Sistem
               </p>
-              <span className="flex-1 h-px bg-gradient-to-r from-slate-700/50 to-transparent" />
+              <span className="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent" />
             </div>
             {systemItems.map(renderItem)}
             {onSignOut && (
               <button
                 onClick={onSignOut}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all"
               >
-                <LogOut className="w-4.5 h-4.5 text-slate-500" />
+                <LogOut className="w-4 h-4 text-slate-400" />
                 Keluar
               </button>
             )}
@@ -255,22 +254,21 @@ export const Sidebar = ({
       </nav>
 
       {/* Status card */}
-      <div className="relative p-5 pt-4">
-        <div className="relative rounded-2xl p-4 bg-white/[0.03] border border-white/5 overflow-hidden">
-          <div className="absolute -right-4 -top-4 w-20 h-20 bg-amber-400/10 rounded-full blur-2xl" />
+      <div className="relative p-4 pt-3">
+        <div className="relative rounded-2xl p-4 tile overflow-hidden">
           {userEmail ? (
             <>
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em] mb-1.5">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.25em] mb-1.5">
                 Akun Aktif
               </p>
               {userFullName && (
-                <p className="text-[10px] font-bold text-slate-200 mb-0.5 truncate" title={userFullName}>
+                <p className="text-[11px] font-bold text-slate-700 mb-0.5 truncate" title={userFullName}>
                   {userFullName}
                 </p>
               )}
               <div className="flex items-center gap-2">
                 <p
-                  className="text-[11px] font-black text-white truncate flex-1 min-w-0"
+                  className="text-[11px] font-black text-slate-900 truncate flex-1 min-w-0"
                   title={userEmail}
                 >
                   {userEmail}
@@ -293,20 +291,20 @@ export const Sidebar = ({
                 })()}
               </div>
               <div className="mt-2 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[9px] font-bold text-emerald-300/80 uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-bold text-emerald-600/80 uppercase tracking-wider">
                   Synced · Supabase
                 </span>
               </div>
             </>
           ) : (
             <>
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em] mb-1.5">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.25em] mb-1.5">
                 Status
               </p>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                <span className="text-[11px] font-black text-white">Mode Lokal</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-[11px] font-black text-slate-700">Mode Lokal</span>
               </div>
             </>
           )}
@@ -329,7 +327,7 @@ export const Sidebar = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onCloseMobile}
-              className="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40"
+              className="lg:hidden fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
             />
             <motion.div
               initial={{ x: '-100%' }}
@@ -341,7 +339,7 @@ export const Sidebar = ({
               <button
                 onClick={onCloseMobile}
                 aria-label="Tutup menu"
-                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-white/80 text-slate-700 hover:bg-white transition-colors shadow-sm"
               >
                 <X className="w-5 h-5" />
               </button>

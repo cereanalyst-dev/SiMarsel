@@ -200,14 +200,11 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 text-rose-600 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-              Content Hub
-            </span>
-          </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-            Skrip Konten
+          <p className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest mb-3">
+            Content Hub
+          </p>
+          <h1 className="font-display text-6xl text-slate-900 leading-none">
+            Skrip <span className="text-orange-600">Konten</span>
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
             Kelola skrip seperti spreadsheet — edit cell langsung di tabel,
@@ -229,7 +226,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="tile p-5 rounded-3xl">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
             <Smartphone className="w-3.5 h-3.5 text-slate-400" />
@@ -294,7 +291,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
       </div>
 
       {/* Spreadsheet */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="tile rounded-3xl overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-[11px] font-bold text-slate-400">
             Memuat skrip…

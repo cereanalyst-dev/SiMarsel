@@ -209,7 +209,7 @@ export const PromoSection = ({
               Promo Analytics
             </span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+          <h1 className="font-display text-6xl text-slate-900 leading-none">
             Performa Kode Promo
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -236,7 +236,7 @@ export const PromoSection = ({
       />
 
       {/* Filter bar */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="tile p-5 rounded-3xl">
         <div className="flex flex-wrap items-center gap-3">
           {/* App */}
           <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
@@ -306,7 +306,7 @@ export const PromoSection = ({
       </div>
 
       {/* Table 1: Kode Promo Per Channel + row Reseller */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="tile rounded-3xl overflow-hidden">
         <div className="px-7 py-5 border-b border-slate-100 flex items-center gap-3">
           <div className="w-1 h-8 rounded-full bg-gradient-to-b from-rose-500 to-pink-500" />
           <div>
@@ -419,7 +419,7 @@ export const PromoSection = ({
       )}
 
       {/* Table 2: Detail per kode unik */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="tile rounded-3xl overflow-hidden">
         <div className="px-7 py-5 border-b border-slate-100 flex flex-wrap items-center gap-4 justify-between">
           <div className="flex items-center gap-3">
             <div className="w-1 h-8 rounded-full bg-gradient-to-b from-violet-500 to-rose-500" />
@@ -560,15 +560,15 @@ function SearchDetailCard({ detail }: { detail: SearchDetail }) {
       </div>
 
       <div className="p-7 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="tile p-5 rounded-2xl">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Jumlah Transaksi</p>
           <h4 className="text-2xl font-black text-indigo-600 tabular-nums">{formatNumber(detail.totalCount)}</h4>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="tile p-5 rounded-2xl">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue</p>
           <h4 className="text-2xl font-black text-emerald-600 tabular-nums">{formatCurrency(detail.totalRev)}</h4>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="tile p-5 rounded-2xl">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">App Pengguna</p>
           <h4 className="text-2xl font-black text-violet-600 tabular-nums">{detail.apps.length}</h4>
         </div>
@@ -579,7 +579,7 @@ function SearchDetailCard({ detail }: { detail: SearchDetail }) {
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">
             Rincian per App
           </p>
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <div className="tile rounded-2xl overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead className="bg-slate-50/60">
                 <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">
