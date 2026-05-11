@@ -4,12 +4,14 @@
 // ==============================================================
 
 import { useEffect, useState } from 'react';
-import { fetchMyRole } from './dataAccess';
+import { getSupabase } from './supabase';
+import { logger } from './logger';
 import { permissionsFor, type Permissions } from './permissions';
 import type { UserRole } from '../types';
 
 export interface UseUserRoleResult {
   role: UserRole | null;
+  fullName: string | null;
   permissions: Permissions;
   loading: boolean;
   refresh: () => Promise<void>;
@@ -17,17 +19,32 @@ export interface UseUserRoleResult {
 
 export const useUserRole = (userId: string | null): UseUserRoleResult => {
   const [role, setRole] = useState<UserRole | null>(null);
+  const [fullName, setFullName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     if (!userId) {
       setRole(null);
+      setFullName(null);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const r = await fetchMyRole(userId);
-    setRole(r);
+    const supabase = getSupabase();
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role, full_name')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) {
+      logger.warn('Failed to fetch user role:', error.message);
+    }
+    setRole((data?.role as UserRole) ?? null);
+    setFullName((data?.full_name as string | null) ?? null);
     setLoading(false);
   };
 
@@ -38,6 +55,7 @@ export const useUserRole = (userId: string | null): UseUserRoleResult => {
 
   return {
     role,
+    fullName,
     permissions: permissionsFor(role),
     loading,
     refresh: load,

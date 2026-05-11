@@ -1,23 +1,34 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, LogOut, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut, Shield, ShieldAlert, ShieldCheck, User, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import {
   APP_ACCENT_SUFFIX, APP_NAME, COMPANY_NAME, LOGO_PATH, MENU_ITEMS,
 } from '../config/app.config';
+import { ROLE_LABELS, type UserRole } from '../types';
 
 interface Props {
   activeTab: string;
   setActiveTab: (t: string) => void;
   onSignOut?: () => void;
   userEmail?: string | null;
+  userRole?: UserRole | null;
+  userFullName?: string | null;
   // Mobile-only: controls slide-in open state
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
 }
 
+const ROLE_BADGE: Record<UserRole, { bg: string; text: string; icon: typeof Shield }> = {
+  admin:        { bg: 'bg-rose-500/20 border-rose-400/30',     text: 'text-rose-300',    icon: ShieldAlert },
+  manager:      { bg: 'bg-violet-500/20 border-violet-400/30', text: 'text-violet-300',  icon: ShieldCheck },
+  asst_manager: { bg: 'bg-indigo-500/20 border-indigo-400/30', text: 'text-indigo-300',  icon: Shield },
+  staf:         { bg: 'bg-slate-500/20 border-slate-400/30',   text: 'text-slate-300',   icon: User },
+};
+
 export const Sidebar = ({
-  activeTab, setActiveTab, onSignOut, userEmail, mobileOpen = false, onCloseMobile,
+  activeTab, setActiveTab, onSignOut, userEmail, userRole, userFullName,
+  mobileOpen = false, onCloseMobile,
 }: Props) => {
   // Track expanded sub-menu group. Auto-expand kalau activeTab adalah child
   // dari salah satu group, supaya user gak harus klik 2x pas refresh.
@@ -252,12 +263,35 @@ export const Sidebar = ({
               <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.25em] mb-1.5">
                 Akun Aktif
               </p>
-              <p
-                className="text-[11px] font-black text-white truncate"
-                title={userEmail}
-              >
-                {userEmail}
-              </p>
+              {userFullName && (
+                <p className="text-[10px] font-bold text-slate-200 mb-0.5 truncate" title={userFullName}>
+                  {userFullName}
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <p
+                  className="text-[11px] font-black text-white truncate flex-1 min-w-0"
+                  title={userEmail}
+                >
+                  {userEmail}
+                </p>
+                {userRole && (() => {
+                  const badge = ROLE_BADGE[userRole];
+                  const Icon = badge.icon;
+                  return (
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[8px] font-black uppercase tracking-wider flex-shrink-0',
+                        badge.bg, badge.text,
+                      )}
+                      title={`Role: ${ROLE_LABELS[userRole]}`}
+                    >
+                      <Icon className="w-2.5 h-2.5" />
+                      {ROLE_LABELS[userRole]}
+                    </span>
+                  );
+                })()}
+              </div>
               <div className="mt-2 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-[9px] font-bold text-emerald-300/80 uppercase tracking-wider">

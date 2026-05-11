@@ -255,16 +255,10 @@ export const TargetSection = ({
     let totalRealDownloader = 0;
     let totalRealSales = 0;
     let totalRealRepeatOrder = 0;
-    dates.forEach((date) => {
-      const dayData = selectedApp.dailyData?.[date] ?? {};
-      const a = getActual(selectedApp.name, date);
-      totalRealDownloader += dayData.actualDownloader != null
-        ? Number(dayData.actualDownloader) : a.downloader;
-      totalRealSales += dayData.actualSales != null
-        ? Number(dayData.actualSales) : a.sales;
-      totalRealRepeatOrder += dayData.actualRepeatOrder != null
-        ? Number(dayData.actualRepeatOrder) : a.premium;
-    });
+    // sumKeterangan = total kolom "Keterangan" di operational sheet, yaitu
+    // sum(actualSales - displayTargetSales) hanya untuk hari yang punya
+    // actualSales > 0. Cells dengan actualSales 0 tampil "-" → tidak ikut.
+    let sumKeterangan = 0;
 
     const targetConfig = selectedApp.targetConfig?.[targetMonth] || {
       targetDownloader: 0,
@@ -273,6 +267,27 @@ export const TargetSection = ({
       targetConversion: 0,
       avgPrice: 0
     };
+    const baseDailySales = (targetConfig.targetSales || 0) / Math.max(1, dates.length);
+
+    dates.forEach((date) => {
+      const dayData = selectedApp.dailyData?.[date] ?? {};
+      const a = getActual(selectedApp.name, date);
+      const actualDownloader = dayData.actualDownloader != null
+        ? Number(dayData.actualDownloader) : a.downloader;
+      const actualSales = dayData.actualSales != null
+        ? Number(dayData.actualSales) : a.sales;
+      const actualRepeatOrder = dayData.actualRepeatOrder != null
+        ? Number(dayData.actualRepeatOrder) : a.premium;
+      totalRealDownloader += actualDownloader;
+      totalRealSales += actualSales;
+      totalRealRepeatOrder += actualRepeatOrder;
+
+      if (actualSales > 0) {
+        // displayTarget = manualTargetSales kalau di-set, else target harian proporsional
+        const dailyTarget = dayData.manualTargetSales || baseDailySales;
+        sumKeterangan += actualSales - dailyTarget;
+      }
+    });
 
     const progressDownloader = targetConfig.targetDownloader > 0
       ? (totalRealDownloader / targetConfig.targetDownloader) * 100
@@ -295,6 +310,7 @@ export const TargetSection = ({
       progressSales,
       progressConversion,
       selisihSales,
+      sumKeterangan,
       targetConfig,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -307,6 +323,9 @@ export const TargetSection = ({
     let totalRealSales = 0;
     let totalTargetRepeatOrder = 0;
     let totalRealRepeatOrder = 0;
+    // sumKeterangan = total kolom "Keterangan" semua app (sum daily salesDiff
+    // hanya untuk hari yang punya actualSales > 0).
+    let sumKeterangan = 0;
 
     filteredAppsForSummary.forEach(app => {
       const targetConfig = app.targetConfig?.[targetMonth];
@@ -315,20 +334,25 @@ export const TargetSection = ({
         totalTargetSales += targetConfig.targetSales || 0;
         totalTargetRepeatOrder += targetConfig.targetRepeatOrder || 0;
       }
+      const baseDailySalesApp = (targetConfig?.targetSales || 0) / Math.max(1, dates.length);
 
       // Real — prioritas manual override (dailyData.actualX), fallback ke DB
       dates.forEach((date) => {
         const dayData = app.dailyData?.[date] ?? {};
         const a = getActual(app.name, date);
+        const actualSales = dayData.actualSales != null ? Number(dayData.actualSales) : a.sales;
         totalRealDownloader += dayData.actualDownloader != null
           ? Number(dayData.actualDownloader)
           : a.downloader;
-        totalRealSales += dayData.actualSales != null
-          ? Number(dayData.actualSales)
-          : a.sales;
+        totalRealSales += actualSales;
         totalRealRepeatOrder += dayData.actualRepeatOrder != null
           ? Number(dayData.actualRepeatOrder)
           : a.premium;
+
+        if (actualSales > 0) {
+          const dailyTarget = dayData.manualTargetSales || baseDailySalesApp;
+          sumKeterangan += actualSales - dailyTarget;
+        }
       });
     });
 
@@ -343,6 +367,7 @@ export const TargetSection = ({
       totalTargetRepeatOrder,
       totalRealRepeatOrder,
       totalSelisihSales,
+      sumKeterangan,
       downloaderProgress: totalTargetDownloader > 0 ? (totalRealDownloader / totalTargetDownloader) * 100 : 0,
       salesProgress,
       conversionProgress: totalRealDownloader > 0 ? (totalRealRepeatOrder / totalRealDownloader) * 100 : 0
@@ -488,11 +513,12 @@ export const TargetSection = ({
               })()}
             </div>
 
-            {/* Status Revenue — angka selisih (real - target). Negatif = merah, positif = hijau. */}
+            {/* Status Revenue = sum kolom Keterangan (sum daily salesDiff).
+                Hijau kalau positif, merah kalau negatif. Tanpa label target/defisit. */}
             {(() => {
-              const s = globalSummary.totalSelisihSales;
+              const s = globalSummary.sumKeterangan;
               const isSurplus = s >= 0;
-              const hasData = globalSummary.totalRealSales > 0 || globalSummary.totalTargetSales > 0;
+              const hasData = Math.abs(s) > 0;
               return (
                 <div className={cn('p-5 rounded-3xl border shadow-sm transition-all',
                   !hasData ? 'bg-slate-50 border-slate-100'
@@ -500,23 +526,11 @@ export const TargetSection = ({
                   <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2',
                     !hasData ? 'text-slate-500'
                       : isSurplus ? 'text-emerald-600' : 'text-rose-500')}>Status Revenue</p>
-                  <h3 className={cn('text-xl font-black',
+                  <h3 className={cn('text-2xl font-black',
                     !hasData ? 'text-slate-700'
                       : isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
                     {!hasData ? '—' : `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))}`}
                   </h3>
-                  <p className={cn('text-[9px] font-bold mt-2',
-                    !hasData ? 'text-slate-400'
-                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
-                    Target: {formatCurrency(globalSummary.totalTargetSales)}
-                  </p>
-                  <p className={cn('text-[9px] font-bold mt-1',
-                    !hasData ? 'text-slate-400'
-                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
-                    {!hasData ? 'Belum ada data sales'
-                      : isSurplus ? 'Surplus · di atas target'
-                      : 'Defisit · kurang dari target'}
-                  </p>
                 </div>
               );
             })()}
@@ -794,11 +808,12 @@ export const TargetSection = ({
               })()}
             </div>
 
-            {/* Status Revenue — angka selisih (real - target). Negatif = merah, positif = hijau. */}
+            {/* Status Revenue = sum kolom Keterangan (sum daily salesDiff).
+                Hijau kalau positif, merah kalau negatif. Tanpa label target/defisit. */}
             {(() => {
-              const s = summary.selisihSales;
+              const s = summary.sumKeterangan;
               const isSurplus = s >= 0;
-              const hasData = summary.totalRealSales > 0 || (summary.targetConfig.targetSales || 0) > 0;
+              const hasData = Math.abs(s) > 0;
               return (
                 <div className={cn('p-5 rounded-3xl border shadow-sm',
                   !hasData ? 'bg-slate-50 border-slate-100'
@@ -806,23 +821,11 @@ export const TargetSection = ({
                   <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2',
                     !hasData ? 'text-slate-500'
                       : isSurplus ? 'text-emerald-600' : 'text-rose-500')}>Status Revenue</p>
-                  <h3 className={cn('text-xl font-black',
+                  <h3 className={cn('text-2xl font-black',
                     !hasData ? 'text-slate-700'
                       : isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
                     {!hasData ? '—' : `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))}`}
                   </h3>
-                  <p className={cn('text-[9px] font-bold mt-2',
-                    !hasData ? 'text-slate-400'
-                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
-                    Target: {formatCurrency(summary.targetConfig.targetSales || 0)}
-                  </p>
-                  <p className={cn('text-[9px] font-bold mt-1',
-                    !hasData ? 'text-slate-400'
-                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
-                    {!hasData ? 'Belum ada data sales'
-                      : isSurplus ? 'Surplus · di atas target'
-                      : 'Defisit · kurang dari target'}
-                  </p>
                 </div>
               );
             })()}

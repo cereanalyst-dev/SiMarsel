@@ -147,7 +147,7 @@ export default function App() {
   const userEmail = session?.user?.email ?? null;
 
   // Role-based permissions — gated UI di Settings, KPI upload, dst.
-  const { role: userRole, permissions } = useUserRole(userId);
+  const { role: userRole, fullName: userFullName, permissions } = useUserRole(userId);
 
   // ---------- Data ----------
   // Strategi loading 2-stage:
@@ -818,6 +818,8 @@ export default function App() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           userEmail={userEmail}
+          userRole={userRole}
+          userFullName={userFullName}
           onSignOut={session ? signOut : undefined}
           mobileOpen={mobileMenuOpen}
           onCloseMobile={() => setMobileMenuOpen(false)}
@@ -828,7 +830,6 @@ export default function App() {
             activeTab={activeTab}
             rowsLoaded={data.length}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
-            userRole={userRole}
           />
 
           <main className="p-8 max-w-[1600px] mx-auto w-full">
@@ -1043,7 +1044,11 @@ export default function App() {
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.15 }}
                     >
-                      <KpiSection canUploadExcel={permissions.canUploadKpi} />
+                      <KpiSection
+                        canUploadExcel={permissions.canUploadKpi}
+                        isStafOnly={userRole === 'staf'}
+                        currentUserName={userFullName}
+                      />
                     </motion.div>
                   )}
                   {activeTab === 'settings' && (

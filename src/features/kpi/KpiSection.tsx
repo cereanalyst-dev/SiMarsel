@@ -84,9 +84,17 @@ const parseLocaleNumber = (s: string): number | null => {
 // ============================================================
 interface KpiSectionProps {
   canUploadExcel?: boolean;
+  // Staf mode: cuma boleh lihat card miliknya (matched by name).
+  // null/false = bisa lihat semua (admin/manager/asst_manager).
+  isStafOnly?: boolean;
+  currentUserName?: string | null;
 }
 
-export const KpiSection = ({ canUploadExcel = true }: KpiSectionProps = {}) => {
+export const KpiSection = ({
+  canUploadExcel = true,
+  isStafOnly = false,
+  currentUserName = null,
+}: KpiSectionProps = {}) => {
   const toast = useToast();
   const [divisions, setDivisions] = useState<KpiDivision[]>([]);
   const [allCards, setAllCards] = useState<KpiCard[]>([]);
@@ -142,9 +150,14 @@ export const KpiSection = ({ canUploadExcel = true }: KpiSectionProps = {}) => {
     return Array.from(set).sort((a, b) => b - a);
   }, [allCards]);
 
-  // Apply filter — cards yang lolos kriteria periode.
+  // Apply filter — cards yang lolos kriteria periode + role.
+  // Staf: cuma card yang name-nya match dengan full_name user (case-insensitive).
   const filteredCards = useMemo(() => {
+    const nameLower = (currentUserName ?? '').trim().toLowerCase();
     return allCards.filter((c) => {
+      if (isStafOnly) {
+        if (!nameLower || c.name.trim().toLowerCase() !== nameLower) return false;
+      }
       if (filterYear === 'none') {
         if (c.period_year != null) return false;
         return true;
@@ -157,7 +170,15 @@ export const KpiSection = ({ canUploadExcel = true }: KpiSectionProps = {}) => {
       }
       return true;
     });
-  }, [allCards, filterYear, filterMonth]);
+  }, [allCards, filterYear, filterMonth, isStafOnly, currentUserName]);
+
+  // Untuk staf: divisi yang ditampilkan hanya divisi yang punya minimal 1 card user.
+  const visibleDivisions = useMemo(() => {
+    if (!isStafOnly) return divisions;
+    const allowedDivIds = new Set<string>();
+    filteredCards.forEach((c) => { if (c.division_id) allowedDivIds.add(c.division_id); });
+    return divisions.filter((d) => allowedDivIds.has(d.id));
+  }, [divisions, filteredCards, isStafOnly]);
 
   const cardsByDivision = useMemo(() => {
     const map = new Map<string, KpiCard[]>();
@@ -295,7 +316,7 @@ export const KpiSection = ({ canUploadExcel = true }: KpiSectionProps = {}) => {
         </div>
 
         {/* Action buttons — beda per level */}
-        {!activeCardId && !activeDivisionId && (
+        {!activeCardId && !activeDivisionId && !isStafOnly && (
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
@@ -374,7 +395,7 @@ export const KpiSection = ({ canUploadExcel = true }: KpiSectionProps = {}) => {
             </button>
           </div>
         )}
-        {!activeCardId && activeDivisionId && (
+        {!activeCardId && activeDivisionId && !isStafOnly && (
           <button
             type="button"
             onClick={() => setShowCreateCard(true)}
@@ -444,7 +465,7 @@ export const KpiSection = ({ canUploadExcel = true }: KpiSectionProps = {}) => {
         />
       ) : (
         <DivisionListView
-          divisions={divisions}
+          divisions={visibleDivisions}
           cardCounts={(id) => cardsByDivision.get(id)?.length ?? 0}
           onOpen={(d) => setActiveDivisionId(d.id)}
           onEdit={(d) => setEditingDivision(d)}
