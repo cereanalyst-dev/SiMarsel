@@ -360,7 +360,7 @@ ${ctxLines}`;
               Kalender Aktivitas
             </span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+          <h1 className="font-display text-6xl text-slate-900 leading-none">
             Kalender Marsel
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -370,7 +370,7 @@ ${ctxLines}`;
         </div>
       </div>
 
-      <div className="relative bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 overflow-hidden">
+      <div className="relative tile p-8 rounded-[2rem] overflow-hidden">
         {/* Decorative */}
         <div className="pointer-events-none absolute -top-20 -right-20 w-60 h-60 bg-gradient-to-br from-amber-100/60 to-transparent rounded-full blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-16 w-60 h-60 bg-gradient-to-br from-indigo-100/40 to-transparent rounded-full blur-3xl" />
@@ -451,7 +451,7 @@ ${ctxLines}`;
             <h3 className="text-xl font-black tracking-tight">{formatCurrency(monthTotals.revenue)}</h3>
             <p className="text-[9px] font-bold text-indigo-200 mt-1">{monthTotals.activeDays} hari aktif</p>
           </div>
-          <div className="relative overflow-hidden bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="relative overflow-hidden tile p-5 rounded-2xl">
             <div className="pointer-events-none absolute -top-4 -right-4 w-16 h-16 bg-emerald-100/60 rounded-full blur-xl" />
             <div className="flex items-center gap-2 mb-1.5">
               <div className="p-1 bg-emerald-50 rounded-md">
@@ -464,7 +464,7 @@ ${ctxLines}`;
               Avg {compactRp(monthTotals.activeDays > 0 ? monthTotals.transactions / monthTotals.activeDays : 0)}/hari
             </p>
           </div>
-          <div className="relative overflow-hidden bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="relative overflow-hidden tile p-5 rounded-2xl">
             <div className="pointer-events-none absolute -top-4 -right-4 w-16 h-16 bg-amber-100/60 rounded-full blur-xl" />
             <div className="flex items-center gap-2 mb-1.5">
               <div className="p-1 bg-amber-50 rounded-md">
@@ -477,7 +477,7 @@ ${ctxLines}`;
             </h3>
             <p className="text-[9px] font-bold text-amber-600 mt-1">{topDay ? formatCurrency(maxDayRevenue) : 'Belum ada data'}</p>
           </div>
-          <div className="relative overflow-hidden bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="relative overflow-hidden tile p-5 rounded-2xl">
             <div className="pointer-events-none absolute -top-4 -right-4 w-16 h-16 bg-violet-100/60 rounded-full blur-xl" />
             <div className="flex items-center gap-2 mb-1.5">
               <div className="p-1 bg-violet-50 rounded-md">
@@ -861,7 +861,7 @@ ${ctxLines}`;
                     di Strategi & Target) + konten Skrip Konten (status
                     published) untuk tanggal ini. Sebelumnya 2 section
                     terpisah, sekarang 1 panel. */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
+                <div className="tile p-6 rounded-2xl mb-8">
                   <div className="flex items-center justify-between mb-5">
                     <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <MessageSquare className="w-3 h-3 text-indigo-600" />
@@ -944,7 +944,7 @@ ${ctxLines}`;
 
                 {/* === Tasks due hari ini === */}
                 {dayTasks.length > 0 && (
-                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
+                  <div className="tile p-6 rounded-2xl mb-8">
                     <div className="flex items-center justify-between mb-5">
                       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                         <CheckSquare className="w-3 h-3 text-cyan-600" />

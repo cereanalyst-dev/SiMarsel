@@ -847,7 +847,7 @@ export const TargetSection = ({
           {/* Summary Cards — Total Downloader, Total Sales, Konversi, Status Revenue */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Downloader */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="tile p-5 rounded-3xl">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Downloader</p>
               <h3 className="text-4xl font-black text-indigo-600 tracking-tight tabular-nums leading-none mb-3">
                 {formatNumber(summary.totalRealDownloader)}
@@ -862,7 +862,7 @@ export const TargetSection = ({
             </div>
 
             {/* Total Sales */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="tile p-5 rounded-3xl">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Sales</p>
               <h3 className="text-3xl font-black text-emerald-600 tracking-tight tabular-nums leading-none mb-3 break-all">
                 {formatCurrency(summary.totalRealSales)}
@@ -881,7 +881,7 @@ export const TargetSection = ({
               const targetConv = summary.targetConfig.targetConversion || 0;
               const pct = targetConv > 0 ? (summary.progressConversion / targetConv) * 100 : 0;
               return (
-                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                <div className="tile p-5 rounded-3xl">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Konversi</p>
                   <h3 className="text-4xl font-black text-violet-600 tracking-tight tabular-nums leading-none mb-3">
                     {summary.progressConversion.toFixed(1)}%
