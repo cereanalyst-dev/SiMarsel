@@ -473,64 +473,80 @@ export const TargetSection = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Total Downloader */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-100 transition-all">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
-              <h3 className="text-xl font-black text-indigo-600">{formatNumber(globalSummary.totalRealDownloader)}</h3>
-              <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {formatNumber(globalSummary.totalTargetDownloader)}</p>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Downloader</p>
+              <h3 className="text-4xl font-black text-indigo-600 tracking-tight tabular-nums leading-none mb-3">
+                {formatNumber(globalSummary.totalRealDownloader)}
+              </h3>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
                 <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.downloaderProgress)}%` }} />
               </div>
-              <p className="text-[9px] font-bold text-indigo-500 mt-1">{globalSummary.downloaderProgress.toFixed(1)}% pencapaian</p>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[10px] font-bold text-slate-400">Target: {formatNumber(globalSummary.totalTargetDownloader)}</span>
+                <span className="text-[11px] font-black text-indigo-600">{globalSummary.downloaderProgress.toFixed(1)}%</span>
+              </div>
             </div>
 
             {/* Total Sales */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-emerald-100 transition-all">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Sales</p>
-              <h3 className="text-xl font-black text-emerald-600">{formatCurrency(globalSummary.totalRealSales)}</h3>
-              <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {formatCurrency(globalSummary.totalTargetSales)}</p>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Sales</p>
+              <h3 className="text-3xl font-black text-emerald-600 tracking-tight tabular-nums leading-none mb-3 break-all">
+                {formatCurrency(globalSummary.totalRealSales)}
+              </h3>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
                 <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, globalSummary.salesProgress)}%` }} />
               </div>
-              <p className="text-[9px] font-bold text-emerald-500 mt-1">{globalSummary.salesProgress.toFixed(1)}% pencapaian</p>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] font-bold text-slate-400 truncate">Target: {formatCurrency(globalSummary.totalTargetSales)}</span>
+                <span className="text-[11px] font-black text-emerald-600 flex-shrink-0">{globalSummary.salesProgress.toFixed(1)}%</span>
+              </div>
             </div>
 
             {/* Konversi */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-violet-100 transition-all">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Konversi</p>
-              <h3 className="text-xl font-black text-violet-600">{globalSummary.conversionProgress.toFixed(1)}%</h3>
-              {(() => {
-                const targetConv = filteredAppsForSummary.reduce((acc, a) => acc + (a.targetConfig?.[targetMonth]?.targetConversion || 0), 0)
-                  / Math.max(1, filteredAppsForSummary.length);
-                const pct = targetConv > 0 ? (globalSummary.conversionProgress / targetConv) * 100 : 0;
-                return (
-                  <>
-                    <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {targetConv.toFixed(1)}%</p>
-                    <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
-                      <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${Math.min(100, pct)}%` }} />
-                    </div>
-                    <p className="text-[9px] font-bold text-violet-500 mt-1">{pct.toFixed(1)}% pencapaian</p>
-                  </>
-                );
-              })()}
-            </div>
+            {(() => {
+              const targetConv = filteredAppsForSummary.reduce((acc, a) => acc + (a.targetConfig?.[targetMonth]?.targetConversion || 0), 0)
+                / Math.max(1, filteredAppsForSummary.length);
+              const pct = targetConv > 0 ? (globalSummary.conversionProgress / targetConv) * 100 : 0;
+              return (
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-violet-100 transition-all">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Konversi</p>
+                  <h3 className="text-4xl font-black text-violet-600 tracking-tight tabular-nums leading-none mb-3">
+                    {globalSummary.conversionProgress.toFixed(1)}%
+                  </h3>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                    <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${Math.min(100, pct)}%` }} />
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-bold text-slate-400">Target: {targetConv.toFixed(1)}%</span>
+                    <span className="text-[11px] font-black text-violet-600">{pct.toFixed(1)}%</span>
+                  </div>
+                </div>
+              );
+            })()}
 
-            {/* Status Revenue = sum kolom Keterangan (sum daily salesDiff).
-                Hijau kalau positif, merah kalau negatif. Tanpa label target/defisit. */}
+            {/* Status Revenue — angka di tengah, subtitle "+/- dari target harian" */}
             {(() => {
               const s = globalSummary.sumKeterangan;
               const isSurplus = s >= 0;
               const hasData = Math.abs(s) > 0;
+              const dailyTarget = globalSummary.totalTargetSales / Math.max(1, dates.length);
               return (
-                <div className={cn('p-5 rounded-3xl border shadow-sm transition-all',
+                <div className={cn('p-5 rounded-3xl border shadow-sm transition-all flex flex-col items-center justify-center text-center',
                   !hasData ? 'bg-slate-50 border-slate-100'
                     : isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
-                  <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2',
+                  <p className={cn('text-[10px] font-bold uppercase tracking-widest mb-3',
                     !hasData ? 'text-slate-500'
                       : isSurplus ? 'text-emerald-600' : 'text-rose-500')}>Status Revenue</p>
-                  <h3 className={cn('text-2xl font-black',
+                  <h3 className={cn('text-3xl font-black tracking-tight tabular-nums leading-none mb-2 break-all',
                     !hasData ? 'text-slate-700'
                       : isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
                     {!hasData ? '—' : `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))}`}
                   </h3>
+                  <p className={cn('text-[10px] font-bold mt-1',
+                    !hasData ? 'text-slate-400'
+                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    {isSurplus ? '+' : '-'}{formatCurrency(Math.abs(s))} dari target harian{' '}
+                    <span className="text-slate-400">({formatCurrency(dailyTarget)})</span>
+                  </p>
                 </div>
               );
             })()}
@@ -769,63 +785,79 @@ export const TargetSection = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Downloader */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
-              <h3 className="text-xl font-black text-indigo-600">{formatNumber(summary.totalRealDownloader)}</h3>
-              <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {formatNumber(summary.targetConfig.targetDownloader || 0)}</p>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Downloader</p>
+              <h3 className="text-4xl font-black text-indigo-600 tracking-tight tabular-nums leading-none mb-3">
+                {formatNumber(summary.totalRealDownloader)}
+              </h3>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
                 <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, summary.progressDownloader)}%` }} />
               </div>
-              <p className="text-[9px] font-bold text-indigo-500 mt-1">{summary.progressDownloader.toFixed(1)}% pencapaian</p>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[10px] font-bold text-slate-400">Target: {formatNumber(summary.targetConfig.targetDownloader || 0)}</span>
+                <span className="text-[11px] font-black text-indigo-600">{summary.progressDownloader.toFixed(1)}%</span>
+              </div>
             </div>
 
             {/* Total Sales */}
             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Sales</p>
-              <h3 className="text-xl font-black text-emerald-600">{formatCurrency(summary.totalRealSales)}</h3>
-              <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {formatCurrency(summary.targetConfig.targetSales || 0)}</p>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Total Sales</p>
+              <h3 className="text-3xl font-black text-emerald-600 tracking-tight tabular-nums leading-none mb-3 break-all">
+                {formatCurrency(summary.totalRealSales)}
+              </h3>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
                 <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, summary.progressSales)}%` }} />
               </div>
-              <p className="text-[9px] font-bold text-emerald-500 mt-1">{summary.progressSales.toFixed(1)}% pencapaian</p>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] font-bold text-slate-400 truncate">Target: {formatCurrency(summary.targetConfig.targetSales || 0)}</span>
+                <span className="text-[11px] font-black text-emerald-600 flex-shrink-0">{summary.progressSales.toFixed(1)}%</span>
+              </div>
             </div>
 
             {/* Konversi */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Konversi</p>
-              <h3 className="text-xl font-black text-violet-600">{summary.progressConversion.toFixed(1)}%</h3>
-              {(() => {
-                const targetConv = summary.targetConfig.targetConversion || 0;
-                const pct = targetConv > 0 ? (summary.progressConversion / targetConv) * 100 : 0;
-                return (
-                  <>
-                    <p className="text-[9px] font-bold text-slate-400 mt-2">Target: {targetConv.toFixed(1)}%</p>
-                    <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
-                      <div className="h-full bg-violet-500" style={{ width: `${Math.min(100, pct)}%` }} />
-                    </div>
-                    <p className="text-[9px] font-bold text-violet-500 mt-1">{pct.toFixed(1)}% pencapaian</p>
-                  </>
-                );
-              })()}
-            </div>
+            {(() => {
+              const targetConv = summary.targetConfig.targetConversion || 0;
+              const pct = targetConv > 0 ? (summary.progressConversion / targetConv) * 100 : 0;
+              return (
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Konversi</p>
+                  <h3 className="text-4xl font-black text-violet-600 tracking-tight tabular-nums leading-none mb-3">
+                    {summary.progressConversion.toFixed(1)}%
+                  </h3>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                    <div className="h-full bg-violet-500" style={{ width: `${Math.min(100, pct)}%` }} />
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-bold text-slate-400">Target: {targetConv.toFixed(1)}%</span>
+                    <span className="text-[11px] font-black text-violet-600">{pct.toFixed(1)}%</span>
+                  </div>
+                </div>
+              );
+            })()}
 
-            {/* Status Revenue = sum kolom Keterangan (sum daily salesDiff).
-                Hijau kalau positif, merah kalau negatif. Tanpa label target/defisit. */}
+            {/* Status Revenue — angka di tengah, subtitle "+/- dari target harian" */}
             {(() => {
               const s = summary.sumKeterangan;
               const isSurplus = s >= 0;
               const hasData = Math.abs(s) > 0;
+              const dailyTarget = (summary.targetConfig.targetSales || 0) / Math.max(1, dates.length);
               return (
-                <div className={cn('p-5 rounded-3xl border shadow-sm',
+                <div className={cn('p-5 rounded-3xl border shadow-sm flex flex-col items-center justify-center text-center',
                   !hasData ? 'bg-slate-50 border-slate-100'
                     : isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100')}>
-                  <p className={cn('text-[9px] font-bold uppercase tracking-widest mb-2',
+                  <p className={cn('text-[10px] font-bold uppercase tracking-widest mb-3',
                     !hasData ? 'text-slate-500'
                       : isSurplus ? 'text-emerald-600' : 'text-rose-500')}>Status Revenue</p>
-                  <h3 className={cn('text-2xl font-black',
+                  <h3 className={cn('text-3xl font-black tracking-tight tabular-nums leading-none mb-2 break-all',
                     !hasData ? 'text-slate-700'
                       : isSurplus ? 'text-emerald-600' : 'text-rose-600')}>
                     {!hasData ? '—' : `${isSurplus ? '+' : '-'}${formatCurrency(Math.abs(s))}`}
                   </h3>
+                  <p className={cn('text-[10px] font-bold mt-1',
+                    !hasData ? 'text-slate-400'
+                      : isSurplus ? 'text-emerald-500' : 'text-rose-400')}>
+                    {isSurplus ? '+' : '-'}{formatCurrency(Math.abs(s))} dari target harian{' '}
+                    <span className="text-slate-400">({formatCurrency(dailyTarget)})</span>
+                  </p>
                 </div>
               );
             })()}
