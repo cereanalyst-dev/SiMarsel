@@ -70,6 +70,22 @@ echo
 
 # 3. Reload nginx (defensive — kalau config berubah)
 echo -e "${YELLOW}→ Reload nginx${NC}"
+
+# Auto-heal: kalau symlink di sites-enabled hilang tapi source masih ada,
+# re-link otomatis (kasus umum setelah rm -rf manual).
+if [[ ! -f /etc/nginx/sites-enabled/simarsel-app ]] && [[ -f /etc/nginx/sites-available/simarsel-app ]]; then
+  echo -e "${YELLOW}  Symlink sites-enabled hilang, re-link…${NC}"
+  ln -sf /etc/nginx/sites-available/simarsel-app /etc/nginx/sites-enabled/simarsel-app
+fi
+
+# Auto-heal: kalau sites-available juga hilang, run nginx setup ulang
+if [[ ! -f /etc/nginx/sites-available/simarsel-app ]]; then
+  echo -e "${YELLOW}  Nginx config belum ada, run 05-nginx-setup.sh…${NC}"
+  if [[ -f "$REPO_DIR/deploy/05-nginx-setup.sh" ]]; then
+    bash "$REPO_DIR/deploy/05-nginx-setup.sh" || true
+  fi
+fi
+
 if nginx -t 2>/dev/null; then
   systemctl reload nginx
   echo -e "${GREEN}✔ Nginx reloaded${NC}"
