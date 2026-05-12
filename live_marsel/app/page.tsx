@@ -18,18 +18,18 @@ interface PageProps {
   searchParams: Promise<{ period?: string }>;
 }
 
-async function paginate<T>(
-  makeQuery: () => {
-    range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }>;
-  },
-): Promise<T[]> {
+// =============================================================
+// Paginate helper — bypass Supabase 1000-row default cap
+// =============================================================
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function paginate<T>(makeQuery: () => any): Promise<T[]> {
   const result: T[] = [];
   let from = 0;
   while (result.length < HARD_CAP) {
     const { data, error } = await makeQuery().range(from, from + PAGE_SIZE - 1);
     if (error || !data) break;
-    result.push(...data);
-    if (data.length < PAGE_SIZE) break;
+    result.push(...(data as T[]));
+    if ((data as T[]).length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
   return result;
@@ -43,9 +43,11 @@ export default async function Page({ searchParams }: PageProps) {
   const supabase = await createClient();
 
   const startDate = jakartaDateOnly(range.start);
+  // End exclusive — pakai last day of month
   const endDate = `${period.year}-${String(period.month).padStart(2, '0')}-${String(range.lastDay).padStart(2, '0')}`;
   const yearMonth = `${period.year}-${String(period.month).padStart(2, '0')}`;
 
+  // Fetch data parallel
   const [transactions, downloads, targetConfigs, yearTotalsRes] = await Promise.all([
     paginate<Transaction>(() =>
       supabase
@@ -63,16 +65,21 @@ export default async function Page({ searchParams }: PageProps) {
         .lte('date', endDate)
         .order('date', { ascending: false }),
     ),
+    // target_config — filter by year_month
     supabase
       .from('target_config')
       .select('*')
       .eq('year_month', yearMonth)
       .then(({ data }) => data ?? []),
+    // RPC dashboard_year_totals
     supabase
       .rpc('dashboard_year_totals', { year_param: period.year })
       .single<YearTotals>(),
   ]);
 
+  // Map target_config → Target FE shape
+  // SiMarsel target_config columns: app_name, target_sales, target_downloader,
+  // target_premium, target_conversion, avg_price (all per year_month).
   const targets: Target[] = (targetConfigs as Array<{
     app_name?: string;
     source_app?: string;
