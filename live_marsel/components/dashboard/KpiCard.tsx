@@ -6,9 +6,9 @@ type CardVariant = 'paper' | 'yellow' | 'pink' | 'cyan' | 'lime' | 'purple' | 'o
 
 interface Props {
   label: string;
-  value: string;
-  target?: string | null;
-  pct?: number | null;
+  value: string;          // formatted display value
+  target?: string | null; // formatted target display
+  pct?: number | null;    // 0-100+
   variant?: CardVariant;
   hint?: string;
 }
@@ -31,33 +31,35 @@ export const KpiCard = ({ label, value, target, pct, variant = 'paper', hint }: 
   const pctValue = pct ?? 0;
   const badge = PROGRESS_BADGE(pctValue);
   return (
-    <Card variant={variant} className="flex flex-col gap-3">
+    <Card variant={variant} className="!shadow-nb flex flex-col gap-3 md:gap-4 !p-5 md:!p-6">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs md:text-sm font-display uppercase tracking-wider text-nb-black/70">
+        <p className="text-sm md:text-base font-display uppercase tracking-wider text-nb-black/80">
           {label}
         </p>
         {pct != null && (
-          <Badge variant={badge.variant}>{formatPercent(pctValue, 0)}</Badge>
+          <Badge variant={badge.variant} className="!text-sm !px-2.5 !py-1">
+            {formatPercent(pctValue, 0)}
+          </Badge>
         )}
       </div>
-      <h3 className="text-3xl md:text-4xl font-display tracking-tight text-nb-black break-all">
+      <h3 className="text-4xl md:text-5xl xl:text-6xl font-display tracking-tight text-nb-black break-all leading-none">
         {value}
       </h3>
       {target != null && (
-        <div className="space-y-1.5">
-          <div className="h-2.5 bg-white border-2 border-nb-black overflow-hidden">
+        <div className="space-y-1.5 md:space-y-2 mt-auto">
+          <div className="h-3 md:h-3.5 bg-white border-[2.5px] border-nb-black overflow-hidden">
             <div
               className={`h-full ${PROGRESS_COLOR(pctValue)} transition-all duration-300`}
               style={{ width: `${clamp(pctValue, 0, 100)}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-[11px] font-bold text-nb-black/60">
-            <span>Target {target}</span>
+          <div className="flex items-center justify-between text-xs md:text-sm font-bold text-nb-black/70">
+            <span>Target: {target}</span>
             <span>{badge.label}</span>
           </div>
         </div>
       )}
-      {hint && <p className="text-[11px] text-nb-black/60 mt-auto">{hint}</p>}
+      {hint && <p className="text-xs md:text-sm text-nb-black/60 mt-auto">{hint}</p>}
     </Card>
   );
 };

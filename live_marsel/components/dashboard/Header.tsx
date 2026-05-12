@@ -19,9 +19,10 @@ export const Header = ({ period }: Props) => {
     const tick = () => {
       const d = new Intl.DateTimeFormat('id-ID', {
         timeZone: 'Asia/Jakarta',
-        weekday: 'short',
+        weekday: 'long',
         day: '2-digit',
-        month: 'short',
+        month: 'long',
+        year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -43,35 +44,39 @@ export const Header = ({ period }: Props) => {
   }, []);
 
   return (
-    <header className="border-b-[3px] border-nb-black bg-nb-bg sticky top-0 z-30">
-      <div className="max-w-screen mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
+    <header className="border-b-[3px] border-nb-black bg-nb-black sticky top-0 z-30">
+      <div className="max-w-screen mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-3 md:gap-4 flex-wrap">
+        {/* Logo + brand */}
         <div className="flex items-center gap-3">
-          <Badge variant="black" className="!px-3 !py-1 !text-base">LIVE</Badge>
-          <h1 className="font-display text-xl md:text-2xl tracking-tight">
+          <Badge variant="yellow" className="!text-lg md:!text-xl !px-3 md:!px-4 !py-1.5 md:!py-2 !tracking-wider">
+            LIVE
+          </Badge>
+          <h1 className="font-display text-2xl md:text-3xl xl:text-4xl tracking-tight text-white">
             DASHBOARD
           </h1>
-          <div className="hidden md:flex items-center gap-1.5 ml-2">
-            <span className="w-2 h-2 rounded-full bg-nb-lime animate-pulse" />
-            <span className="text-[10px] font-display uppercase tracking-wider text-nb-black/70">
+          <div className="hidden md:flex items-center gap-2 ml-3 px-2.5 py-1 bg-nb-lime border-[2.5px] border-white">
+            <span className="w-2 h-2 rounded-full bg-nb-black animate-pulse" />
+            <span className="text-xs font-display uppercase tracking-wider text-nb-black">
               Realtime
             </span>
           </div>
         </div>
 
+        {/* Period + clock + auth */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Badge variant="yellow" className="!text-sm md:!text-base !py-1.5 !px-3">
-            {monthNameID(period.month)} {period.year}
+          <Badge variant="yellow" className="!text-base md:!text-lg !py-1.5 md:!py-2 !px-3 md:!px-4">
+            {monthNameID(period.month).toUpperCase()} {period.year}
           </Badge>
-          <code className="text-xs md:text-sm font-mono font-bold text-nb-black/80 hidden md:inline">
+          <code className="text-sm md:text-base font-mono font-bold text-white hidden md:inline px-3 py-1.5 bg-nb-black border-[2.5px] border-white">
             {now}
           </code>
           {isAuth ? (
             <Link href="/settings/periode">
-              <Button variant="cyan" size="sm">Setting</Button>
+              <Button variant="cyan" size="md">Setting</Button>
             </Link>
           ) : (
             <Link href="/login">
-              <Button variant="black" size="sm">Login</Button>
+              <Button variant="pink" size="md">Login</Button>
             </Link>
           )}
         </div>

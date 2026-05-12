@@ -315,19 +315,19 @@ export const DashboardClient = ({
   // Render
   // ============================================================
   return (
-    <main className="max-w-screen mx-auto px-4 md:px-6 py-4 space-y-4">
+    <main className="max-w-screen mx-auto px-4 md:px-6 py-4 md:py-5 space-y-4 md:space-y-5">
       {/* Period KPI section */}
-      <section className="space-y-3">
-        <div className="flex items-baseline justify-between gap-2 flex-wrap">
-          <div className="flex items-baseline gap-2">
+      <section className="space-y-3 md:space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Badge variant="black" className="!text-sm md:!text-base !px-3 !py-1.5">
+              Periode {period.year}
+            </Badge>
             <span className="text-[11px] md:text-xs font-display uppercase tracking-widest text-nb-black/60">
-              Periode
+              Performa Bulan Berjalan
             </span>
-            <h2 className="font-display text-xl md:text-2xl tracking-tight">
-              Bulan Ini
-            </h2>
           </div>
-          <Badge variant={hasTarget ? 'lime' : 'red'}>
+          <Badge variant={hasTarget ? 'lime' : 'red'} className="!text-xs md:!text-sm !px-3 !py-1">
             {hasTarget ? `${targetByApp.size} app punya target` : 'Belum ada target'}
           </Badge>
         </div>
@@ -370,26 +370,33 @@ export const DashboardClient = ({
         </div>
       </section>
 
-      {/* Carousels */}
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <PerformanceCarousel
-          data={daily}
-          totals={{
-            sales: totals.sales,
-            downloaders: totals.downloaders,
-            premium: totals.premium,
-            conversion: totals.conversion,
-          }}
-          dailyTargets={dailyTargets}
-        />
-        <TargetCarousel blocks={blocks} hasTarget={hasTarget} />
-      </section>
+      {/* Layout: Performa (col 1-7) | Pencapaian (col 8-10) | Stack right (col 11-12) */}
+      <section className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4">
+        {/* Performa Harian — wider, left half */}
+        <div className="xl:col-span-7">
+          <PerformanceCarousel
+            data={daily}
+            totals={{
+              sales: totals.sales,
+              downloaders: totals.downloaders,
+              premium: totals.premium,
+              conversion: totals.conversion,
+            }}
+            dailyTargets={dailyTargets}
+          />
+        </div>
 
-      {/* Bottom row */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <PaymentMethodChart slices={paymentSlices} />
-        <PromoRank entries={promoEntries} />
-        <TopProducts products={topProducts} />
+        {/* Pencapaian per App — middle column */}
+        <div className="xl:col-span-3">
+          <TargetCarousel blocks={blocks} hasTarget={hasTarget} />
+        </div>
+
+        {/* Right stack: TopProducts → PromoRank → PaymentMethod */}
+        <div className="xl:col-span-2 flex flex-col gap-3 md:gap-4">
+          <TopProducts products={topProducts} />
+          <PromoRank entries={promoEntries} />
+          <PaymentMethodChart slices={paymentSlices} />
+        </div>
       </section>
     </main>
   );

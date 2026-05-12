@@ -77,17 +77,21 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
+      {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-3">
-          <Badge variant="black">Performa Harian</Badge>
-          <h3 className="font-display text-xl md:text-2xl tracking-tight">
+          <Badge variant="black" className="!text-sm md:!text-base !px-3 !py-1.5">Performa Harian</Badge>
+          <h3 className="font-display text-2xl md:text-3xl tracking-tight">
             {slide.label}
           </h3>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold tabular-nums">
-            Total: {fmt(totalValue, slide.unit)}
-          </span>
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex flex-col items-end leading-tight">
+            <span className="text-[10px] font-display uppercase tracking-wider text-nb-black/60">Total Bulan Ini</span>
+            <span className="text-base md:text-lg font-display tabular-nums">
+              {fmt(totalValue, slide.unit)}
+            </span>
+          </div>
           <Button
             variant="white" size="sm"
             onClick={() => setIdx((i) => (i - 1 + SLIDES.length) % SLIDES.length)}
@@ -105,6 +109,7 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
         </div>
       </div>
 
+      {/* Chart */}
       <div className="h-72 md:h-80">
         {chartData.length === 0 ? (
           <div className="h-full flex items-center justify-center border-2 border-dashed border-nb-black/30">
@@ -125,12 +130,12 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
                 tick={{ fontSize: 10, fontWeight: 700, fill: '#0A0A0A' }}
                 stroke="#0A0A0A"
                 strokeWidth={2}
-                tickFormatter={(v: number) => fmt(v, slide.unit)}
+                tickFormatter={(v: any) => fmt(v, slide.unit)}
                 width={70}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(10,10,10,0.05)' }}
-                formatter={(v: number) => [fmt(v, slide.unit), slide.label]}
+                formatter={(v: any) => [fmt(v, slide.unit), slide.label]}
                 labelFormatter={(label) => `Hari ${label}`}
               />
               {target > 0 && (
@@ -161,7 +166,7 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(v: number) => fmt(v, slide.unit)}
+                  formatter={(v: any) => fmt(v, slide.unit)}
                   style={{ fontSize: 10, fontWeight: 800, fill: '#0A0A0A' }}
                 />
               </Bar>
@@ -170,6 +175,7 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
         )}
       </div>
 
+      {/* Slide indicator dots */}
       <div className="flex items-center justify-center gap-2 mt-1">
         {SLIDES.map((s, i) => (
           <button
