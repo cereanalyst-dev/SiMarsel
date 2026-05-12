@@ -344,7 +344,7 @@ export const ImportExportButtons = ({ platform, onImported }: Props) => {
     <div className="flex items-center gap-2">
       <label
         className={cn(
-          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all',
+          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider cursor-pointer transition-all',
           'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-100',
           importing && 'opacity-50 cursor-wait',
         )}
@@ -371,7 +371,7 @@ export const ImportExportButtons = ({ platform, onImported }: Props) => {
         }}
         disabled={exporting}
         className={cn(
-          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all',
+          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all',
           'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-100',
           exporting && 'opacity-50 cursor-wait',
         )}

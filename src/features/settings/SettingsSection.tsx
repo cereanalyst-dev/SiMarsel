@@ -22,11 +22,11 @@ export const SettingsSection = ({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">
               System
             </span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+          <h1 className="hero-title">
             Pengaturan
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -128,7 +128,7 @@ const CreateAccountCard = () => {
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mb-1">
             Akun Baru
           </p>
-          <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+          <h3 className="text-base font-semibold text-slate-900 tracking-tight flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-cyan-600" />
             Buat Akun
           </h3>

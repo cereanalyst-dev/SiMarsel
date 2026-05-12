@@ -257,9 +257,9 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-600 mb-3">
             <Sparkles className="w-3 h-3" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Insight Hasil</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Insight Hasil</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+          <h1 className="hero-title">
             Insight Hasil Konten
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -328,7 +328,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
             {platformOptions.map((p) => <option key={p} value={p}>{p.toUpperCase()}</option>)}
           </select>
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dari</span>
+            <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Dari</span>
             <input
               type="date"
               value={dateFrom}
@@ -338,7 +338,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
             />
           </div>
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sd</span>
+            <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Sd</span>
             <input
               type="date"
               value={dateTo}
@@ -347,7 +347,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
               className="bg-transparent text-[11px] font-black text-slate-700 outline-none"
             />
           </div>
-          <span className="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest tabular-nums">
+          <span className="ml-auto text-[11px] font-medium text-slate-400 uppercase tracking-wider tabular-nums">
             {filtered.length} / {rows.length} baris
           </span>
         </div>
@@ -488,7 +488,7 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
                   </td>
                   <td className="py-3.5 px-5 text-xs font-black text-slate-700 uppercase tracking-widest">{r.app_name}</td>
                   <td className="py-3.5 px-5">
-                    <span className="px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[9px] font-black uppercase tracking-widest">{r.platform}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-semibold uppercase tracking-wider">{r.platform}</span>
                   </td>
                   <td className="py-3.5 px-5 text-right text-xs font-black text-slate-900 tabular-nums">{formatNumber(r.tayangan)}</td>
                   <td className="py-3.5 px-5 text-right text-xs font-black text-slate-900 tabular-nums">{formatNumber(r.jangkauan)}</td>
@@ -584,7 +584,7 @@ const AddModal = ({ form, setForm, appNames, submitting, onClose, onSubmit }: Ad
         <div className="p-7 border-b border-slate-100 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.2em] mb-0.5">Insight Hasil</p>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">Tambah / Update Insight</h3>
+            <h3 className="text-base font-semibold text-slate-900 tracking-tight">Tambah / Update Insight</h3>
             <p className="text-xs text-slate-400 font-medium mt-1">
               Kombinasi (App + Platform + Tanggal) yang sudah ada akan di-overwrite.
             </p>
@@ -683,7 +683,7 @@ const AddModal = ({ form, setForm, appNames, submitting, onClose, onSubmit }: Ad
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
-    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider ml-1 block">
       {label}
     </label>
     {children}

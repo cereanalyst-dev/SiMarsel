@@ -300,11 +300,11 @@ export const BulananSection = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-600 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">
               Monthly Snapshot
             </span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+          <h1 className="hero-title">
             Performa Bulanan
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
