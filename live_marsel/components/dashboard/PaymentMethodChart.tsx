@@ -49,13 +49,17 @@ export const PaymentMethodChart = ({ slices }: Props) => {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(v: number) => [
-                    `${formatCompactIDR(v)} (${formatPercent(total > 0 ? (v / total) * 100 : 0, 1)})`,
-                    'Revenue',
-                  ]}
+                  formatter={(v) => {
+                    const n = Number(v) || 0;
+                    return [
+                      `${formatCompactIDR(n)} (${formatPercent(total > 0 ? (n / total) * 100 : 0, 1)})`,
+                      'Revenue',
+                    ] as [string, string];
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
+            {/* Center total */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-[10px] font-display uppercase tracking-wider text-nb-black/60">
                 Total
@@ -66,6 +70,7 @@ export const PaymentMethodChart = ({ slices }: Props) => {
             </div>
           </div>
 
+          {/* Legend 2-col */}
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
             {sorted.slice(0, 8).map((s, i) => (
               <div key={s.name} className="flex items-center gap-1.5 truncate">
