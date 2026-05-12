@@ -48,10 +48,10 @@ export const DashboardClient = ({
     const channel = supabase
       .channel('dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
-        setTransactions((prev) => mergeRow<Transaction>(prev, payload as RealtimePayload<Transaction>, 'trx_id', TRX_CAP));
+        setTransactions((prev) => mergeRow<Transaction>(prev, payload as unknown as RealtimePayload<Transaction>, 'trx_id', TRX_CAP));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'downloaders' }, (payload) => {
-        setDownloads((prev) => mergeDownload(prev, payload as RealtimePayload<Download>, DL_CAP));
+        setDownloads((prev) => mergeDownload(prev, payload as unknown as RealtimePayload<Download>, DL_CAP));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'target_config' }, () => {
         // Targets kompleks (ada year_month filter) — refetch sederhana via reload
