@@ -358,6 +358,35 @@ export default function App() {
   });
   const realtimeLive = realtimeStatus === 'live';
 
+  // Realtime: transactions & downloaders dari n8n auto-insert.
+  // Debounce 2 detik supaya bulk insert (n8n biasanya batch) cuma trigger
+  // 1 refetch, bukan ribuan. Refetch full karena kita butuh semua row untuk
+  // aggregasi di filter, chart, dll.
+  const pullRawData = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const res = await fetchDataFromSupabase();
+      if (res) {
+        setData(res.transactions);
+        setDownloaderData(res.downloaders);
+      }
+    } catch (err) {
+      logger.warn('Realtime raw data refetch failed:', err);
+    }
+  }, [userId]);
+
+  useRealtimeTable({
+    table: 'transactions',
+    onChange: () => { void pullRawData(); },
+    debounceMs: 2000,
+  });
+  useRealtimeTable({
+    table: 'downloaders',
+    onChange: () => { void pullRawData(); },
+    debounceMs: 2000,
+  });
+
+
   // Pull user-defined kode promo rules. Re-callable lewat reloadPromoRules()
   // setelah user edit di drawer.
   const reloadPromoRules = useCallback(async () => {
@@ -372,6 +401,14 @@ export default function App() {
   useEffect(() => {
     void reloadPromoRules();
   }, [reloadPromoRules]);
+
+  // Realtime: promo_code_rules → refetch promoRulesIndex.
+  useRealtimeTable({
+    table: 'promo_code_rules',
+    filter: userId ? `user_id=eq.${userId}` : undefined,
+    onChange: () => { void reloadPromoRules(); },
+    debounceMs: 500,
+  });
 
   // Auto-sync app cards dari source_app yang ada di DB (transactions + downloaders).
   // Daftar platform di Strategi & Target jadi auto-derived — user cuma perlu
