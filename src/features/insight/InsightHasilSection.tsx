@@ -14,6 +14,7 @@ import {
 import { cn } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatters';
 import { useToast } from '../../components/Toast';
+import { useRealtimeTable } from '../../lib/useRealtimeTable';
 import {
   bulkUploadInsightHasil, deleteInsightHasil,
   downloadInsightHasilTemplate, fetchInsightHasil, upsertInsightHasil,
@@ -85,6 +86,14 @@ export const InsightHasilSection = ({ userId, apps }: Props) => {
   }, [userId]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  // Realtime — auto refetch saat ada user lain INSERT/UPDATE/DELETE insight_hasil.
+  useRealtimeTable({
+    table: 'insight_hasil',
+    filter: userId ? `user_id=eq.${userId}` : undefined,
+    onChange: () => { void reload(); },
+    debounceMs: 400,
+  });
 
   // Set default app dari knownPlatforms
   useEffect(() => {

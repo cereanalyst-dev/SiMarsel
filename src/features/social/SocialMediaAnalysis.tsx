@@ -16,6 +16,7 @@ import { formatNumber } from '../../lib/formatters';
 import { excelDateToJSDate } from '../../lib/excelDate';
 import { useToast } from '../../components/Toast';
 import { fetchContentScripts } from '../../lib/dataAccess';
+import { useRealtimeTable } from '../../lib/useRealtimeTable';
 import type {
   AppData, CarouselContent, ContentScript, SinglePostContent,
   SocialMediaContent, VideoContent,
@@ -79,15 +80,25 @@ export const SocialMediaAnalysis = ({
 
   // Konten dari Skrip Konten yang sudah status='published'.
   const [publishedKonten, setPublishedKonten] = useState<ContentScript[]>([]);
+  const loadPublishedKonten = async () => {
+    const rows = await fetchContentScripts({ status: 'published' });
+    setPublishedKonten(rows);
+  };
   useEffect(() => {
     let active = true;
-    const load = async () => {
+    void (async () => {
       const rows = await fetchContentScripts({ status: 'published' });
       if (active) setPublishedKonten(rows);
-    };
-    void load();
+    })();
     return () => { active = false; };
   }, []);
+
+  // Realtime — auto-update saat content_scripts berubah status publish
+  useRealtimeTable({
+    table: 'content_scripts',
+    onChange: () => { void loadPublishedKonten(); },
+    debounceMs: 500,
+  });
 
   // ContentScript published → shape mirip SocialMediaContent.
   // Metrik-nya 0 karena Skrip Konten cuma punya metadata, belum ada metrik aktual.

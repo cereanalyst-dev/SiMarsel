@@ -12,6 +12,7 @@ import {
   fetchContentScripts,
 } from '../../lib/dataAccess';
 import { getSupabase } from '../../lib/supabase';
+import { useRealtimeTable } from '../../lib/useRealtimeTable';
 import type {
   ContentScript, ContentStatus, ContentType,
 } from '../../types';
@@ -100,6 +101,13 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Realtime — auto refetch saat user lain edit content_scripts
+  useRealtimeTable({
+    table: 'content_scripts',
+    onChange: () => { void refresh(); },
+    debounceMs: 400,
+  });
 
   useEffect(() => {
     if (detectedPlatforms.length > 0) {

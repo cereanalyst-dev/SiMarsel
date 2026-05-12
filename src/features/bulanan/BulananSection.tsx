@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
 import { useToast } from '../../components/Toast';
 import { logger } from '../../lib/logger';
+import { useRealtimeTable } from '../../lib/useRealtimeTable';
 import {
   deleteMonthlyPerformance, fetchMonthlyPerformance, upsertMonthlyPerformance,
 } from '../../lib/dataAccess';
@@ -75,6 +76,13 @@ export const BulananSection = () => {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Realtime — auto refetch saat monthly_performance berubah
+  useRealtimeTable({
+    table: 'monthly_performance',
+    onChange: () => { void refresh(); },
+    debounceMs: 400,
+  });
 
   // ============================================================
   // Excel upload + cleansing + aggregate
