@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInCalendarDays, differenceInHours, differenceInMinutes } from 'date-fns';
 import {
   AlertTriangle, Calendar, CheckCircle2, Clock, Edit2, ExternalLink,
-  Filter, Flame, KanbanSquare, Plus, Tag, Trash2, User as UserIcon, X,
+  Filter, Flame, KanbanSquare, Plus, Tag, Trash2, User as UserIcon, X, Zap,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useToast } from '../../components/Toast';
@@ -11,6 +11,7 @@ import {
   createTask, deleteTask, fetchAllUserRoles, fetchTasks, updateTask,
 } from '../../lib/dataAccess';
 import { getSupabase } from '../../lib/supabase';
+import { useRealtimeTable } from '../../lib/useRealtimeTable';
 import type {
   NewTask, Task, TaskDepartment, TaskPriority, TaskStatus,
 } from '../../types';
@@ -129,6 +130,14 @@ export const TasklistSection = ({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Realtime sync — auto-refetch saat ada user lain yang INSERT/UPDATE/DELETE task.
+  // Debounce 300ms supaya bulk update (drag-drop reorder) tidak spam refetch.
+  const { status: realtimeStatus } = useRealtimeTable({
+    table: 'tasks',
+    onChange: () => { void refresh(); },
+    debounceMs: 300,
+  });
 
   // Load user list dari user_roles + existing assignees. Sekarang pakai EMAIL
   // (lebih unik & stabil) — bukan full_name yang bisa kosong/duplikat.
@@ -314,11 +323,22 @@ export const TasklistSection = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 text-cyan-700 mb-3">
-            <KanbanSquare className="w-3 h-3 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-              {viewMode === 'mine' ? 'Rencana Pribadi' : 'Task Board'}
-            </span>
+          <div className="inline-flex items-center gap-2 mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 text-cyan-700">
+              <KanbanSquare className="w-3 h-3 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+                {viewMode === 'mine' ? 'Rencana Pribadi' : 'Task Board'}
+              </span>
+            </div>
+            {realtimeStatus === 'live' && (
+              <span
+                title="Auto-sync aktif — perubahan dari user lain langsung tampil"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700"
+              >
+                <Zap className="w-2.5 h-2.5" />
+                <span className="text-[9px] font-black uppercase tracking-widest">Live</span>
+              </span>
+            )}
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
             {viewMode === 'mine' ? 'Tugas Saya' : 'Tasklist'}

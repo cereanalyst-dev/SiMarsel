@@ -25,6 +25,7 @@ import { processDownloaders, processTransactions } from './lib/dataProcessing';
 import { fetchPromoCodeRules } from './lib/promoCodeRulesClient';
 import { buildUserPromoRulesIndex, type UserPromoRulesIndex } from './lib/promoRules';
 import { useUserRole } from './lib/useUserRole';
+import { useRealtimeTable } from './lib/useRealtimeTable';
 import { COLORS } from './lib/constants';
 import { COMPANY_TAGLINE, DEFAULT_TAB } from './config/app.config';
 import type {
@@ -328,18 +329,34 @@ export default function App() {
   }, [apps, selectedAppId]);
 
   // Pull apps snapshot from Supabase when user signs in.
-  useEffect(() => {
+  const pullApps = useCallback(async () => {
     if (!userId) return;
+    const remote = await fetchAppsFromSupabase(userId);
+    if (!remote || remote.length === 0) return;
+    setApps(remote);
+    saveAppsToLocal(remote);
+  }, [userId]);
+
+  useEffect(() => {
     let active = true;
-    fetchAppsFromSupabase(userId).then((remote) => {
+    void (async () => {
+      const remote = userId ? await fetchAppsFromSupabase(userId) : null;
       if (!active || !remote || remote.length === 0) return;
       setApps(remote);
       saveAppsToLocal(remote);
-    });
-    return () => {
-      active = false;
-    };
+    })();
+    return () => { active = false; };
   }, [userId]);
+
+  // Realtime: kalau apps_snapshot di-update dari client lain (mis. user
+  // di tim sama generate target baru), auto-refetch supaya UI selalu fresh.
+  const { status: realtimeStatus } = useRealtimeTable({
+    table: 'apps_snapshot',
+    filter: userId ? `user_id=eq.${userId}` : undefined,
+    onChange: () => { void pullApps(); },
+    debounceMs: 500,
+  });
+  const realtimeLive = realtimeStatus === 'live';
 
   // Pull user-defined kode promo rules. Re-callable lewat reloadPromoRules()
   // setelah user edit di drawer.
@@ -837,6 +854,7 @@ export default function App() {
             activeTab={activeTab}
             rowsLoaded={data.length}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
+            realtimeLive={realtimeLive}
           />
 
           <main className="p-8 max-w-[1600px] mx-auto w-full">

@@ -14,6 +14,7 @@ import {
 } from '../../lib/dataAccess';
 import { bulkUploadKpi, downloadKpiTemplate } from '../../lib/kpiExcel';
 import { getSupabase } from '../../lib/supabase';
+import { useRealtimeTable } from '../../lib/useRealtimeTable';
 import type {
   KpiCard, KpiDivision, KpiMetric,
   NewKpiCard, NewKpiDivision, NewKpiMetric,
@@ -131,6 +132,19 @@ export const KpiSection = ({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Realtime — auto-refetch saat divisi/card berubah. Metrics di-fetch
+  // per card-detail jadi nanti detail view juga subscribe sendiri.
+  useRealtimeTable({
+    table: 'kpi_cards',
+    onChange: () => { void refresh(); },
+    debounceMs: 400,
+  });
+  useRealtimeTable({
+    table: 'kpi_divisions',
+    onChange: () => { void refresh(); },
+    debounceMs: 400,
+  });
 
   const activeDivision = useMemo(
     () => divisions.find((d) => d.id === activeDivisionId) ?? null,
@@ -1031,6 +1045,15 @@ function KpiCardDetail({ card, onBack, onEditCard, onDeleteCard }: {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Realtime — auto refetch metrics card ini saat ada yang ubah.
+  // Filter by card_id supaya gak nerima event card lain.
+  useRealtimeTable({
+    table: 'kpi_metrics',
+    filter: `card_id=eq.${card.id}`,
+    onChange: () => { void refresh(); },
+    debounceMs: 300,
+  });
 
   const grouped = useMemo(() => {
     const map = new Map<string, KpiMetric[]>();

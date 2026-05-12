@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Activity, ChevronRight, Database, Menu } from 'lucide-react';
+import { Activity, ChevronRight, Database, Menu, Zap } from 'lucide-react';
 import { APP_NAME, LOGO_PATH, MENU_ITEMS } from '../config/app.config';
 
 interface Props {
   activeTab: string;
   rowsLoaded?: number;
   onOpenMobileMenu?: () => void;
+  // True kalau Realtime channel sudah SUBSCRIBED — UI tampilkan badge "Live".
+  realtimeLive?: boolean;
 }
 
-export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu }: Props) => {
+export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu, realtimeLive = false }: Props) => {
   const active = MENU_ITEMS.find((m) => m.id === activeTab);
   const [now, setNow] = useState(new Date());
 
@@ -77,11 +79,30 @@ export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu }: Props) => {
           </div>
         )}
 
-        <div className="hidden lg:flex items-center gap-2 px-3 py-2 bg-slate-100/70 rounded-xl">
-          <Activity className="w-3.5 h-3.5 text-slate-500" />
-          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
-            Live
-          </span>
+        <div
+          className={
+            'hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl ' +
+            (realtimeLive
+              ? 'bg-emerald-50 border border-emerald-100'
+              : 'bg-slate-100/70')
+          }
+          title={realtimeLive ? 'Auto-sync aktif — semua perubahan dari user lain langsung tampil' : 'Realtime tidak aktif'}
+        >
+          {realtimeLive ? (
+            <>
+              <Zap className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">
+                Live Sync
+              </span>
+            </>
+          ) : (
+            <>
+              <Activity className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                Live
+              </span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
