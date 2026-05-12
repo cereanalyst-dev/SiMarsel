@@ -44,7 +44,7 @@ export const CarouselForm = ({ value, onChange }: Props) => {
         <button
           type="button"
           onClick={addSlide}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all"
         >
           <Plus className="w-3 h-3" />
           Tambah Slide

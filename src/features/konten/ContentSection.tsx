@@ -210,11 +210,11 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 text-rose-600 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">
               Content Hub
             </span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+          <h1 className="hero-title">
             Skrip Konten
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -260,7 +260,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
                   type="button"
                   onClick={() => setTypeTab(t)}
                   className={cn(
-                    'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all',
+                    'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all',
                     typeTab === t ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-700',
                   )}
                 >
@@ -278,7 +278,7 @@ export const ContentSection = ({ detectedPlatforms = [] }: Props) => {
                 type="button"
                 onClick={() => setStatusFilter(s)}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all',
+                  'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all',
                   statusFilter === s ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-700',
                 )}
               >
@@ -633,7 +633,7 @@ function DropdownCell({ value, options, onChange }: {
           type="button"
           onClick={() => setOpen((o) => !o)}
           className={cn(
-            'w-full px-2.5 py-1.5 inline-flex items-center justify-between gap-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+            'w-full px-2.5 py-1.5 inline-flex items-center justify-between gap-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all',
             'border',
             tone
               ? `${tone.bg} ${tone.text} ${ring ?? 'border-transparent'} hover:shadow-md`
@@ -720,7 +720,7 @@ function DropdownOption({
       role="option"
       aria-selected={selected}
       className={cn(
-        'w-full px-2.5 py-1.5 my-0.5 inline-flex items-center justify-between gap-2 rounded-lg text-[10px] font-black uppercase tracking-widest text-left transition-all',
+        'w-full px-2.5 py-1.5 my-0.5 inline-flex items-center justify-between gap-2 rounded-lg text-[11px] font-semibold uppercase tracking-wider text-left transition-all',
         tone
           ? `${tone.bg} ${tone.text} ${ring ?? ''} border`
           : 'text-slate-400 hover:bg-slate-50 border border-transparent',

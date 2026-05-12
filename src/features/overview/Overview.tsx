@@ -81,11 +81,11 @@ export const Overview = ({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">
               Live Dashboard
             </span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+          <h1 className="hero-title">
             Ringkasan Performa
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1.5 max-w-xl">
@@ -94,10 +94,10 @@ export const Overview = ({
           </p>
         </div>
         <div className="text-right hidden md:block">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
             Total Rows
           </p>
-          <p className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+          <p className="metric-number mt-1">
             {formatNumber(stats.totalTransactions)}
           </p>
         </div>
@@ -172,7 +172,7 @@ export const Overview = ({
               <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.25em] mb-1.5">
                 Analytics
               </p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+              <h3 className="metric-number leading-tight">
                 Analisa Tren &amp; Performa
               </h3>
               <p className="text-sm text-slate-500 font-medium mt-1 max-w-md">
@@ -249,7 +249,7 @@ export const Overview = ({
         <div className="card-hero p-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">Metode Pembayaran</h3>
+              <h3 className="text-base font-semibold text-slate-900 tracking-tight">Metode Pembayaran</h3>
               <p className="text-xs text-slate-400 font-medium mt-1">
                 Distribusi berdasarkan {paymentChartMode === 'revenue' ? 'pendapatan' : 'jumlah transaksi'}
               </p>
@@ -299,7 +299,7 @@ export const Overview = ({
         <div className="card-hero p-8">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">Waktu Pembelian (Jam)</h3>
+              <h3 className="text-base font-semibold text-slate-900 tracking-tight">Waktu Pembelian (Jam)</h3>
               <p className="text-xs text-slate-400 font-medium mt-1">Distribusi transaksi berdasarkan jam</p>
             </div>
             <div className="p-2.5 bg-indigo-50 rounded-xl">
@@ -369,7 +369,7 @@ const HeroCard = ({ icon: Icon, gradient, label, value, sub }: HeroCardProps) =>
       <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-inner">
         <Icon className="w-7 h-7 text-white" />
       </div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-white/80">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-white/80">{label}</p>
     </div>
     <div className="relative">
       <h3 className="text-3xl font-black tracking-tight leading-none mb-2">{value}</h3>
@@ -415,7 +415,7 @@ const MetricCard = ({ icon: Icon, color, label, value, sub }: MetricCardProps) =
         </div>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
       </div>
-      <h3 className="text-2xl font-black text-slate-900 tracking-tight">{value}</h3>
+      <h3 className="metric-number">{value}</h3>
       <p className="text-[10px] text-slate-400 font-medium mt-1">{sub}</p>
     </motion.div>
   );
@@ -468,7 +468,7 @@ const ConversionCard = ({ value, transactions, downloader }: ConversionCardProps
         </span>
       </div>
 
-      <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+      <h3 className="metric-number">
         {clamped.toFixed(2)}
         <span className="text-lg text-slate-400 font-bold">%</span>
       </h3>
@@ -550,7 +550,7 @@ function TrendTable({
     <div className="h-full overflow-auto custom-scrollbar rounded-2xl border border-slate-100">
       <table className="w-full text-left border-collapse">
         <thead className="sticky top-0 bg-white z-10">
-          <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+          <tr className="text-[11px] font-medium text-slate-400 uppercase tracking-wider border-b border-slate-100">
             <th className="py-3 px-4 bg-white">Tanggal</th>
             {visibleApps.length > 0 ? (
               visibleApps.map((app) => (

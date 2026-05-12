@@ -497,7 +497,7 @@ export const SocialMediaAnalysis = ({
               <Smartphone className="w-5 h-5 text-rose-600" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">
+              <h3 className="text-base font-semibold text-slate-900 tracking-tight">
                 Repository Konten Sosial Media
               </h3>
               <p className="text-xs text-slate-400 font-medium mt-1">
@@ -618,7 +618,7 @@ export const SocialMediaAnalysis = ({
               className="bg-transparent text-[11px] font-bold text-slate-700 outline-none"
             />
           </div>
-          <span className="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest tabular-nums">
+          <span className="ml-auto text-[11px] font-medium text-slate-400 uppercase tracking-wider tabular-nums">
             {filteredContent.length} / {allContent.length} konten
           </span>
         </div>
@@ -804,10 +804,10 @@ export const SocialMediaAnalysis = ({
                             </td>
                             <td className="py-3 px-4 text-[11px] font-black text-slate-700 uppercase tracking-widest whitespace-nowrap">{item.appName}</td>
                             <td className="py-3 px-4 whitespace-nowrap">
-                              <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[9px] font-black uppercase tracking-widest">{item.platform}</span>
+                              <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-semibold uppercase tracking-wider">{item.platform}</span>
                             </td>
                             <td className="py-3 px-4 whitespace-nowrap">
-                              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-black uppercase tracking-widest">{item.jenisKonten}</span>
+                              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold uppercase tracking-wider">{item.jenisKonten}</span>
                             </td>
                             <td className="py-3 px-4 max-w-[240px]">
                               <p className="text-[11px] text-slate-700 font-medium line-clamp-2">{item.caption || <span className="text-slate-300">(tanpa caption)</span>}</p>
@@ -912,7 +912,7 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
       >
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">Tambah Konten Sosial Media</h3>
+            <h3 className="text-base font-semibold text-slate-900 tracking-tight">Tambah Konten Sosial Media</h3>
             <p className="text-xs text-slate-400 font-medium mt-1">
               17 metrik per post — semua angka dalam unit aslinya.
             </p>
@@ -1043,13 +1043,13 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+            className="px-6 py-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors"
           >
             Batal
           </button>
           <button
             type="submit"
-            className="px-8 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+            className="px-8 py-3 bg-indigo-600 text-white rounded-2xl text-[11px] font-semibold uppercase tracking-wider shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
           >
             Simpan Konten
           </button>
@@ -1064,7 +1064,7 @@ const AddContentModal = ({ apps, onClose, onSave }: AddModalProps) => {
 // ============================================================
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="space-y-2">
-    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider ml-1 block">
       {label}
     </label>
     {children}

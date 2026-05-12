@@ -7,7 +7,13 @@
 
 @layer base {
   body {
-    @apply bg-slate-50/50 text-slate-900;
+    @apply bg-slate-50/40 text-slate-900;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    letter-spacing: -0.005em;
+  }
+  /* Default font weight lebih ringan untuk feel "modern" */
+  h1, h2, h3, h4, h5 {
+    letter-spacing: -0.02em;
   }
 }
 
@@ -17,16 +23,16 @@
   padding: 0.5rem 0.75rem;
   background: white;
   border: 1px solid rgb(226 232 240);
-  border-radius: 0.75rem;
-  font-size: 12px;
+  border-radius: 0.625rem;
+  font-size: 13px;
   font-weight: 500;
   color: rgb(15 23 42);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .form-input:focus {
-  border-color: rgb(244 63 94);
-  box-shadow: 0 0 0 3px rgb(244 63 94 / 0.1);
+  border-color: rgb(99 102 241);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.1);
 }
 .form-input::placeholder {
   color: rgb(203 213 225);
@@ -95,56 +101,57 @@ textarea.sheet-cell {
 }
 
 /* ============================================================
-   Standardized card patterns — pakai class ini di seluruh app
-   supaya konsisten visual & spacing antar halaman.
-
-   Hierarchy:
-   - .card-hero       → wrapper section besar (rounded 2.5rem, padding 8, shadow halus)
-   - .card-tile       → kartu medium (rounded 3xl, padding 6, shadow tipis)
-   - .card-compact    → metric kecil / item kecil (rounded 2xl, padding 5, shadow tipis)
-   - .card-flat       → tabel / item dalam scroll (rounded 3xl, no shadow)
-
-   Hover: tambah .card-hover di samping class di atas (kalau clickable).
+   Standardized card patterns — clean modern minimal
+   Border-radius: 16px (rounded-2xl) untuk modern look.
+   Shadow: single-layer halus, bukan dramatic.
+   Border: hairline slate-200 untuk definisi crisp.
    ============================================================ */
 .card-hero {
-  @apply bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.03)];
+  @apply bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)];
 }
 .card-tile {
-  @apply bg-white rounded-3xl border border-slate-100 shadow-sm;
+  @apply bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)];
 }
 .card-compact {
-  @apply bg-white rounded-2xl border border-slate-100 shadow-sm;
+  @apply bg-white rounded-xl border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.03)];
 }
 .card-flat {
-  @apply bg-white rounded-3xl border border-slate-100;
+  @apply bg-white rounded-2xl border border-slate-200/70;
 }
 .card-hover {
-  @apply hover:shadow-lg hover:border-slate-200 transition-all;
+  @apply hover:shadow-md hover:border-slate-300 transition-all duration-200;
 }
 
-/* Standardized typography for page hero — semua halaman pakai pola sama */
+/* Standardized typography for page hero
+   Bobot font lebih ringan (bold, bukan black) — feel modern minimalis */
 .hero-eyebrow {
-  @apply inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-[10px] font-black uppercase tracking-[0.2em];
+  @apply inline-flex items-center gap-1.5 mb-2 text-[11px] font-semibold uppercase tracking-wider;
 }
 .hero-title {
-  @apply text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight;
+  @apply text-2xl md:text-3xl font-bold text-slate-900 tracking-tight leading-tight;
 }
 .hero-subtitle {
-  @apply text-sm text-slate-500 font-medium mt-1.5 max-w-xl;
+  @apply text-sm text-slate-500 mt-1.5 max-w-xl;
 }
 
 /* Section sub-header (dipakai di dalam card-hero) */
 .section-title {
-  @apply text-base font-black text-slate-900 tracking-tight;
+  @apply text-base font-semibold text-slate-900 tracking-tight;
 }
 .section-eyebrow {
-  @apply text-[10px] font-black uppercase tracking-[0.25em];
+  @apply text-[11px] font-semibold uppercase tracking-wider text-slate-500;
 }
 
-/* Metric number — angka besar di kartu */
-.metric-number {
-  @apply text-3xl font-black tracking-tight tabular-nums;
-}
+/* Metric — pattern untuk kartu KPI/stat
+   - Label kecil neutral di atas
+   - Angka tabular semibold (bukan black) untuk readability
+   - Delta/sub: kecil + warna sesuai status */
 .metric-label {
-  @apply text-[10px] font-black text-slate-400 uppercase tracking-widest;
+  @apply text-[11px] font-medium text-slate-500 uppercase tracking-wider;
+}
+.metric-number {
+  @apply text-2xl md:text-3xl font-semibold text-slate-900 tabular-nums tracking-tight leading-none;
+}
+.metric-sub {
+  @apply text-xs text-slate-400 mt-1;
 }

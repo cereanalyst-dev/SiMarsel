@@ -137,7 +137,7 @@ export const PricingComparison = ({ data, filters }: Props) => {
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-12">
         <div>
-          <h3 className="text-2xl font-black text-slate-900 tracking-tight">Perbandingan Harga & Performa</h3>
+          <h3 className="metric-number">Perbandingan Harga & Performa</h3>
           <p className="text-sm text-slate-400 font-medium mt-1.5">
             Analisis benchmark dan rekomendasi harga strategis lintas periode
           </p>
