@@ -163,12 +163,16 @@ export interface DataSet {
 // request tidak deterministik, jadi range(0-999) & range(1000-1999) bisa
 // overlap atau skip rows. Hasilnya state browser punya duplikat +
 // distinct email turun padahal total rows match.
+// 1000 = default Supabase PostgREST max-rows. Lebih dari ini perlu set
+// db-aggregates di Supabase config — biarkan 1000 aman.
 const PAGE_SIZE = 1000;
 
-// Berapa request paralel sekaligus ke Supabase. Lebih besar = lebih cepat
-// tapi mendekati rate limit. 8 = sweet spot (285 page = ~36 batch ~3-5 detik
-// vs ~28 detik kalau sequential).
-const FETCH_CONCURRENCY = 8;
+// Berapa request paralel sekaligus ke Supabase.
+// 16 = aggressive — HTTP/2 multiplex, browser support penuh. Reduce ke 8
+// kalau hit rate limit (rare karena Supabase free tier 200 req/sec).
+// Dengan 16 paralel × 1000 rows = 16K rows/round. 364K rows ~23 round
+// ~2.5 detik (vs ~5 detik dengan 8 paralel).
+const FETCH_CONCURRENCY = 16;
 
 export type FetchProgressCallback = (loaded: number, label: string) => void;
 
@@ -247,6 +251,39 @@ async function fetchAllPages<T>(
   logger.info(`✅ ${label}: ${rows.length} baris (${ms}ms, parallel x${FETCH_CONCURRENCY})`);
   return rows;
 }
+
+// localStorage cache untuk quickStats — instant render saat reload.
+// Key per user. TTL pendek (10 menit) supaya tidak stale.
+const QUICK_STATS_CACHE_PREFIX = 'simarsel.quick_stats.';
+const QUICK_STATS_CACHE_TTL_MS = 10 * 60 * 1000;
+
+interface CachedQuickStats {
+  data: QuickOverviewStats;
+  cachedAt: number;
+}
+
+export const loadQuickStatsFromLocal = (userId: string | null): QuickOverviewStats | null => {
+  if (!userId || typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(QUICK_STATS_CACHE_PREFIX + userId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedQuickStats;
+    if (Date.now() - parsed.cachedAt > QUICK_STATS_CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+};
+
+export const saveQuickStatsToLocal = (userId: string | null, stats: QuickOverviewStats): void => {
+  if (!userId || typeof window === 'undefined') return;
+  try {
+    const payload: CachedQuickStats = { data: stats, cachedAt: Date.now() };
+    window.localStorage.setItem(QUICK_STATS_CACHE_PREFIX + userId, JSON.stringify(payload));
+  } catch {
+    /* quota exceeded — ignore */
+  }
+};
 
 export const fetchDataFromSupabase = async (
   onProgress?: FetchProgressCallback,

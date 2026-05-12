@@ -404,7 +404,7 @@ export const TargetSection = ({
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 mb-3">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">
                 Operasional Harian
               </span>
             </div>
@@ -417,10 +417,10 @@ export const TargetSection = ({
             </p>
           </div>
           <div className="text-right hidden md:block">
-            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
               Periode
             </p>
-            <p className="text-xl font-semibold text-slate-900 tracking-tight mt-1">
+            <p className="text-xl font-black text-slate-900 tracking-tight mt-1">
               {format(new Date(targetMonth + '-01'), 'MMMM yyyy')}
             </p>
           </div>
@@ -438,7 +438,7 @@ export const TargetSection = ({
                 <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.25em] mb-1">
                   Analytics
                 </p>
-                <h3 className="text-xl font-semibold text-slate-900 tracking-tight">
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">
                   Ringkasan Semua Platform
                 </h3>
                 <p className="text-xs text-slate-400 font-medium mt-1">
@@ -775,7 +775,7 @@ export const TargetSection = ({
               <Target className="w-6 h-6 text-indigo-600" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Set Target - {selectedApp.name}</h3>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Set Target - {selectedApp.name}</h3>
               <p className="text-sm text-slate-400 font-medium">Target untuk bulan {format(new Date(targetMonth + '-01'), 'MMMM yyyy')}</p>
             </div>
           </div>
@@ -948,7 +948,7 @@ export const TargetSection = ({
                     newIsTargetSet[targetMonth] = false;
                     setApps(apps.map(a => a.id === selectedAppId ? { ...a, isTargetSet: newIsTargetSet } : a));
                   }}
-                  className="px-4 py-2 bg-white border border-slate-200 text-indigo-600 text-[11px] font-semibold uppercase tracking-wider rounded-xl hover:bg-slate-50 transition-all"
+                  className="px-4 py-2 bg-white border border-slate-200 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-slate-50 transition-all"
                 >
                   Edit Target
                 </button>

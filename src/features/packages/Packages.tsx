@@ -99,7 +99,7 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-50 text-pink-600 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
               Product Analytics
             </span>
           </div>
@@ -111,7 +111,7 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
           </p>
         </div>
         <div className="text-right hidden md:block">
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
             Total Paket
           </p>
           <p className="metric-number mt-1">
@@ -174,7 +174,7 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
 
       <div className="card-hero p-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
-          <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Detail Performa Paket</h3>
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Detail Performa Paket</h3>
           <div className="flex flex-1 md:flex-initial items-center gap-2 flex-wrap md:flex-nowrap md:justify-end">
             {/* Search box */}
             <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 min-w-[260px] flex-1 md:flex-initial">
@@ -192,7 +192,7 @@ export const Packages = ({ filters, setFilters, availableOptions, packagePerform
                   type="button"
                   onClick={() => setSearch('')}
                   aria-label="Clear search"
-                  className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:text-rose-500"
+                  className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500"
                 >
                   Clear
                 </button>

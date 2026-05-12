@@ -326,7 +326,7 @@ export const TasklistSection = ({
           <div className="inline-flex items-center gap-2 mb-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 text-cyan-700">
               <KanbanSquare className="w-3 h-3 animate-pulse" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">
                 {viewMode === 'mine' ? 'Rencana Pribadi' : 'Task Board'}
               </span>
             </div>
@@ -336,7 +336,7 @@ export const TasklistSection = ({
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700"
               >
                 <Zap className="w-2.5 h-2.5" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider">Live</span>
+                <span className="text-[9px] font-black uppercase tracking-widest">Live</span>
               </span>
             )}
           </div>
@@ -354,7 +354,7 @@ export const TasklistSection = ({
             <button
               type="button"
               onClick={() => setViewMode('all')}
-              className={cn('px-4 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all',
+              className={cn('px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] transition-all',
                 viewMode === 'all' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
             >
               Semua Tim
@@ -364,7 +364,7 @@ export const TasklistSection = ({
               onClick={() => setViewMode('mine')}
               disabled={!currentUserEmail}
               title={!currentUserEmail ? 'Email user belum terdeteksi' : undefined}
-              className={cn('px-4 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all',
+              className={cn('px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] transition-all',
                 viewMode === 'mine' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-700',
                 !currentUserEmail && 'opacity-40 cursor-not-allowed')}
             >
@@ -391,7 +391,7 @@ export const TasklistSection = ({
         )}>
           <div className="flex items-center justify-between mb-1">
             <p className={cn(
-              'text-[10px] font-semibold uppercase tracking-wider',
+              'text-[9px] font-black uppercase tracking-widest',
               deadlineStats.overdue > 0 ? 'text-rose-600' : 'text-slate-400',
             )}>Terlambat</p>
             <AlertTriangle className={cn('w-4 h-4',
@@ -406,7 +406,7 @@ export const TasklistSection = ({
 
         <div className="card-compact p-4">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">Hari Ini</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">Hari Ini</p>
             <Clock className="w-4 h-4 text-amber-500" />
           </div>
           <h3 className="text-2xl font-black text-amber-700">{deadlineStats.dueToday}</h3>
@@ -415,7 +415,7 @@ export const TasklistSection = ({
 
         <div className="card-compact p-4">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-500">Urgent</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-rose-500">Urgent</p>
             <Flame className="w-4 h-4 text-rose-500" />
           </div>
           <h3 className="text-2xl font-black text-rose-700">{deadlineStats.urgent}</h3>
@@ -424,7 +424,7 @@ export const TasklistSection = ({
 
         <div className="card-compact p-4">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Selesai</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Selesai</p>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
           <h3 className="text-2xl font-black text-emerald-700">{counts.done}</h3>
@@ -504,7 +504,7 @@ export const TasklistSection = ({
                 {/* Column header */}
                 <div className="flex items-center justify-between mb-3 px-2 py-1">
                   <div className="flex items-center gap-2">
-                    <span className={cn('text-[11px] font-semibold uppercase tracking-wider', col.color)}>
+                    <span className={cn('text-[10px] font-black uppercase tracking-[0.2em]', col.color)}>
                       {col.label}
                     </span>
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-white text-slate-500 border border-slate-200">
@@ -874,7 +874,7 @@ function TaskModal({ task, defaultStatus, assigneeOptions, defaultAssignee, onCl
                 <button
                   type="button"
                   onClick={onDelete}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wider text-rose-500 hover:bg-rose-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] text-rose-500 hover:bg-rose-50"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Hapus
@@ -884,7 +884,7 @@ function TaskModal({ task, defaultStatus, assigneeOptions, defaultAssignee, onCl
                 <button
                   type="button"
                   onClick={onOpenCalendar}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wider text-cyan-600 hover:bg-cyan-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] text-cyan-600 hover:bg-cyan-50"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   Lihat di Kalender

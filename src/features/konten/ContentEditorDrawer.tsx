@@ -312,12 +312,12 @@ export const ContentEditorDrawer = ({
               <div className="flex items-center gap-3">
                 {/* Indicator auto-save */}
                 {saving ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-semibold uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-[0.2em]">
                     <Loader2 className="w-3 h-3 animate-spin" />
                     Menyimpan
                   </span>
                 ) : savedAt ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-semibold uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-[0.2em]">
                     <Check className="w-3 h-3" />
                     Tersimpan
                   </span>

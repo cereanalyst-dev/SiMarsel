@@ -356,7 +356,7 @@ ${ctxLines}`;
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-600 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
               Kalender Aktivitas
             </span>
           </div>
@@ -382,7 +382,7 @@ ${ctxLines}`;
               <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.25em] mb-1">
                 {format(currentMonth, 'MMMM yyyy')}
               </p>
-              <h3 className="text-xl font-semibold text-slate-900 tracking-tight">
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">
                 Transaksi Bulan Ini
               </h3>
               <p className="text-xs text-slate-400 font-medium mt-1">
@@ -447,7 +447,7 @@ ${ctxLines}`;
         <div className="relative grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-indigo-700 p-5 rounded-2xl text-white shadow-lg shadow-indigo-200/40">
             <div className="pointer-events-none absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-200 mb-1.5">Revenue Bulan Ini</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-200 mb-1.5">Revenue Bulan Ini</p>
             <h3 className="text-xl font-black tracking-tight">{formatCurrency(monthTotals.revenue)}</h3>
             <p className="text-[9px] font-bold text-indigo-200 mt-1">{monthTotals.activeDays} hari aktif</p>
           </div>
@@ -457,11 +457,11 @@ ${ctxLines}`;
               <div className="p-1 bg-emerald-50 rounded-md">
                 <ShoppingBag className="w-3 h-3 text-emerald-600" />
               </div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Transaksi</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total Transaksi</p>
             </div>
-            <h3 className="text-xl font-semibold text-slate-900 tracking-tight">{formatNumber(monthTotals.transactions)}</h3>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">{formatNumber(monthTotals.transactions)}</h3>
             <p className="text-[9px] font-bold text-slate-400 mt-1">
-              Avg {compactRp(monthTotals.activeDays > 0 ? monthTotals.transactions / monthTotals.activeDays : 0)}/hari
+              Avg {formatNumber(monthTotals.activeDays > 0 ? Math.round(monthTotals.transactions / monthTotals.activeDays) : 0)}/hari
             </p>
           </div>
           <div className="relative overflow-hidden card-compact p-5">
@@ -470,9 +470,9 @@ ${ctxLines}`;
               <div className="p-1 bg-amber-50 rounded-md">
                 <Crown className="w-3 h-3 text-amber-600" />
               </div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Hari Paling Ramai</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Hari Paling Ramai</p>
             </div>
-            <h3 className="text-xl font-semibold text-slate-900 tracking-tight">
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">
               {topDay ? format(new Date(topDay), 'dd MMM') : '—'}
             </h3>
             <p className="text-[9px] font-bold text-amber-600 mt-1">{topDay ? formatCurrency(maxDayRevenue) : 'Belum ada data'}</p>
@@ -483,16 +483,16 @@ ${ctxLines}`;
               <div className="p-1 bg-violet-50 rounded-md">
                 <Flame className="w-3 h-3 text-violet-600" />
               </div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Rata-rata / Hari Aktif</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Rata-rata / Hari Aktif</p>
             </div>
-            <h3 className="text-xl font-semibold text-slate-900 tracking-tight">{formatCurrency(monthTotals.avgPerDay)}</h3>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">{formatCurrency(monthTotals.avgPerDay)}</h3>
             <p className="text-[9px] font-bold text-slate-400 mt-1">{monthTotals.activeDays > 0 ? 'Basis hari jualan' : 'Basis hari jualan'}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-7 gap-2 md:gap-3 mb-4">
           {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map(day => (
-            <div key={day} className="text-center py-2 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            <div key={day} className="text-center py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               {day}
             </div>
           ))}
@@ -640,7 +640,7 @@ ${ctxLines}`;
                     >
                       {/* Header: tanggal + revenue */}
                       <div className="flex items-start justify-between border-b border-white/10 pb-1">
-                        <span className="text-[9px] md:text-[11px] font-semibold uppercase tracking-wider text-indigo-200">
+                        <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">
                           {format(day, 'd MMM')}
                         </span>
                         {isTop && (
@@ -756,7 +756,7 @@ ${ctxLines}`;
                 {hasActivity && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-2">Total Revenue</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Revenue</p>
                       <h3 className="text-xl font-black text-indigo-600">{formatCurrency(dayRevenue)}</h3>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {Object.entries(dayBreakdown).map(([app, vals]: [string, any]) => (
@@ -767,7 +767,7 @@ ${ctxLines}`;
                       </div>
                     </div>
                     <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-2">Total Transaksi</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Transaksi</p>
                       <h3 className="text-xl font-black text-emerald-600">{formatNumber(dayTrx)}</h3>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {Object.entries(dayBreakdown).map(([app, vals]: [string, any]) => (
@@ -778,7 +778,7 @@ ${ctxLines}`;
                       </div>
                     </div>
                     <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-2">Total Downloader</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Downloader</p>
                       <h3 className="text-xl font-black text-violet-600">{formatNumber(dayDl)}</h3>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {downloaderData.filter(d => format(d.parsed_date, 'yyyy-MM-dd') === selectedDay).map((d, i) => (
@@ -789,7 +789,7 @@ ${ctxLines}`;
                       </div>
                     </div>
                     <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-2">AOV Harian</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">AOV Harian</p>
                       <h3 className="text-xl font-black text-amber-600">
                         {dayTrx ? formatCurrency(dayRevenue / dayTrx) : 'Rp0'}
                       </h3>
@@ -800,7 +800,7 @@ ${ctxLines}`;
                 {hasActivity && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                     <div className="max-h-[350px] overflow-y-auto custom-scrollbar pr-2 border border-slate-100 rounded-2xl">
-                      <h5 className="text-[11px] font-medium text-slate-400 uppercase tracking-wider p-4 border-b border-slate-50 sticky top-0 bg-white z-20 flex items-center gap-2">
+                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest p-4 border-b border-slate-50 sticky top-0 bg-white z-20 flex items-center gap-2">
                         <ShoppingBag className="w-3 h-3 text-emerald-600" />
                         Detail Transaksi
                       </h5>
@@ -829,7 +829,7 @@ ${ctxLines}`;
                     </div>
 
                     <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                      <h5 className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                         <Zap className="w-3 h-3 text-indigo-600" />
                         Strategi & Aktivitas Operasional
                       </h5>
@@ -863,11 +863,11 @@ ${ctxLines}`;
                     terpisah, sekarang 1 panel. */}
                 <div className="card-compact p-6 mb-8">
                   <div className="flex items-center justify-between mb-5">
-                    <h5 className="text-[11px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <MessageSquare className="w-3 h-3 text-indigo-600" />
                       Konten Hari Ini
                     </h5>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-md bg-slate-50 text-slate-500 border border-slate-100">
+                    <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-slate-50 text-slate-500 border border-slate-100">
                       {totalKonten} konten
                     </span>
                   </div>
@@ -946,11 +946,11 @@ ${ctxLines}`;
                 {dayTasks.length > 0 && (
                   <div className="card-compact p-6 mb-8">
                     <div className="flex items-center justify-between mb-5">
-                      <h5 className="text-[11px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                         <CheckSquare className="w-3 h-3 text-cyan-600" />
                         Task Due Hari Ini
                       </h5>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-100">
+                      <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-100">
                         {dayTasks.length} task
                       </span>
                     </div>
@@ -988,7 +988,7 @@ ${ctxLines}`;
                 {/* === AI Insight === */}
                 <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-2xl text-white">
                   <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                    <h5 className="text-[11px] font-semibold uppercase tracking-wider flex items-center gap-2">
+                    <h5 className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
                       <TrendingUp className="w-3 h-3 text-white" />
                       AI Insight Harian
                     </h5>
@@ -997,7 +997,7 @@ ${ctxLines}`;
                       onClick={() => void handleGenerateInsight()}
                       disabled={insightLoading}
                       className={cn(
-                        'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all',
+                        'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all',
                         'bg-white text-indigo-700 hover:bg-indigo-50 shadow-md',
                         'disabled:bg-white/40 disabled:text-white/70 disabled:cursor-not-allowed',
                       )}
