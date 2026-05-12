@@ -13,9 +13,7 @@ import type {
 import { KpiCard } from './KpiCard';
 import { PerformanceCarousel } from './PerformanceCarousel';
 import { TargetCarousel } from './TargetCarousel';
-import { PaymentMethodChart } from './PaymentMethodChart';
-import { PromoRank } from './PromoRank';
-import { TopProducts } from './TopProducts';
+import { TopRankCarousel } from './TopRankCarousel';
 import { Badge } from '@/components/ui/Badge';
 
 // =============================================================
@@ -55,8 +53,6 @@ export const DashboardClient = ({
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'target_config' }, () => {
         // Targets kompleks (ada year_month filter) — refetch sederhana via reload
-        // Untuk kesederhanaan, kita re-fetch lewat trigger SSR.
-        // Atau bisa diabaikan — target jarang berubah saat dashboard tayang.
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -73,7 +69,6 @@ export const DashboardClient = ({
       const d = t.transaction_date ?? t.payment_date ?? t.created_at;
       if (!d) return false;
       const ds = jakartaDateOnly(d);
-      // include if date >= startStr AND month/year matches
       if (ds < startStr) return false;
       const p = jakartaParts(d);
       return p.year === period.year && p.month === period.month;
@@ -83,7 +78,6 @@ export const DashboardClient = ({
   const downloadsInRange = useMemo(() => {
     return downloads.filter((d) => {
       if (!d.date) return false;
-      // d.date format YYYY-MM-DD already
       const [y, m] = d.date.split('-').map(Number);
       return y === period.year && m === period.month;
     });
@@ -140,7 +134,6 @@ export const DashboardClient = ({
     const totalSales = perApp.reduce((s, a) => s + a.sales, 0);
     const totalTrx = perApp.reduce((s, a) => s + a.trxCount, 0);
     const totalDl = perApp.reduce((s, a) => s + a.downloaders, 0);
-    // Premium across all = unique emails dari semua trx
     const allEmails = new Set<string>();
     trxInRange.forEach((t) => { if (t.email) allEmails.add(t.email.trim().toLowerCase()); });
     return {
@@ -172,7 +165,7 @@ export const DashboardClient = ({
     sales:       aggregateTarget.sales / range.lastDay,
     downloaders: aggregateTarget.downloaders / range.lastDay,
     premium:     aggregateTarget.premium / range.lastDay,
-    conversion:  aggregateTarget.conversion,    // already a rate
+    conversion:  aggregateTarget.conversion,
   }), [aggregateTarget, range.lastDay]);
 
   // ============================================================
@@ -218,17 +211,8 @@ export const DashboardClient = ({
   }, [trxInRange, downloadsInRange, period.year, period.month, range.lastDay]);
 
   // ============================================================
-  // Slices
+  // Top rank slices
   // ============================================================
-  const paymentSlices = useMemo(() => {
-    const acc = new Map<string, number>();
-    trxInRange.forEach((t) => {
-      const k = (t.methode_name || 'Tidak Diketahui').trim();
-      acc.set(k, (acc.get(k) ?? 0) + (Number(t.revenue) || 0));
-    });
-    return Array.from(acc.entries()).map(([name, value]) => ({ name, value }));
-  }, [trxInRange]);
-
   const promoEntries = useMemo(() => {
     const acc = new Map<string, number>();
     trxInRange.forEach((t) => {
@@ -261,8 +245,9 @@ export const DashboardClient = ({
   // Per-app blocks for TargetCarousel
   // ============================================================
   const blocks = useMemo<MetricBlock[]>(() => {
-    const sortAndTake = <T extends { value: number }>(arr: T[]) =>
-      arr.sort((a, b) => b.value - a.value).slice(0, 8);
+    // Tampilkan SEMUA app (sort desc by value, no top-N slice)
+    const sortDesc = <T extends { value: number }>(arr: T[]) =>
+      arr.sort((a, b) => b.value - a.value);
 
     const salesApps = perApp.map((a) => ({
       app: a.app, value: a.sales,
@@ -286,26 +271,10 @@ export const DashboardClient = ({
     }));
 
     return [
-      {
-        key: 'sales', label: 'Sales', unit: 'rp',
-        total: totals.sales, target: aggregateTarget.sales,
-        apps: sortAndTake(salesApps),
-      },
-      {
-        key: 'downloaders', label: 'Downloader', unit: 'num',
-        total: totals.downloaders, target: aggregateTarget.downloaders,
-        apps: sortAndTake(dlApps),
-      },
-      {
-        key: 'premium', label: 'Premium', unit: 'num',
-        total: totals.premium, target: aggregateTarget.premium,
-        apps: sortAndTake(premApps),
-      },
-      {
-        key: 'conversion', label: 'Konversi', unit: 'pct',
-        total: totals.conversion, target: aggregateTarget.conversion,
-        apps: sortAndTake(convApps),
-      },
+      { key: 'sales', label: 'Sales', unit: 'rp', total: totals.sales, target: aggregateTarget.sales, apps: sortDesc(salesApps) },
+      { key: 'downloaders', label: 'Downloader', unit: 'num', total: totals.downloaders, target: aggregateTarget.downloaders, apps: sortDesc(dlApps) },
+      { key: 'premium', label: 'Premium', unit: 'num', total: totals.premium, target: aggregateTarget.premium, apps: sortDesc(premApps) },
+      { key: 'conversion', label: 'Konversi', unit: 'pct', total: totals.conversion, target: aggregateTarget.conversion, apps: sortDesc(convApps) },
     ];
   }, [perApp, totals, aggregateTarget]);
 
@@ -332,48 +301,18 @@ export const DashboardClient = ({
           </Badge>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          <KpiCard
-            label="Sales"
-            value={formatCompactIDR(totals.sales)}
-            target={hasTarget ? formatCompactIDR(aggregateTarget.sales) : null}
-            pct={hasTarget && aggregateTarget.sales > 0 ? (totals.sales / aggregateTarget.sales) * 100 : null}
-            variant="yellow"
-          />
-          <KpiCard
-            label="Downloader"
-            value={formatNumber(totals.downloaders)}
-            target={hasTarget ? formatNumber(aggregateTarget.downloaders) : null}
-            pct={hasTarget && aggregateTarget.downloaders > 0 ? (totals.downloaders / aggregateTarget.downloaders) * 100 : null}
-            variant="cyan"
-          />
-          <KpiCard
-            label="Premium"
-            value={formatNumber(totals.premium)}
-            target={hasTarget ? formatNumber(aggregateTarget.premium) : null}
-            pct={hasTarget && aggregateTarget.premium > 0 ? (totals.premium / aggregateTarget.premium) * 100 : null}
-            variant="pink"
-          />
-          <KpiCard
-            label="Konversi"
-            value={formatPercent(totals.conversion, 1)}
-            target={hasTarget ? formatPercent(aggregateTarget.conversion, 1) : null}
-            pct={hasTarget && aggregateTarget.conversion > 0 ? (totals.conversion / aggregateTarget.conversion) * 100 : null}
-            variant="lime"
-          />
-          <KpiCard
-            label="Avg Price"
-            value={formatCompactIDR(totals.avgPrice)}
-            target={hasTarget ? formatCompactIDR(aggregateTarget.avgPrice) : null}
-            pct={hasTarget && aggregateTarget.avgPrice > 0 ? (totals.avgPrice / aggregateTarget.avgPrice) * 100 : null}
-            variant="purple"
-          />
+          <KpiCard label="Sales" value={formatCompactIDR(totals.sales)} target={hasTarget ? formatCompactIDR(aggregateTarget.sales) : null} pct={hasTarget && aggregateTarget.sales > 0 ? (totals.sales / aggregateTarget.sales) * 100 : null} variant="yellow" />
+          <KpiCard label="Downloader" value={formatNumber(totals.downloaders)} target={hasTarget ? formatNumber(aggregateTarget.downloaders) : null} pct={hasTarget && aggregateTarget.downloaders > 0 ? (totals.downloaders / aggregateTarget.downloaders) * 100 : null} variant="cyan" />
+          <KpiCard label="Premium" value={formatNumber(totals.premium)} target={hasTarget ? formatNumber(aggregateTarget.premium) : null} pct={hasTarget && aggregateTarget.premium > 0 ? (totals.premium / aggregateTarget.premium) * 100 : null} variant="pink" />
+          <KpiCard label="Konversi" value={formatPercent(totals.conversion, 1)} target={hasTarget ? formatPercent(aggregateTarget.conversion, 1) : null} pct={hasTarget && aggregateTarget.conversion > 0 ? (totals.conversion / aggregateTarget.conversion) * 100 : null} variant="lime" />
+          <KpiCard label="Avg Price" value={formatCompactIDR(totals.avgPrice)} target={hasTarget ? formatCompactIDR(aggregateTarget.avgPrice) : null} pct={hasTarget && aggregateTarget.avgPrice > 0 ? (totals.avgPrice / aggregateTarget.avgPrice) * 100 : null} variant="purple" />
         </div>
       </section>
 
-      {/* Layout: Performa (col 1-7) | Pencapaian (col 8-10) | Stack right (col 11-12) */}
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4">
-        {/* Performa Harian — wider, left half */}
-        <div className="xl:col-span-7">
+      {/* Layout 3 kolom equal height: Performa (6) | Pencapaian (3) | TopRank (3) */}
+      <section className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4 items-stretch">
+        {/* Performa Harian — wider, left */}
+        <div className="xl:col-span-6 flex">
           <PerformanceCarousel
             data={daily}
             totals={{
@@ -386,16 +325,14 @@ export const DashboardClient = ({
           />
         </div>
 
-        {/* Pencapaian per App — middle column */}
-        <div className="xl:col-span-3">
+        {/* Pencapaian per App — semua app, scrollable */}
+        <div className="xl:col-span-3 flex">
           <TargetCarousel blocks={blocks} hasTarget={hasTarget} />
         </div>
 
-        {/* Right stack: TopProducts → PromoRank → PaymentMethod */}
-        <div className="xl:col-span-2 flex flex-col gap-3 md:gap-4">
-          <TopProducts products={topProducts} />
-          <PromoRank entries={promoEntries} />
-          <PaymentMethodChart slices={paymentSlices} />
+        {/* Top Rank slider (TopProducts ↔ PromoCode) */}
+        <div className="xl:col-span-3 flex">
+          <TopRankCarousel products={topProducts} promoEntries={promoEntries} />
         </div>
       </section>
     </main>

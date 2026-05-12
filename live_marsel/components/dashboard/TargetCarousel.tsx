@@ -50,7 +50,7 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
   return (
     <Card
       variant="paper"
-      className="flex flex-col gap-3 h-full"
+      className="flex flex-col gap-3 h-full w-full"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -93,8 +93,8 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
         )}
       </div>
 
-      {/* App list */}
-      <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar">
+      {/* App list — SEMUA app, scrollable */}
+      <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar min-h-0">
         {block.apps.length === 0 ? (
           <div className="h-32 flex items-center justify-center border-2 border-dashed border-nb-black/30">
             <p className="text-sm font-bold text-nb-black/50">Belum ada data</p>

@@ -73,7 +73,7 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
   return (
     <Card
       variant="paper"
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-3 h-full w-full"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -109,8 +109,8 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="h-72 md:h-80">
+      {/* Chart — fill remaining card height (min 320px) */}
+      <div className="flex-1 min-h-[320px]">
         {chartData.length === 0 ? (
           <div className="h-full flex items-center justify-center border-2 border-dashed border-nb-black/30">
             <p className="text-sm font-bold text-nb-black/50">Belum ada data periode ini</p>
