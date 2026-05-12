@@ -905,6 +905,7 @@ export default function App() {
             rowsLoaded={data.length}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             realtimeLive={realtimeLive}
+            liveDashboardPeriod={targetMonth}
           />
 
           <main className="p-8 max-w-[1600px] mx-auto w-full">

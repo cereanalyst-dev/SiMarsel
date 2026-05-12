@@ -134,3 +134,13 @@ export const MAX_ROWS_PER_QUERY = 1_000_000;
 // ---------- Misc ----------
 // Dipakai ErrorBoundary untuk branding halaman error.
 export const SUPPORT_EMAIL: string | null = null; // mis. 'support@company.com'
+
+// ---------- Live Dashboard ----------
+// URL Live Dashboard (Next.js app terpisah, deploy di Vercel atau di
+// VPS subdomain sendiri). Dibuka via tombol "Live Dashboard" di TopBar
+// SiMarsel — auto append ?period=YYYY-MM dari targetMonth saat ini.
+//
+// Set via env: VITE_LIVE_DASHBOARD_URL
+// Contoh: 'https://live.marsel-base.online' atau 'https://live-marsel.vercel.app'
+export const LIVE_DASHBOARD_URL: string | null =
+  import.meta.env?.VITE_LIVE_DASHBOARD_URL ?? null;

@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Activity, ChevronRight, Database, Menu, Zap } from 'lucide-react';
-import { APP_NAME, LOGO_PATH, MENU_ITEMS } from '../config/app.config';
+import { Activity, ChevronRight, Database, ExternalLink, Menu, Tv, Zap } from 'lucide-react';
+import { APP_NAME, LIVE_DASHBOARD_URL, LOGO_PATH, MENU_ITEMS } from '../config/app.config';
 
 interface Props {
   activeTab: string;
   rowsLoaded?: number;
   onOpenMobileMenu?: () => void;
   realtimeLive?: boolean;
+  // Period dari Strategi & Target — dipakai untuk auto append ?period= ke
+  // Live Dashboard URL.
+  liveDashboardPeriod?: string;
 }
 
-export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu, realtimeLive = false }: Props) => {
+export const TopBar = ({
+  activeTab, rowsLoaded, onOpenMobileMenu, realtimeLive = false, liveDashboardPeriod,
+}: Props) => {
   const active = MENU_ITEMS.find((m) => m.id === activeTab);
   const [now, setNow] = useState(new Date());
 
@@ -95,6 +100,22 @@ export const TopBar = ({ activeTab, rowsLoaded, onOpenMobileMenu, realtimeLive =
               Idle
             </span>
           </div>
+        )}
+
+        {/* Live Dashboard launcher — buka Next.js app terpisah di tab baru
+            dengan period dari Strategi & Target. */}
+        {LIVE_DASHBOARD_URL && (
+          <a
+            href={`${LIVE_DASHBOARD_URL}${liveDashboardPeriod ? `?period=${liveDashboardPeriod}` : ''}`}
+            target="_blank"
+            rel="noreferrer"
+            title="Buka Live Dashboard di tab baru (untuk display TV)"
+            className="hidden md:inline-flex items-center gap-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-amber-700 transition-colors"
+          >
+            <Tv className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Live Dashboard</span>
+            <ExternalLink className="w-3 h-3 opacity-60" />
+          </a>
         )}
 
         <div className="flex items-center gap-3">
