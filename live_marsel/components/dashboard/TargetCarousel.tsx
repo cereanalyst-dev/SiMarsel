@@ -10,7 +10,7 @@ import {
 import type { MetricBlock } from '@/types/database';
 
 interface Props {
-  blocks: MetricBlock[];     // 4 metric blocks (sales/dl/premium/conversion)
+  blocks: MetricBlock[];
   hasTarget: boolean;
 }
 
@@ -57,8 +57,8 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-3">
-          <Badge variant="black" className="!text-sm md:!text-base !px-3 !py-1.5">Pencapaian per App</Badge>
-          <h3 className="font-display text-2xl md:text-3xl tracking-tight">{block.label}</h3>
+          <Badge variant="black" className="!text-base md:!text-lg !px-3 !py-1.5">Pencapaian per App</Badge>
+          <h3 className="font-display text-3xl md:text-4xl tracking-tight">{block.label}</h3>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -80,20 +80,20 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
 
       {/* Total + overall % */}
       <div className="flex items-baseline justify-between gap-2 pb-3 border-b-2 border-dashed border-nb-black/30">
-        <span className="font-display text-3xl md:text-4xl xl:text-5xl tracking-tight">
+        <span className="font-display text-4xl md:text-5xl xl:text-6xl tracking-tight">
           {fmt(block.total, block.unit)}
         </span>
         {hasTarget && block.target > 0 && (
           <Badge
             variant={overallPct >= 100 ? 'lime' : overallPct >= 75 ? 'yellow' : overallPct >= 50 ? 'orange' : 'red'}
-            className="!text-sm !px-3 !py-1"
+            className="!text-base !px-3 !py-1.5"
           >
             {formatPercent(overallPct, 0)} dari target
           </Badge>
         )}
       </div>
 
-      {/* App list — SEMUA app, scrollable */}
+      {/* App list */}
       <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar min-h-0">
         {block.apps.length === 0 ? (
           <div className="h-32 flex items-center justify-center border-2 border-dashed border-nb-black/30">
@@ -103,29 +103,29 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
           block.apps.map((app, i) => {
             const pct = clamp(app.pct, 0, 999);
             return (
-              <div key={app.app} className="flex items-center gap-3 py-1.5">
+              <div key={app.app} className="flex items-center gap-3 py-2">
                 {/* Rank */}
-                <span className="w-7 h-7 flex items-center justify-center bg-nb-black text-white text-sm font-display flex-shrink-0">
+                <span className="w-9 h-9 flex items-center justify-center bg-nb-black text-white text-base font-display flex-shrink-0">
                   {i + 1}
                 </span>
                 {/* Name + values */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-2 mb-1">
-                    <span className="font-display text-base md:text-lg truncate">
+                  <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                    <span className="font-display text-lg md:text-xl truncate">
                       {titleCase(app.app)}
                     </span>
-                    <span className="text-sm md:text-base font-display tabular-nums flex-shrink-0">
+                    <span className="text-base md:text-lg font-display tabular-nums flex-shrink-0">
                       {fmt(app.value, block.unit)}
                     </span>
                   </div>
-                  <div className="h-2.5 bg-white border-[2.5px] border-nb-black overflow-hidden">
+                  <div className="h-3 bg-white border-[2.5px] border-nb-black overflow-hidden">
                     <div
                       className={`h-full ${COLOR_BY_PCT(pct)} transition-all duration-300`}
                       style={{ width: `${clamp(pct, 0, 100)}%` }}
                     />
                   </div>
                 </div>
-                <span className="text-sm font-bold tabular-nums w-14 text-right flex-shrink-0">
+                <span className="text-base font-bold tabular-nums w-16 text-right flex-shrink-0">
                   {hasTarget && app.target > 0 ? formatPercent(pct, 0) : '—'}
                 </span>
               </div>
