@@ -128,7 +128,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-600 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
               Pricing Intelligence
             </span>
           </div>
@@ -155,7 +155,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
             <p className="text-[10px] font-black text-violet-600 uppercase tracking-[0.25em] mb-1">
               Pricing Engine
             </p>
-            <h3 className="text-xl font-semibold text-slate-900 tracking-tight">
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">
               Saran Harga Paket
             </h3>
             <p className="text-xs text-slate-400 font-medium mt-1">
@@ -213,13 +213,13 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
               <div className="flex items-start justify-between mb-4">
                 <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 text-slate-600">
                   <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider">Anchor</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest">Anchor</span>
                 </span>
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                   Coret
                 </span>
               </div>
-              <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
                 Harga Psikologis
               </p>
               <p className="text-2xl font-black text-slate-400 line-through tracking-tight">
@@ -247,7 +247,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
                 <div className="flex items-start justify-between mb-4">
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/20 backdrop-blur-sm text-white">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">Value</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">Value</span>
                   </span>
                   <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest">
                     ⭐ Pilihan
@@ -280,7 +280,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
               <div className="flex items-start justify-between mb-4">
                 <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 text-emerald-600">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider">Campaign</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest">Campaign</span>
                 </span>
                 <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">
                   Promo
@@ -329,7 +329,7 @@ export const PriceSuggestion = ({ data, availableOptions }: PriceSuggestionProps
             </div>
             <button 
               onClick={() => setShowAllHistory(!showAllHistory)}
-              className="px-4 py-2 bg-slate-50 text-slate-500 text-[11px] font-semibold uppercase tracking-wider rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all"
+              className="px-4 py-2 bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all"
             >
               {showAllHistory ? 'Paket Mirip' : 'Semua Paket'}
             </button>

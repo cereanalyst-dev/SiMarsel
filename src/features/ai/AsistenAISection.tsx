@@ -228,7 +228,7 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-600 mb-3">
             <Sparkles className="w-3 h-3 animate-pulse" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
               AI Assistant
             </span>
           </div>
@@ -324,7 +324,7 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
         )}>
           {/* Context type selector — pas bisa pilih jenis pertanyaan */}
           <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
               Mode:
             </span>
             {(['analytics', 'recommendation', 'copy', 'free'] as ContextType[]).map((t) => (
@@ -333,7 +333,7 @@ export const AsistenAISection = ({ detectedPlatforms = [], setActiveTab }: Props
                 type="button"
                 onClick={() => setContextType(t)}
                 className={cn(
-                  'px-3 py-1 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all',
+                  'px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] transition-all',
                   contextType === t
                     ? 'bg-violet-600 text-white shadow'
                     : 'bg-white text-slate-500 border border-slate-200 hover:border-violet-200',
@@ -458,7 +458,7 @@ function ChatBubble({ msg, onSaveAsKonten, onCopy }: {
             <button
               type="button"
               onClick={onCopy}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-all"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-all"
             >
               <Copy className="w-3 h-3" />
               Salin
@@ -467,7 +467,7 @@ function ChatBubble({ msg, onSaveAsKonten, onCopy }: {
               <button
                 type="button"
                 onClick={onSaveAsKonten}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-violet-600 bg-violet-50 hover:bg-violet-100 transition-all"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-violet-600 bg-violet-50 hover:bg-violet-100 transition-all"
               >
                 <FileText className="w-3 h-3" />
                 Simpan ke Konten

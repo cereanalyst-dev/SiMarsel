@@ -205,7 +205,7 @@ export const PromoSection = ({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 text-rose-600 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
               Promo Analytics
             </span>
           </div>
@@ -337,7 +337,7 @@ export const PromoSection = ({
                   <tr key={row.category} className="border-b border-slate-50 hover:bg-slate-50/40 transition-colors">
                     <td className="py-4 px-6">
                       <span className={cn(
-                        'inline-flex items-center px-3 py-1 rounded-lg text-[11px] font-semibold uppercase tracking-wider border',
+                        'inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] border',
                         tone.bg, tone.text, 'border-current/20',
                       )}>
                         {row.category}
@@ -368,7 +368,7 @@ export const PromoSection = ({
                   karena udah ke-count di kategori-nya masing-masing) */}
               <tr className="bg-violet-50/40 border-b-2 border-violet-200">
                 <td className="py-4 px-6">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-violet-100 text-violet-800 text-[11px] font-semibold uppercase tracking-wider border border-violet-200">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-violet-100 text-violet-800 text-[10px] font-black uppercase tracking-[0.2em] border border-violet-200">
                     <Layers className="w-3 h-3" />
                     Kode Promo + Reseller
                   </span>
@@ -460,7 +460,7 @@ export const PromoSection = ({
                   type="button"
                   onClick={() => setSearch('')}
                   aria-label="Clear"
-                  className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:text-rose-500"
+                  className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500"
                 >
                   Clear
                 </button>
@@ -509,7 +509,7 @@ export const PromoSection = ({
                     </td>
                     <td className="py-3.5 px-6">
                       <span className={cn(
-                        'inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider',
+                        'inline-flex px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest',
                         tone.bg, tone.text,
                       )}>
                         {row.category}
@@ -637,7 +637,7 @@ const HeroCard = ({ icon: Icon, label, value, gradient }: {
       <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
         <Icon className="w-5 h-5" />
       </div>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-white/80 text-right">
+      <p className="text-[9px] font-black uppercase tracking-widest text-white/80 text-right">
         {label}
       </p>
     </div>

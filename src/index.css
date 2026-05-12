@@ -23,16 +23,16 @@
   padding: 0.5rem 0.75rem;
   background: white;
   border: 1px solid rgb(226 232 240);
-  border-radius: 0.625rem;
-  font-size: 13px;
+  border-radius: 0.75rem;
+  font-size: 12px;
   font-weight: 500;
   color: rgb(15 23 42);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .form-input:focus {
-  border-color: rgb(99 102 241);
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.1);
+  border-color: rgb(244 63 94);
+  box-shadow: 0 0 0 3px rgb(244 63 94 / 0.1);
 }
 .form-input::placeholder {
   color: rgb(203 213 225);
@@ -122,35 +122,31 @@ textarea.sheet-cell {
   @apply hover:shadow-md hover:border-slate-300 transition-all duration-200;
 }
 
-/* Standardized typography for page hero
-   Bobot font lebih ringan (bold, bukan black) — feel modern minimalis */
+/* Standardized typography for page hero — bobot tegas untuk impact */
 .hero-eyebrow {
-  @apply inline-flex items-center gap-1.5 mb-2 text-[11px] font-semibold uppercase tracking-wider;
+  @apply inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-[10px] font-black uppercase tracking-[0.2em];
 }
 .hero-title {
-  @apply text-2xl md:text-3xl font-bold text-slate-900 tracking-tight leading-tight;
+  @apply text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight;
 }
 .hero-subtitle {
-  @apply text-sm text-slate-500 mt-1.5 max-w-xl;
+  @apply text-sm text-slate-500 font-medium mt-1.5 max-w-xl;
 }
 
 /* Section sub-header (dipakai di dalam card-hero) */
 .section-title {
-  @apply text-base font-semibold text-slate-900 tracking-tight;
+  @apply text-base font-black text-slate-900 tracking-tight;
 }
 .section-eyebrow {
-  @apply text-[11px] font-semibold uppercase tracking-wider text-slate-500;
+  @apply text-[10px] font-black uppercase tracking-[0.25em];
 }
 
-/* Metric — pattern untuk kartu KPI/stat
-   - Label kecil neutral di atas
-   - Angka tabular semibold (bukan black) untuk readability
-   - Delta/sub: kecil + warna sesuai status */
+/* Metric — pattern untuk kartu KPI/stat */
 .metric-label {
-  @apply text-[11px] font-medium text-slate-500 uppercase tracking-wider;
+  @apply text-[10px] font-black text-slate-400 uppercase tracking-widest;
 }
 .metric-number {
-  @apply text-2xl md:text-3xl font-semibold text-slate-900 tabular-nums tracking-tight leading-none;
+  @apply text-3xl font-black text-slate-900 tabular-nums tracking-tight leading-none;
 }
 .metric-sub {
   @apply text-xs text-slate-400 mt-1;

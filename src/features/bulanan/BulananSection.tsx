@@ -300,7 +300,7 @@ export const BulananSection = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-600 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
               Monthly Snapshot
             </span>
           </div>

@@ -11,6 +11,8 @@ import {
   fetchAppsFromSupabase,
   fetchDataFromSupabase,
   fetchOverviewStats,
+  loadQuickStatsFromLocal,
+  saveQuickStatsToLocal,
   loadAppsFromLocal,
   loadSelectedAppIdFromLocal,
   saveAppsToLocal,
@@ -255,12 +257,23 @@ export default function App() {
         return;
       }
 
-      // Stage 1: quick stats (instant)
+      // Stage 0 (instant): load cached quickStats dari localStorage
+      // → headline cards muncul tanpa nunggu network.
+      const cached = loadQuickStatsFromLocal(userId);
+      if (cached && active) {
+        setQuickStats(cached);
+        setLoadingHeadline(false);
+      }
+
+      // Stage 1: quick stats fresh dari server (overwrite cache)
       try {
         logger.info('Load quick stats for user:', userId);
         const quick = await fetchOverviewStats();
         if (!active) return;
-        if (quick) setQuickStats(quick);
+        if (quick) {
+          setQuickStats(quick);
+          saveQuickStatsToLocal(userId, quick);
+        }
       } catch (err) {
         logger.warn('Quick stats fetch failed (lanjut ke raw):', err);
       } finally {

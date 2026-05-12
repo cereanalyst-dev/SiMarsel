@@ -122,7 +122,7 @@ export const RoleManagement = () => {
               type="button"
               onClick={() => void handleAdd()}
               disabled={savingUserId === 'new'}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wider"
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em]"
             >
               {savingUserId === 'new' ? '...' : 'Simpan'}
             </button>
@@ -169,7 +169,7 @@ export const RoleManagement = () => {
                     {row.email || <span className="text-slate-400 italic">(email belum di-set)</span>}
                   </td>
                   <td className="py-3 px-3">
-                    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider',
+                    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest',
                       tone.bg, tone.text)}>
                       {row.role === 'admin' && <ShieldAlert className="w-2.5 h-2.5" />}
                       {row.role === 'manager' && <ShieldCheck className="w-2.5 h-2.5" />}
@@ -183,7 +183,7 @@ export const RoleManagement = () => {
                       onChange={(e) => void handleUpdateRole(row.user_id, e.target.value as UserRole)}
                       disabled={savingUserId === row.user_id}
                       aria-label={`Ubah role ${row.full_name ?? row.user_id}`}
-                      className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[11px] font-semibold uppercase tracking-wider outline-none"
+                      className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-black uppercase tracking-[0.2em] outline-none"
                     >
                       {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                     </select>

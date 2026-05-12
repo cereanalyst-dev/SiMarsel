@@ -165,7 +165,7 @@ export const PromoCodeSettingsDrawer = ({
                 <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-0.5">
                   Setting
                 </p>
-                <h2 className="text-xl font-semibold text-slate-900 tracking-tight">
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">
                   Kode Promo & Kategori
                 </h2>
               </div>
@@ -274,7 +274,7 @@ export const PromoCodeSettingsDrawer = ({
                   <option key={c} value={c}>{c.toUpperCase()}</option>
                 ))}
               </select>
-              <span className="ml-auto text-[11px] font-medium text-slate-400 uppercase tracking-wider tabular-nums">
+              <span className="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest tabular-nums">
                 {filteredRules.length} / {rules.length} kode
               </span>
             </div>
@@ -313,7 +313,7 @@ export const PromoCodeSettingsDrawer = ({
                           </td>
                           <td className="py-3 px-6">
                             <span className={cn(
-                              'inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider',
+                              'inline-flex px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest',
                               tone.bg, tone.text,
                             )}>
                               {r.category}

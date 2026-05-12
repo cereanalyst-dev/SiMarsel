@@ -108,12 +108,12 @@ function SkripCardHeader({ script, onClose }: { script: ContentScript; onClose: 
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className={cn(
-              'text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md',
+              'text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md',
               `bg-${meta.accent}-50 text-${meta.accent}-700 border border-${meta.accent}-100`,
             )}>
               {meta.label}
             </span>
-            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
               {script.platform.toUpperCase()}
             </span>
             {dateStr && (
@@ -122,7 +122,7 @@ function SkripCardHeader({ script, onClose }: { script: ContentScript; onClose: 
               </span>
             )}
           </div>
-          <h3 className="text-base font-semibold text-slate-900 tracking-tight leading-tight truncate">
+          <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight truncate">
             {script.title || 'Tanpa Judul'}
           </h3>
         </div>
@@ -226,7 +226,7 @@ function SkripField({ label, value, highlight }: {
       highlight ? 'bg-rose-50/40 border-rose-100' : 'bg-slate-50/40 border-slate-100',
     )}>
       <p className={cn(
-        'text-[11px] font-semibold uppercase tracking-wider mb-1.5',
+        'text-[10px] font-black uppercase tracking-[0.2em] mb-1.5',
         highlight ? 'text-rose-700' : 'text-slate-500',
       )}>
         {label}
