@@ -34,9 +34,7 @@ export const DashboardClient = ({
   const [downloads, setDownloads] = useState<Download[]>(initialDownloads);
   const [targets] = useState<Target[]>(initialTargets);
 
-  // router.refresh() debounced — biar YearlyKpi + target_config juga ikut update
-  // tanpa user refresh manual. Monthly data sudah instant via setState; ini
-  // re-run SSR di background buat update yearly totals.
+  // router.refresh() debounced — yearly + target_config auto-update on realtime
   const router = useRouter();
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleRefresh = () => {
@@ -195,6 +193,7 @@ export const DashboardClient = ({
     return buckets;
   }, [trxInRange, downloadsInRange, period.year, period.month, range.lastDay]);
 
+  // Top rank slices
   const promoEntries = useMemo(() => {
     const acc = new Map<string, number>();
     trxInRange.forEach((t) => {
@@ -221,6 +220,16 @@ export const DashboardClient = ({
       acc.set(name, cur);
     });
     return Array.from(acc.entries()).map(([name, v]) => ({ name, ...v }));
+  }, [trxInRange]);
+
+  // Top Payment Method — sum revenue per methode_name
+  const paymentSlices = useMemo(() => {
+    const acc = new Map<string, number>();
+    trxInRange.forEach((t) => {
+      const k = (t.methode_name || 'Tidak Diketahui').trim();
+      acc.set(k, (acc.get(k) ?? 0) + (Number(t.revenue) || 0));
+    });
+    return Array.from(acc.entries()).map(([name, value]) => ({ name, value }));
   }, [trxInRange]);
 
   const blocks = useMemo<MetricBlock[]>(() => {
@@ -277,7 +286,7 @@ export const DashboardClient = ({
           <TargetCarousel blocks={blocks} hasTarget={hasTarget} />
         </div>
         <div className="xl:col-span-3 flex">
-          <TopRankCarousel products={topProducts} promoEntries={promoEntries} />
+          <TopRankCarousel products={topProducts} promoEntries={promoEntries} paymentSlices={paymentSlices} />
         </div>
       </section>
     </main>

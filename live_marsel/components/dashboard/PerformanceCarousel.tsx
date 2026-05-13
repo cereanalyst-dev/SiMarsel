@@ -92,20 +92,8 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
               {fmt(totalValue, slide.unit)}
             </span>
           </div>
-          <Button
-            variant="white" size="sm"
-            onClick={() => setIdx((i) => (i - 1 + SLIDES.length) % SLIDES.length)}
-            aria-label="Sebelumnya"
-          >
-            ←
-          </Button>
-          <Button
-            variant="white" size="sm"
-            onClick={() => setIdx((i) => (i + 1) % SLIDES.length)}
-            aria-label="Berikutnya"
-          >
-            →
-          </Button>
+          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i - 1 + SLIDES.length) % SLIDES.length)} aria-label="Sebelumnya">←</Button>
+          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i + 1) % SLIDES.length)} aria-label="Berikutnya">→</Button>
         </div>
       </div>
 
@@ -117,21 +105,22 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 24, right: 16, left: 8, bottom: 8 }}>
+            <BarChart data={chartData} margin={{ top: 36, right: 24, left: 12, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#0A0A0A" strokeOpacity={0.1} vertical={false} />
               <XAxis
                 dataKey="day"
-                tick={{ fontSize: 16, fontWeight: 800, fill: '#0A0A0A' }}
+                tick={{ fontSize: 18, fontWeight: 800, fill: '#0A0A0A' }}
                 stroke="#0A0A0A"
                 strokeWidth={2}
+                height={36}
               />
               <YAxis
                 domain={[0, yMax]}
-                tick={{ fontSize: 14, fontWeight: 800, fill: '#0A0A0A' }}
+                tick={{ fontSize: 16, fontWeight: 800, fill: '#0A0A0A' }}
                 stroke="#0A0A0A"
                 strokeWidth={2}
                 tickFormatter={(v: any) => fmt(v, slide.unit)}
-                width={90}
+                width={100}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(10,10,10,0.05)' }}
@@ -141,16 +130,18 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
               {target > 0 && (
                 <ReferenceLine
                   y={target}
-                  stroke="#0A0A0A"
-                  strokeDasharray="6 3"
-                  strokeWidth={2}
+                  stroke="#DC2626"
+                  strokeDasharray="12 6"
+                  strokeWidth={4}
                   label={{
-                    value: `Target ${fmt(target, slide.unit)}`,
+                    value: `▸ TARGET ${fmt(target, slide.unit)}`,
                     position: 'insideTopRight',
-                    fontSize: 16,
-                    fontWeight: 800,
-                    fill: '#0A0A0A',
+                    fontSize: 18,
+                    fontWeight: 900,
+                    fill: '#DC2626',
+                    offset: 8,
                   }}
+                  ifOverflow="extendDomain"
                 />
               )}
               <Bar dataKey="value" radius={0} stroke="#0A0A0A" strokeWidth={2}>
@@ -167,7 +158,7 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
                   dataKey="value"
                   position="top"
                   formatter={(v: any) => fmt(v, slide.unit)}
-                  style={{ fontSize: 15, fontWeight: 800, fill: '#0A0A0A' }}
+                  style={{ fontSize: 17, fontWeight: 900, fill: '#0A0A0A' }}
                 />
               </Bar>
             </BarChart>
