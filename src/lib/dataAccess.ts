@@ -30,6 +30,14 @@ import {
   SELECTED_APP_STORAGE_KEY,
 } from '../config/app.config';
 import { processDownloaders, processTransactions } from './dataProcessing';
+import {
+  loadCachedDataset,
+  writeTransactions as cacheWriteTransactions,
+  writeDownloaders as cacheWriteDownloaders,
+  deleteTransactionFromCache,
+  deleteDownloaderFromCache,
+  clearCache,
+} from './cache/indexedDbCache';
 
 // ---------- Apps (operational data) ----------
 
@@ -168,13 +176,32 @@ export interface DataSet {
 const PAGE_SIZE = 1000;
 
 // Berapa request paralel sekaligus ke Supabase.
-// 16 = aggressive — HTTP/2 multiplex, browser support penuh. Reduce ke 8
-// kalau hit rate limit (rare karena Supabase free tier 200 req/sec).
-// Dengan 16 paralel × 1000 rows = 16K rows/round. 364K rows ~23 round
-// ~2.5 detik (vs ~5 detik dengan 8 paralel).
-const FETCH_CONCURRENCY = 16;
+// 8 = balanced — cukup cepet tapi gak stress Supabase / network user.
+// Naikkin ke 16 kalau yakin network kenceng & dataset < 100K. Turunin ke 4
+// kalau sering hit rate limit / connection error.
+// Untuk dataset 300K+ rows, 8 lebih reliable daripada 16 karena lebih sedikit
+// concurrent connections = lebih kecil chance random error.
+const FETCH_CONCURRENCY = 8;
+
+// Max retry per page sebelum nyerah. Mitigasi network blip / rate limit.
+// 4 attempts × backoff 1s/2s/3s/4s = max ~10s extra time per page yang bermasalah.
+const MAX_RETRY_PER_PAGE = 4;
+
+// Per-request timeout — guard kalau Supabase nge-hang.
+const PAGE_TIMEOUT_MS = 30_000;
 
 export type FetchProgressCallback = (loaded: number, label: string) => void;
+
+// Wrap supabase query dengan timeout — kalau pending > 30s anggap gagal.
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout ${ms}ms: ${label}`)), ms);
+    Promise.resolve(promise).then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
 
 async function fetchAllPages<T>(
   supabase: ReturnType<typeof getSupabase>,
@@ -194,23 +221,50 @@ async function fetchAllPages<T>(
   let nextPage = 0;
   let done = false;
 
+  // Retry helper — max attempts per page sebelum nyerah. Mitigasi network
+  // blip yang singkat (mis. wifi switch, 4G drop sebentar) + rate limit.
+  const fetchPageWithRetry = async (pageIdx: number, attempt = 0): Promise<{
+    pageIdx: number;
+    res: Awaited<ReturnType<ReturnType<ReturnType<typeof supabase.from>['select']>['range']>>;
+  }> => {
+    const query = supabase
+      .from(tableName)
+      .select('*')
+      .order(orderColumn, { ascending: true });
+    if (tableName === 'downloaders') {
+      query.order('source_app', { ascending: true });
+    }
+    const from = pageIdx * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    let res: Awaited<ReturnType<ReturnType<ReturnType<typeof supabase.from>['select']>['range']>>;
+    try {
+      res = await withTimeout(query.range(from, to), PAGE_TIMEOUT_MS, `${label} page ${pageIdx}`);
+    } catch (timeoutErr) {
+      // Build a synthetic error result so retry logic kicks in
+      res = {
+        data: null,
+        error: { message: (timeoutErr as Error).message, name: 'TimeoutError', details: '', hint: '', code: 'TIMEOUT' },
+        count: null,
+        status: 0,
+        statusText: 'Timeout',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
+    }
+    if (res.error && attempt < MAX_RETRY_PER_PAGE - 1) {
+      // Backoff 1s × attempt+1 sebelum retry (1s, 2s, 3s, 4s — max 10s)
+      const backoff = 1000 * (attempt + 1);
+      logger.warn(`⚠️ ${label} page ${pageIdx} retry ${attempt + 1}/${MAX_RETRY_PER_PAGE} after ${backoff}ms (${res.error.message})`);
+      await new Promise((r) => setTimeout(r, backoff));
+      return fetchPageWithRetry(pageIdx, attempt + 1);
+    }
+    return { pageIdx, res };
+  };
+
   while (!done) {
-    // Build N request paralel sekaligus.
-    const batch = Array.from({ length: FETCH_CONCURRENCY }, (_, i) => {
-      const pageIdx = nextPage + i;
-      const query = supabase
-        .from(tableName)
-        .select('*')
-        .order(orderColumn, { ascending: true });
-
-      if (tableName === 'downloaders') {
-        query.order('source_app', { ascending: true });
-      }
-
-      const from = pageIdx * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-      return query.range(from, to).then((res) => ({ pageIdx, res }));
-    });
+    // Build N request paralel sekaligus (dengan retry per page).
+    const batch = Array.from({ length: FETCH_CONCURRENCY }, (_, i) =>
+      fetchPageWithRetry(nextPage + i),
+    );
 
     const results = await Promise.all(batch);
 
@@ -220,13 +274,13 @@ async function fetchAllPages<T>(
     for (const { pageIdx, res } of results) {
       const { data, error } = res;
       if (error) {
+        // Throw — JANGAN return partial. Caller (pullRawData) bakal catch
+        // dan KEEP state lama, jadi UI gak flicker dari 288K ke partial.
         logger.error(
-          `❌ Gagal fetch ${label} (page ${pageIdx}):`,
+          `❌ Gagal fetch ${label} (page ${pageIdx} setelah retry):`,
           error.message,
-          error,
         );
-        done = true;
-        break;
+        throw new Error(`Fetch ${label} gagal di page ${pageIdx}: ${error.message}`);
       }
       if (!data) continue;
       rows.push(...(data as T[]));
@@ -325,6 +379,238 @@ export const fetchDataFromSupabase = async (
 
   return { transactions, downloaders };
 };
+
+// ==============================================================
+// Fetch dengan IndexedDB cache + delta sync
+// ==============================================================
+//
+// Strategy:
+// 1. Load cached rows dari IndexedDB → return INSTANT (~1-2 detik buat 364K rows)
+// 2. Caller render dashboard pakai cached data
+// 3. Background: fetch rows yang uploaded_at > lastSync → cuma data baru
+// 4. Merge new rows + write ke cache + update lastSync
+// 5. Caller dapet notifikasi (onSyncComplete) buat refresh UI dengan data baru
+//
+// First visit (cache kosong): jalanin full fetch + populate cache.
+// Subsequent visits: 5-10x lebih cepet karena cuma delta yang dari network.
+// ==============================================================
+
+interface RawTransactionRow {
+  id?: string;
+  uploaded_at?: string;
+  [k: string]: unknown;
+}
+
+interface RawDownloaderRow {
+  date: string;
+  source_app: string;
+  count: number;
+  uploaded_at?: string;
+  [k: string]: unknown;
+}
+
+export interface CacheLoadResult {
+  fromCache: boolean;            // true kalau initial render pakai cache
+  transactions: Transaction[];
+  downloaders: Downloader[];
+}
+
+export interface DeltaSyncResult {
+  changed: boolean;              // true kalau ada data baru / berubah
+  transactions: Transaction[];   // full set after merge
+  downloaders: Downloader[];     // full set after merge
+  added: { tx: number; dl: number };
+}
+
+/**
+ * Load cached data dari IndexedDB. Instant render.
+ * Return empty arrays kalau cache kosong.
+ */
+export const loadCachedData = async (userId: string): Promise<CacheLoadResult> => {
+  const cached = await loadCachedDataset<RawTransactionRow, RawDownloaderRow>(userId);
+  if (cached.transactions.length === 0 && cached.downloaders.length === 0) {
+    return { fromCache: false, transactions: [], downloaders: [] };
+  }
+  const transactions = processTransactions(cached.transactions);
+  // wide format conversion for downloaders
+  const dlByDate = new Map<string, Record<string, unknown>>();
+  cached.downloaders.forEach((r) => {
+    const existing = dlByDate.get(r.date) || { Tanggal: r.date };
+    existing[r.source_app] = r.count;
+    dlByDate.set(r.date, existing);
+  });
+  const downloaders = processDownloaders(Array.from(dlByDate.values()));
+  logger.info(
+    `[cache] loaded ${transactions.length} tx + ${downloaders.length} dl rows from IndexedDB`,
+  );
+  return { fromCache: true, transactions, downloaders };
+};
+
+/**
+ * Sync delta: fetch rows dengan uploaded_at > lastSync. Kalau lastSync null
+ * (first visit) → fetch full dataset.
+ *
+ * Return merged full dataset (cache + new rows) untuk replace state.
+ */
+export const syncDeltaFromSupabase = async (
+  userId: string,
+  onProgress?: FetchProgressCallback,
+): Promise<DeltaSyncResult | null> => {
+  const supabase = getSupabase();
+  if (!supabase) {
+    logger.warn('Supabase belum terkonfigurasi');
+    return null;
+  }
+
+  const cached = await loadCachedDataset<RawTransactionRow, RawDownloaderRow>(userId);
+  const isFirstVisit = cached.lastSyncTx === null;
+
+  if (isFirstVisit) {
+    // Full fetch — sama kayak fetchDataFromSupabase, tapi tulis ke cache juga
+    logger.info('[cache] first visit detected — full fetch');
+    const [txRows, dlRows] = await Promise.all([
+      fetchAllPages<RawTransactionRow>(supabase, 'transactions', 'transactions', onProgress),
+      fetchAllPages<RawDownloaderRow>(supabase, 'downloaders', 'downloaders', onProgress),
+    ]);
+    // Tulis ke cache (background)
+    void cacheWriteTransactions(userId, txRows);
+    void cacheWriteDownloaders(userId, dlRows);
+
+    const transactions = processTransactions(txRows);
+    const dlByDate = new Map<string, Record<string, unknown>>();
+    dlRows.forEach((r) => {
+      const existing = dlByDate.get(r.date) || { Tanggal: r.date };
+      existing[r.source_app] = r.count;
+      dlByDate.set(r.date, existing);
+    });
+    const downloaders = processDownloaders(Array.from(dlByDate.values()));
+
+    return {
+      changed: true,
+      transactions,
+      downloaders,
+      added: { tx: txRows.length, dl: dlRows.length },
+    };
+  }
+
+  // Delta fetch — cuma row dengan uploaded_at > lastSync
+  logger.info(
+    `[cache] delta sync — tx sejak ${cached.lastSyncTx}, dl sejak ${cached.lastSyncDl}`,
+  );
+
+  const [newTx, newDl] = await Promise.all([
+    fetchSinceUploadedAt<RawTransactionRow>(supabase, 'transactions', cached.lastSyncTx),
+    fetchSinceUploadedAt<RawDownloaderRow>(supabase, 'downloaders', cached.lastSyncDl),
+  ]);
+
+  if (newTx.length === 0 && newDl.length === 0) {
+    // Tidak ada perubahan — return cached as-is (caller sudah render dari cache)
+    return { changed: false, transactions: [], downloaders: [], added: { tx: 0, dl: 0 } };
+  }
+
+  // Tulis delta ke cache (merge by primary key)
+  void cacheWriteTransactions(userId, newTx);
+  void cacheWriteDownloaders(userId, newDl);
+
+  // Merge cached + new untuk return full dataset
+  const txByKey = new Map<string, RawTransactionRow>();
+  cached.transactions.forEach((r) => { if (r.id) txByKey.set(r.id, r); });
+  newTx.forEach((r) => { if (r.id) txByKey.set(r.id, r); });
+  const mergedTx = Array.from(txByKey.values());
+
+  const dlByKey = new Map<string, RawDownloaderRow>();
+  cached.downloaders.forEach((r) => {
+    dlByKey.set(`${r.date}::${r.source_app}`, r);
+  });
+  newDl.forEach((r) => {
+    dlByKey.set(`${r.date}::${r.source_app}`, r);
+  });
+  const mergedDl = Array.from(dlByKey.values());
+
+  const transactions = processTransactions(mergedTx);
+  const dlByDate = new Map<string, Record<string, unknown>>();
+  mergedDl.forEach((r) => {
+    const existing = dlByDate.get(r.date) || { Tanggal: r.date };
+    existing[r.source_app] = r.count;
+    dlByDate.set(r.date, existing);
+  });
+  const downloaders = processDownloaders(Array.from(dlByDate.values()));
+
+  logger.info(
+    `[cache] delta merged: +${newTx.length} tx, +${newDl.length} dl. Total: ${transactions.length} tx, ${downloaders.length} dl`,
+  );
+
+  return {
+    changed: true,
+    transactions,
+    downloaders,
+    added: { tx: newTx.length, dl: newDl.length },
+  };
+};
+
+/**
+ * Fetch rows dari Supabase WHERE uploaded_at > since.
+ * Pagination ringan — biasanya delta < 1000 rows = 1 request.
+ */
+async function fetchSinceUploadedAt<T>(
+  supabase: ReturnType<typeof getSupabase>,
+  tableName: 'transactions' | 'downloaders',
+  since: string | null,
+): Promise<T[]> {
+  if (!supabase || !since) return [];
+  const rows: T[] = [];
+  let nextPage = 0;
+  while (rows.length < MAX_ROWS_PER_QUERY) {
+    const query = supabase
+      .from(tableName)
+      .select('*')
+      .gt('uploaded_at', since)
+      .order('uploaded_at', { ascending: true });
+    const from = nextPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await query.range(from, to);
+    if (error) {
+      logger.warn(`[cache] delta fetch ${tableName} error:`, error.message);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    rows.push(...(data as T[]));
+    if (data.length < PAGE_SIZE) break;
+    nextPage += 1;
+  }
+  return rows;
+}
+
+/**
+ * Helper untuk realtime: update cache saat ada INSERT/UPDATE/DELETE event.
+ */
+export const handleRealtimeCacheUpdate = async (
+  userId: string,
+  table: 'transactions' | 'downloaders',
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE',
+  newRow: Record<string, unknown> | null,
+  oldRow: Record<string, unknown> | null,
+): Promise<void> => {
+  if (table === 'transactions') {
+    if (eventType === 'DELETE' && oldRow?.id) {
+      await deleteTransactionFromCache(String(oldRow.id));
+    } else if (newRow?.id) {
+      await cacheWriteTransactions(userId, [newRow as RawTransactionRow]);
+    }
+  } else if (table === 'downloaders') {
+    if (eventType === 'DELETE' && oldRow?.date && oldRow?.source_app) {
+      await deleteDownloaderFromCache(String(oldRow.date), String(oldRow.source_app));
+    } else if (newRow?.date && newRow?.source_app) {
+      await cacheWriteDownloaders(userId, [newRow as RawDownloaderRow]);
+    }
+  }
+};
+
+/**
+ * Clear cache — dipanggil saat user upload Excel baru (replace mode)
+ * untuk menghindari race kondisi cache vs DB.
+ */
+export const clearLocalCache = (): Promise<void> => clearCache();
 
 // ---------- Quick overview stats (server-side aggregated) ----------
 //
