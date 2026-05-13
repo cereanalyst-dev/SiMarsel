@@ -59,20 +59,8 @@ export const TopRankCarousel = ({ products, promoEntries }: Props) => {
           {slide.label}
         </Badge>
         <div className="flex items-center gap-2">
-          <Button
-            variant="white" size="sm"
-            onClick={() => setIdx((i) => (i - 1 + SLIDES.length) % SLIDES.length)}
-            aria-label="Sebelumnya"
-          >
-            ←
-          </Button>
-          <Button
-            variant="white" size="sm"
-            onClick={() => setIdx((i) => (i + 1) % SLIDES.length)}
-            aria-label="Berikutnya"
-          >
-            →
-          </Button>
+          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i - 1 + SLIDES.length) % SLIDES.length)} aria-label="Sebelumnya">←</Button>
+          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i + 1) % SLIDES.length)} aria-label="Berikutnya">→</Button>
         </div>
       </div>
 
@@ -89,28 +77,28 @@ export const TopRankCarousel = ({ products, promoEntries }: Props) => {
                 return (
                   <div key={p.name} className="flex-1 flex items-center gap-3 min-h-0">
                     <span
-                      className="w-11 h-11 flex items-center justify-center text-nb-black text-lg font-display flex-shrink-0 border-[2.5px] border-nb-black"
+                      className="w-12 h-12 flex items-center justify-center text-nb-black text-xl font-display flex-shrink-0 border-[2.5px] border-nb-black"
                       style={{ background: COLORS[i % COLORS.length] }}
                     >
                       {i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2 mb-1.5">
-                        <p className="text-base md:text-lg font-bold leading-tight line-clamp-2 break-words">
+                        <p className="text-lg md:text-xl font-bold leading-tight line-clamp-2 break-words">
                           {p.name}
                         </p>
-                        <span className="text-base md:text-lg font-display tabular-nums flex-shrink-0">
+                        <span className="text-lg md:text-xl font-display tabular-nums flex-shrink-0">
                           {formatCompactIDR(p.revenue)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 h-3 bg-white border-[2.5px] border-nb-black overflow-hidden">
+                        <div className="flex-1 h-3.5 bg-white border-[2.5px] border-nb-black overflow-hidden">
                           <div
                             className="h-full bg-nb-black"
                             style={{ width: `${clamp(pct, 0, 100)}%` }}
                           />
                         </div>
-                        <span className="text-sm font-bold tabular-nums text-nb-black/60 w-12 text-right">
+                        <span className="text-base font-bold tabular-nums text-nb-black/60 w-14 text-right">
                           {formatPercent(sharePct, 0)}
                         </span>
                       </div>
@@ -131,28 +119,28 @@ export const TopRankCarousel = ({ products, promoEntries }: Props) => {
                 return (
                   <div key={e.code} className="flex-1 flex items-center gap-3 min-h-0">
                     <span
-                      className="w-11 h-11 flex items-center justify-center text-nb-black text-lg font-display flex-shrink-0 border-[2.5px] border-nb-black"
+                      className="w-12 h-12 flex items-center justify-center text-nb-black text-xl font-display flex-shrink-0 border-[2.5px] border-nb-black"
                       style={{ background: COLORS[i % COLORS.length] }}
                     >
                       {i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2 mb-1.5">
-                        <p className="font-display text-base md:text-lg leading-tight truncate" title={e.code}>
+                        <p className="font-display text-lg md:text-xl leading-tight truncate" title={e.code}>
                           {e.code}
                         </p>
-                        <span className="text-base md:text-lg font-display tabular-nums flex-shrink-0">
+                        <span className="text-lg md:text-xl font-display tabular-nums flex-shrink-0">
                           {formatNumber(e.count)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 h-3 bg-white border-[2.5px] border-nb-black overflow-hidden">
+                        <div className="flex-1 h-3.5 bg-white border-[2.5px] border-nb-black overflow-hidden">
                           <div
                             className="h-full bg-nb-black"
                             style={{ width: `${clamp(pct, 0, 100)}%` }}
                           />
                         </div>
-                        <span className="text-sm font-bold tabular-nums text-nb-black/60 w-12 text-right">
+                        <span className="text-base font-bold tabular-nums text-nb-black/60 w-14 text-right">
                           {formatPercent(sharePct, 0)}
                         </span>
                       </div>

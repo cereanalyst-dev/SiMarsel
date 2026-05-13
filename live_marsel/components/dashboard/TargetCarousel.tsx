@@ -61,20 +61,8 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
           <h3 className="font-display text-3xl md:text-4xl tracking-tight">{block.label}</h3>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="white" size="sm"
-            onClick={() => setIdx((i) => (i - 1 + blocks.length) % blocks.length)}
-            aria-label="Sebelumnya"
-          >
-            ←
-          </Button>
-          <Button
-            variant="white" size="sm"
-            onClick={() => setIdx((i) => (i + 1) % blocks.length)}
-            aria-label="Berikutnya"
-          >
-            →
-          </Button>
+          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i - 1 + blocks.length) % blocks.length)} aria-label="Sebelumnya">←</Button>
+          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i + 1) % blocks.length)} aria-label="Berikutnya">→</Button>
         </div>
       </div>
 
@@ -104,28 +92,26 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
             const pct = clamp(app.pct, 0, 999);
             return (
               <div key={app.app} className="flex items-center gap-3 py-2">
-                {/* Rank */}
-                <span className="w-9 h-9 flex items-center justify-center bg-nb-black text-white text-base font-display flex-shrink-0">
+                <span className="w-10 h-10 flex items-center justify-center bg-nb-black text-white text-lg font-display flex-shrink-0">
                   {i + 1}
                 </span>
-                {/* Name + values */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-2 mb-1.5">
-                    <span className="font-display text-lg md:text-xl truncate">
+                    <span className="font-display text-xl md:text-2xl truncate">
                       {titleCase(app.app)}
                     </span>
-                    <span className="text-base md:text-lg font-display tabular-nums flex-shrink-0">
+                    <span className="text-lg md:text-xl font-display tabular-nums flex-shrink-0">
                       {fmt(app.value, block.unit)}
                     </span>
                   </div>
-                  <div className="h-3 bg-white border-[2.5px] border-nb-black overflow-hidden">
+                  <div className="h-3.5 bg-white border-[2.5px] border-nb-black overflow-hidden">
                     <div
                       className={`h-full ${COLOR_BY_PCT(pct)} transition-all duration-300`}
                       style={{ width: `${clamp(pct, 0, 100)}%` }}
                     />
                   </div>
                 </div>
-                <span className="text-base font-bold tabular-nums w-16 text-right flex-shrink-0">
+                <span className="text-lg font-bold tabular-nums w-16 text-right flex-shrink-0">
                   {hasTarget && app.target > 0 ? formatPercent(pct, 0) : '—'}
                 </span>
               </div>

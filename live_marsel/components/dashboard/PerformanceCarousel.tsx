@@ -87,8 +87,8 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
         </div>
         <div className="flex items-center gap-2 md:gap-3">
           <div className="flex flex-col items-end leading-tight">
-            <span className="text-xs md:text-sm font-display uppercase tracking-wider text-nb-black/60">Total Bulan Ini</span>
-            <span className="text-xl md:text-2xl font-display tabular-nums">
+            <span className="text-sm md:text-base font-display uppercase tracking-wider text-nb-black/60">Total Bulan Ini</span>
+            <span className="text-3xl md:text-4xl xl:text-5xl font-display tabular-nums">
               {fmt(totalValue, slide.unit)}
             </span>
           </div>
@@ -121,17 +121,17 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
               <CartesianGrid strokeDasharray="3 3" stroke="#0A0A0A" strokeOpacity={0.1} vertical={false} />
               <XAxis
                 dataKey="day"
-                tick={{ fontSize: 13, fontWeight: 800, fill: '#0A0A0A' }}
+                tick={{ fontSize: 16, fontWeight: 800, fill: '#0A0A0A' }}
                 stroke="#0A0A0A"
                 strokeWidth={2}
               />
               <YAxis
                 domain={[0, yMax]}
-                tick={{ fontSize: 12, fontWeight: 800, fill: '#0A0A0A' }}
+                tick={{ fontSize: 14, fontWeight: 800, fill: '#0A0A0A' }}
                 stroke="#0A0A0A"
                 strokeWidth={2}
                 tickFormatter={(v: any) => fmt(v, slide.unit)}
-                width={80}
+                width={90}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(10,10,10,0.05)' }}
@@ -147,7 +147,7 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
                   label={{
                     value: `Target ${fmt(target, slide.unit)}`,
                     position: 'insideTopRight',
-                    fontSize: 13,
+                    fontSize: 16,
                     fontWeight: 800,
                     fill: '#0A0A0A',
                   }}
@@ -167,7 +167,7 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
                   dataKey="value"
                   position="top"
                   formatter={(v: any) => fmt(v, slide.unit)}
-                  style={{ fontSize: 12, fontWeight: 800, fill: '#0A0A0A' }}
+                  style={{ fontSize: 15, fontWeight: 800, fill: '#0A0A0A' }}
                 />
               </Bar>
             </BarChart>

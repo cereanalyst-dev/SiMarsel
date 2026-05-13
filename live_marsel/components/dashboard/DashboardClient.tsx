@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   formatCompactIDR, formatNumber, formatPercent,
@@ -16,9 +17,6 @@ import { TargetCarousel } from './TargetCarousel';
 import { TopRankCarousel } from './TopRankCarousel';
 import { Badge } from '@/components/ui/Badge';
 
-// =============================================================
-// Types
-// =============================================================
 interface Props {
   initialTransactions: Transaction[];
   initialDownloads: Download[];
@@ -26,13 +24,9 @@ interface Props {
   period: { year: number; month: number };
 }
 
-// Caps untuk hindari memory blow-up dari realtime burst
 const TRX_CAP = 5000;
 const DL_CAP  = 730;
 
-// =============================================================
-// Component
-// =============================================================
 export const DashboardClient = ({
   initialTransactions, initialDownloads, initialTargets, period,
 }: Props) => {
@@ -40,27 +34,39 @@ export const DashboardClient = ({
   const [downloads, setDownloads] = useState<Download[]>(initialDownloads);
   const [targets] = useState<Target[]>(initialTargets);
 
-  // Realtime subscribe
+  // router.refresh() debounced — biar YearlyKpi + target_config juga ikut update
+  // tanpa user refresh manual. Monthly data sudah instant via setState; ini
+  // re-run SSR di background buat update yearly totals.
+  const router = useRouter();
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefresh = () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => router.refresh(), 5000);
+  };
+
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel('dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
         setTransactions((prev) => mergeRow<Transaction>(prev, payload as unknown as RealtimePayload<Transaction>, 'trx_id', TRX_CAP));
+        scheduleRefresh();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'downloaders' }, (payload) => {
         setDownloads((prev) => mergeDownload(prev, payload as unknown as RealtimePayload<Download>, DL_CAP));
+        scheduleRefresh();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'target_config' }, () => {
-        // Targets kompleks (ada year_month filter) — refetch sederhana via reload
+        scheduleRefresh();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ============================================================
-  // Period range filter
-  // ============================================================
   const range = useMemo(() => monthRangeJakarta(period.year, period.month), [period.year, period.month]);
 
   const trxInRange = useMemo(() => {
@@ -89,15 +95,11 @@ export const DashboardClient = ({
     return map;
   }, [targets]);
 
-  // ============================================================
-  // Per-app aggregation
-  // ============================================================
   const perApp = useMemo<AppAggregate[]>(() => {
     const acc = new Map<string, {
       sales: number; trxCount: number; downloaders: number;
       emails: Set<string>;
     }>();
-
     trxInRange.forEach((t) => {
       const app = normalizeApp(t.source_app || appFromTrxId(t.trx_id));
       if (!app) return;
@@ -107,7 +109,6 @@ export const DashboardClient = ({
       if (t.email) cur.emails.add(t.email.trim().toLowerCase());
       acc.set(app, cur);
     });
-
     downloadsInRange.forEach((d) => {
       const app = normalizeApp(d.source_app);
       if (!app) return;
@@ -115,21 +116,13 @@ export const DashboardClient = ({
       cur.downloaders += Number(d.count) || 0;
       acc.set(app, cur);
     });
-
     return Array.from(acc.entries()).map(([app, v]) => {
       const target = targetByApp.get(app) ?? null;
       const conversion = v.downloaders > 0 ? (v.trxCount / v.downloaders) * 100 : 0;
-      return {
-        app, sales: v.sales, trxCount: v.trxCount,
-        downloaders: v.downloaders, premium: v.emails.size,
-        conversion, target,
-      };
+      return { app, sales: v.sales, trxCount: v.trxCount, downloaders: v.downloaders, premium: v.emails.size, conversion, target };
     });
   }, [trxInRange, downloadsInRange, targetByApp]);
 
-  // ============================================================
-  // Totals
-  // ============================================================
   const totals = useMemo(() => {
     const totalSales = perApp.reduce((s, a) => s + a.sales, 0);
     const totalTrx = perApp.reduce((s, a) => s + a.trxCount, 0);
@@ -146,9 +139,6 @@ export const DashboardClient = ({
     };
   }, [perApp, trxInRange]);
 
-  // ============================================================
-  // Aggregate target
-  // ============================================================
   const aggregateTarget = useMemo(() => {
     const ts = Array.from(targetByApp.values());
     const sales = ts.reduce((s, t) => s + (Number(t.sales_target) || 0), 0);
@@ -168,21 +158,16 @@ export const DashboardClient = ({
     conversion:  aggregateTarget.conversion,
   }), [aggregateTarget, range.lastDay]);
 
-  // ============================================================
-  // Daily breakdown
-  // ============================================================
   const daily = useMemo<DailyPoint[]>(() => {
     const today = jakartaParts();
     const isCurrentMonth = today.year === period.year && today.month === period.month;
     const lastDayToShow = isCurrentMonth ? today.day : range.lastDay;
-
     const buckets: DailyPoint[] = Array.from({ length: lastDayToShow }, (_, i) => ({
       day: i + 1,
       date: `${period.year}-${String(period.month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
       sales: 0, trxCount: 0, downloaders: 0, premium: 0, conversion: 0,
     }));
     const emailsByDay: Map<number, Set<string>> = new Map();
-
     trxInRange.forEach((t) => {
       const d = t.transaction_date ?? t.payment_date ?? t.created_at;
       if (!d) return;
@@ -210,9 +195,6 @@ export const DashboardClient = ({
     return buckets;
   }, [trxInRange, downloadsInRange, period.year, period.month, range.lastDay]);
 
-  // ============================================================
-  // Top rank slices
-  // ============================================================
   const promoEntries = useMemo(() => {
     const acc = new Map<string, number>();
     trxInRange.forEach((t) => {
@@ -241,35 +223,13 @@ export const DashboardClient = ({
     return Array.from(acc.entries()).map(([name, v]) => ({ name, ...v }));
   }, [trxInRange]);
 
-  // ============================================================
-  // Per-app blocks for TargetCarousel
-  // ============================================================
   const blocks = useMemo<MetricBlock[]>(() => {
-    // Tampilkan SEMUA app (sort desc by value, no top-N slice)
     const sortDesc = <T extends { value: number }>(arr: T[]) =>
       arr.sort((a, b) => b.value - a.value);
-
-    const salesApps = perApp.map((a) => ({
-      app: a.app, value: a.sales,
-      target: a.target?.sales_target ?? 0,
-      pct: a.target?.sales_target ? (a.sales / a.target.sales_target) * 100 : 0,
-    }));
-    const dlApps = perApp.map((a) => ({
-      app: a.app, value: a.downloaders,
-      target: a.target?.downloader_target ?? 0,
-      pct: a.target?.downloader_target ? (a.downloaders / a.target.downloader_target) * 100 : 0,
-    }));
-    const premApps = perApp.map((a) => ({
-      app: a.app, value: a.premium,
-      target: a.target?.premium_user_target ?? 0,
-      pct: a.target?.premium_user_target ? (a.premium / a.target.premium_user_target) * 100 : 0,
-    }));
-    const convApps = perApp.map((a) => ({
-      app: a.app, value: a.conversion,
-      target: a.target?.conversion_target ?? 0,
-      pct: a.target?.conversion_target ? (a.conversion / a.target.conversion_target) * 100 : 0,
-    }));
-
+    const salesApps = perApp.map((a) => ({ app: a.app, value: a.sales, target: a.target?.sales_target ?? 0, pct: a.target?.sales_target ? (a.sales / a.target.sales_target) * 100 : 0 }));
+    const dlApps = perApp.map((a) => ({ app: a.app, value: a.downloaders, target: a.target?.downloader_target ?? 0, pct: a.target?.downloader_target ? (a.downloaders / a.target.downloader_target) * 100 : 0 }));
+    const premApps = perApp.map((a) => ({ app: a.app, value: a.premium, target: a.target?.premium_user_target ?? 0, pct: a.target?.premium_user_target ? (a.premium / a.target.premium_user_target) * 100 : 0 }));
+    const convApps = perApp.map((a) => ({ app: a.app, value: a.conversion, target: a.target?.conversion_target ?? 0, pct: a.target?.conversion_target ? (a.conversion / a.target.conversion_target) * 100 : 0 }));
     return [
       { key: 'sales', label: 'Sales', unit: 'rp', total: totals.sales, target: aggregateTarget.sales, apps: sortDesc(salesApps) },
       { key: 'downloaders', label: 'Downloader', unit: 'num', total: totals.downloaders, target: aggregateTarget.downloaders, apps: sortDesc(dlApps) },
@@ -280,23 +240,19 @@ export const DashboardClient = ({
 
   const hasTarget = aggregateTarget.sales > 0 || targetByApp.size > 0;
 
-  // ============================================================
-  // Render
-  // ============================================================
   return (
     <main className="max-w-screen mx-auto px-4 md:px-6 py-4 md:py-5 space-y-4 md:space-y-5">
-      {/* Period KPI section */}
       <section className="space-y-3 md:space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-wrap">
-            <Badge variant="black" className="!text-sm md:!text-base !px-3 !py-1.5">
+            <Badge variant="black" className="!text-base md:!text-lg !px-4 !py-2">
               Periode {period.year}
             </Badge>
-            <span className="text-[11px] md:text-xs font-display uppercase tracking-widest text-nb-black/60">
+            <span className="text-sm md:text-base font-display uppercase tracking-widest text-nb-black/60">
               Performa Bulan Berjalan
             </span>
           </div>
-          <Badge variant={hasTarget ? 'lime' : 'red'} className="!text-xs md:!text-sm !px-3 !py-1">
+          <Badge variant={hasTarget ? 'lime' : 'red'} className="!text-sm md:!text-base !px-3 !py-1.5">
             {hasTarget ? `${targetByApp.size} app punya target` : 'Belum ada target'}
           </Badge>
         </div>
@@ -309,28 +265,17 @@ export const DashboardClient = ({
         </div>
       </section>
 
-      {/* Layout 3 kolom equal height: Performa (6) | Pencapaian (3) | TopRank (3) */}
       <section className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4 items-stretch">
-        {/* Performa Harian — wider, left */}
         <div className="xl:col-span-6 flex">
           <PerformanceCarousel
             data={daily}
-            totals={{
-              sales: totals.sales,
-              downloaders: totals.downloaders,
-              premium: totals.premium,
-              conversion: totals.conversion,
-            }}
+            totals={{ sales: totals.sales, downloaders: totals.downloaders, premium: totals.premium, conversion: totals.conversion }}
             dailyTargets={dailyTargets}
           />
         </div>
-
-        {/* Pencapaian per App — semua app, scrollable */}
         <div className="xl:col-span-3 flex">
           <TargetCarousel blocks={blocks} hasTarget={hasTarget} />
         </div>
-
-        {/* Top Rank slider (TopProducts ↔ PromoCode) */}
         <div className="xl:col-span-3 flex">
           <TopRankCarousel products={topProducts} promoEntries={promoEntries} />
         </div>
@@ -339,9 +284,6 @@ export const DashboardClient = ({
   );
 };
 
-// =============================================================
-// Realtime helpers
-// =============================================================
 type RealtimePayload<T> = { eventType: string; new: T; old: T };
 
 function mergeRow<T>(
