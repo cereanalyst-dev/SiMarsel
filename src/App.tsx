@@ -391,16 +391,20 @@ export default function App() {
   useRealtimeTable({
     table: 'transactions',
     onChange: () => { void pullRawData(); },
-    debounceMs: 2000,
-    // Heartbeat 10 menit khusus tabel berat (288K baris) — biar gak refetch
-    // full setiap 3 menit yang bikin UI flicker + makan bandwidth.
-    heartbeatMs: 10 * 60 * 1000,
+    // Debounce 5 detik buat tabel besar — bulk insert dari n8n (mis. 100 row
+    // berturut-turut) cuma trigger 1 refetch, bukan 100x. Refetch 364K rows
+    // butuh ~30 detik, jadi terlalu sering refetch bikin UI ngelag.
+    debounceMs: 5000,
+    // Heartbeat 15 menit khusus tabel berat — refetch full 364K rows berat.
+    // Realtime tetap deliver event INSERT/UPDATE/DELETE, jadi heartbeat cuma
+    // safety-net buat catch event yang miss karena disconnect.
+    heartbeatMs: 15 * 60 * 1000,
   });
   useRealtimeTable({
     table: 'downloaders',
     onChange: () => { void pullRawData(); },
-    debounceMs: 2000,
-    heartbeatMs: 10 * 60 * 1000,
+    debounceMs: 5000,
+    heartbeatMs: 15 * 60 * 1000,
   });
 
 

@@ -168,13 +168,32 @@ export interface DataSet {
 const PAGE_SIZE = 1000;
 
 // Berapa request paralel sekaligus ke Supabase.
-// 16 = aggressive — HTTP/2 multiplex, browser support penuh. Reduce ke 8
-// kalau hit rate limit (rare karena Supabase free tier 200 req/sec).
-// Dengan 16 paralel × 1000 rows = 16K rows/round. 364K rows ~23 round
-// ~2.5 detik (vs ~5 detik dengan 8 paralel).
-const FETCH_CONCURRENCY = 16;
+// 8 = balanced — cukup cepet tapi gak stress Supabase / network user.
+// Naikkin ke 16 kalau yakin network kenceng & dataset < 100K. Turunin ke 4
+// kalau sering hit rate limit / connection error.
+// Untuk dataset 300K+ rows, 8 lebih reliable daripada 16 karena lebih sedikit
+// concurrent connections = lebih kecil chance random error.
+const FETCH_CONCURRENCY = 8;
+
+// Max retry per page sebelum nyerah. Mitigasi network blip / rate limit.
+// 4 attempts × backoff 1s/2s/3s/4s = max ~10s extra time per page yang bermasalah.
+const MAX_RETRY_PER_PAGE = 4;
+
+// Per-request timeout — guard kalau Supabase nge-hang.
+const PAGE_TIMEOUT_MS = 30_000;
 
 export type FetchProgressCallback = (loaded: number, label: string) => void;
+
+// Wrap supabase query dengan timeout — kalau pending > 30s anggap gagal.
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout ${ms}ms: ${label}`)), ms);
+    Promise.resolve(promise).then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
 
 async function fetchAllPages<T>(
   supabase: ReturnType<typeof getSupabase>,
@@ -194,8 +213,8 @@ async function fetchAllPages<T>(
   let nextPage = 0;
   let done = false;
 
-  // Retry helper — 2 attempts per page sebelum nyerah. Mitigasi network
-  // blip yang singkat (mis. wifi switch, 4G drop sebentar).
+  // Retry helper — max attempts per page sebelum nyerah. Mitigasi network
+  // blip yang singkat (mis. wifi switch, 4G drop sebentar) + rate limit.
   const fetchPageWithRetry = async (pageIdx: number, attempt = 0): Promise<{
     pageIdx: number;
     res: Awaited<ReturnType<ReturnType<ReturnType<typeof supabase.from>['select']>['range']>>;
@@ -209,10 +228,25 @@ async function fetchAllPages<T>(
     }
     const from = pageIdx * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
-    const res = await query.range(from, to);
-    if (res.error && attempt < 2) {
-      // Backoff 500ms × attempt+1 sebelum retry
-      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+    let res: Awaited<ReturnType<ReturnType<ReturnType<typeof supabase.from>['select']>['range']>>;
+    try {
+      res = await withTimeout(query.range(from, to), PAGE_TIMEOUT_MS, `${label} page ${pageIdx}`);
+    } catch (timeoutErr) {
+      // Build a synthetic error result so retry logic kicks in
+      res = {
+        data: null,
+        error: { message: (timeoutErr as Error).message, name: 'TimeoutError', details: '', hint: '', code: 'TIMEOUT' },
+        count: null,
+        status: 0,
+        statusText: 'Timeout',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
+    }
+    if (res.error && attempt < MAX_RETRY_PER_PAGE - 1) {
+      // Backoff 1s × attempt+1 sebelum retry (1s, 2s, 3s, 4s — max 10s)
+      const backoff = 1000 * (attempt + 1);
+      logger.warn(`⚠️ ${label} page ${pageIdx} retry ${attempt + 1}/${MAX_RETRY_PER_PAGE} after ${backoff}ms (${res.error.message})`);
+      await new Promise((r) => setTimeout(r, backoff));
       return fetchPageWithRetry(pageIdx, attempt + 1);
     }
     return { pageIdx, res };
