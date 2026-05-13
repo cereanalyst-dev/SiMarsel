@@ -17,6 +17,9 @@ import { TargetCarousel } from './TargetCarousel';
 import { TopRankCarousel } from './TopRankCarousel';
 import { Badge } from '@/components/ui/Badge';
 
+// =============================================================
+// Types
+// =============================================================
 interface Props {
   initialTransactions: Transaction[];
   initialDownloads: Download[];
@@ -24,9 +27,13 @@ interface Props {
   period: { year: number; month: number };
 }
 
+// Caps untuk hindari memory blow-up dari realtime burst
 const TRX_CAP = 5000;
 const DL_CAP  = 730;
 
+// =============================================================
+// Component
+// =============================================================
 export const DashboardClient = ({
   initialTransactions, initialDownloads, initialTargets, period,
 }: Props) => {
@@ -34,7 +41,7 @@ export const DashboardClient = ({
   const [downloads, setDownloads] = useState<Download[]>(initialDownloads);
   const [targets] = useState<Target[]>(initialTargets);
 
-  // router.refresh() debounced — yearly + target_config auto-update on realtime
+  // router.refresh() debounced — YearlyKpi + target_config auto-update on realtime
   const router = useRouter();
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleRefresh = () => {
@@ -42,25 +49,92 @@ export const DashboardClient = ({
     refreshTimerRef.current = setTimeout(() => router.refresh(), 5000);
   };
 
+  // Realtime subscribe — dengan stability features:
+  // - Auto-reconnect with exponential backoff on channel error/closed
+  // - Visibility change detector: refetch + verify channel saat tab balik aktif
+  // - Online event: refetch + reconnect saat network kembali
+  // - Heartbeat 3 menit: safety-net refetch
+  // Penting buat dashboard TV yang nyala 24/7 — WebSocket suka "zombie"
+  // setelah idle lama, ini paksa keep-alive.
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel('dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
-        setTransactions((prev) => mergeRow<Transaction>(prev, payload as unknown as RealtimePayload<Transaction>, 'trx_id', TRX_CAP));
-        scheduleRefresh();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'downloaders' }, (payload) => {
-        setDownloads((prev) => mergeDownload(prev, payload as unknown as RealtimePayload<Download>, DL_CAP));
-        scheduleRefresh();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'target_config' }, () => {
-        scheduleRefresh();
-      })
-      .subscribe();
+    let cancelled = false;
+    let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempt = 0;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+    const setupChannel = () => {
+      if (cancelled) return;
+      const channel = supabase
+        .channel('dashboard')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+          setTransactions((prev) => mergeRow<Transaction>(prev, payload as unknown as RealtimePayload<Transaction>, 'trx_id', TRX_CAP));
+          scheduleRefresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'downloaders' }, (payload) => {
+          setDownloads((prev) => mergeDownload(prev, payload as unknown as RealtimePayload<Download>, DL_CAP));
+          scheduleRefresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'target_config' }, () => {
+          scheduleRefresh();
+        })
+        .subscribe((s: string) => {
+          if (cancelled) return;
+          if (s === 'SUBSCRIBED') {
+            reconnectAttempt = 0;
+            router.refresh();
+          } else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') {
+            const delay = Math.min(30_000, 1000 * Math.pow(2, reconnectAttempt));
+            reconnectAttempt += 1;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => {
+              if (cancelled) return;
+              void supabase.removeChannel(channel);
+              setupChannel();
+            }, delay);
+          }
+        });
+      currentChannel = channel;
+    };
+
+    setupChannel();
+
+    heartbeatTimer = setInterval(() => {
+      if (!document.hidden) router.refresh();
+    }, 3 * 60 * 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh();
+        const chan = currentChannel as unknown as { state?: string } | null;
+        if (chan && chan.state && chan.state !== 'joined') {
+          if (currentChannel) void supabase.removeChannel(currentChannel);
+          setupChannel();
+        }
+      }
+    };
+
+    const handleOnline = () => {
+      router.refresh();
+      const chan = currentChannel as unknown as { state?: string } | null;
+      if (chan && chan.state && chan.state !== 'joined') {
+        if (currentChannel) void supabase.removeChannel(currentChannel);
+        setupChannel();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      if (currentChannel) void supabase.removeChannel(currentChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -222,7 +296,6 @@ export const DashboardClient = ({
     return Array.from(acc.entries()).map(([name, v]) => ({ name, ...v }));
   }, [trxInRange]);
 
-  // Top Payment Method — sum revenue per methode_name
   const paymentSlices = useMemo(() => {
     const acc = new Map<string, number>();
     trxInRange.forEach((t) => {
