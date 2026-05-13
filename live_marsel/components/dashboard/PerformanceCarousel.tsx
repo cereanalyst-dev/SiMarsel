@@ -73,79 +73,75 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
   return (
     <Card
       variant="paper"
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-3 h-full w-full"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
+      {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-3">
-          <Badge variant="black">Performa Harian</Badge>
-          <h3 className="font-display text-xl md:text-2xl tracking-tight">
+          <Badge variant="black" className="!text-base md:!text-lg !px-3 !py-1.5">Performa Harian</Badge>
+          <h3 className="font-display text-3xl md:text-4xl tracking-tight">
             {slide.label}
           </h3>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold tabular-nums">
-            Total: {fmt(totalValue, slide.unit)}
-          </span>
-          <Button
-            variant="white" size="sm"
-            onClick={() => setIdx((i) => (i - 1 + SLIDES.length) % SLIDES.length)}
-            aria-label="Sebelumnya"
-          >
-            ←
-          </Button>
-          <Button
-            variant="white" size="sm"
-            onClick={() => setIdx((i) => (i + 1) % SLIDES.length)}
-            aria-label="Berikutnya"
-          >
-            →
-          </Button>
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex flex-col items-end leading-tight">
+            <span className="text-sm md:text-base font-display uppercase tracking-wider text-nb-black/60">Total Bulan Ini</span>
+            <span className="text-3xl md:text-4xl xl:text-5xl font-display tabular-nums">
+              {fmt(totalValue, slide.unit)}
+            </span>
+          </div>
+          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i - 1 + SLIDES.length) % SLIDES.length)} aria-label="Sebelumnya">←</Button>
+          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i + 1) % SLIDES.length)} aria-label="Berikutnya">→</Button>
         </div>
       </div>
 
-      <div className="h-72 md:h-80">
+      {/* Chart — fill remaining card height (min 320px) */}
+      <div className="flex-1 min-h-[320px]">
         {chartData.length === 0 ? (
           <div className="h-full flex items-center justify-center border-2 border-dashed border-nb-black/30">
             <p className="text-sm font-bold text-nb-black/50">Belum ada data periode ini</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 24, right: 16, left: 8, bottom: 8 }}>
+            <BarChart data={chartData} margin={{ top: 36, right: 24, left: 12, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#0A0A0A" strokeOpacity={0.1} vertical={false} />
               <XAxis
                 dataKey="day"
-                tick={{ fontSize: 11, fontWeight: 700, fill: '#0A0A0A' }}
+                tick={{ fontSize: 18, fontWeight: 800, fill: '#0A0A0A' }}
                 stroke="#0A0A0A"
                 strokeWidth={2}
+                height={36}
               />
               <YAxis
                 domain={[0, yMax]}
-                tick={{ fontSize: 10, fontWeight: 700, fill: '#0A0A0A' }}
+                tick={{ fontSize: 16, fontWeight: 800, fill: '#0A0A0A' }}
                 stroke="#0A0A0A"
                 strokeWidth={2}
-                tickFormatter={(v: number) => fmt(v, slide.unit)}
-                width={70}
+                tickFormatter={(v: any) => fmt(v, slide.unit)}
+                width={100}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(10,10,10,0.05)' }}
-                formatter={(v: number) => [fmt(v, slide.unit), slide.label]}
+                formatter={(v: any) => [fmt(v, slide.unit), slide.label]}
                 labelFormatter={(label) => `Hari ${label}`}
               />
               {target > 0 && (
                 <ReferenceLine
                   y={target}
-                  stroke="#0A0A0A"
-                  strokeDasharray="6 3"
-                  strokeWidth={2}
+                  stroke="#DC2626"
+                  strokeDasharray="12 6"
+                  strokeWidth={4}
                   label={{
-                    value: `Target ${fmt(target, slide.unit)}`,
+                    value: `▸ TARGET ${fmt(target, slide.unit)}`,
                     position: 'insideTopRight',
-                    fontSize: 11,
-                    fontWeight: 800,
-                    fill: '#0A0A0A',
+                    fontSize: 18,
+                    fontWeight: 900,
+                    fill: '#DC2626',
+                    offset: 8,
                   }}
+                  ifOverflow="extendDomain"
                 />
               )}
               <Bar dataKey="value" radius={0} stroke="#0A0A0A" strokeWidth={2}>
@@ -161,8 +157,8 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(v: number) => fmt(v, slide.unit)}
-                  style={{ fontSize: 10, fontWeight: 800, fill: '#0A0A0A' }}
+                  formatter={(v: any) => fmt(v, slide.unit)}
+                  style={{ fontSize: 17, fontWeight: 900, fill: '#0A0A0A' }}
                 />
               </Bar>
             </BarChart>
@@ -170,6 +166,7 @@ export const PerformanceCarousel = ({ data, totals, dailyTargets }: Props) => {
         )}
       </div>
 
+      {/* Slide indicator dots */}
       <div className="flex items-center justify-center gap-2 mt-1">
         {SLIDES.map((s, i) => (
           <button

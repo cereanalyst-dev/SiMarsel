@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   formatCompactIDR, formatNumber, formatPercent,
@@ -13,11 +14,12 @@ import type {
 import { KpiCard } from './KpiCard';
 import { PerformanceCarousel } from './PerformanceCarousel';
 import { TargetCarousel } from './TargetCarousel';
-import { PaymentMethodChart } from './PaymentMethodChart';
-import { PromoRank } from './PromoRank';
-import { TopProducts } from './TopProducts';
+import { TopRankCarousel } from './TopRankCarousel';
 import { Badge } from '@/components/ui/Badge';
 
+// =============================================================
+// Types
+// =============================================================
 interface Props {
   initialTransactions: Transaction[];
   initialDownloads: Download[];
@@ -25,9 +27,13 @@ interface Props {
   period: { year: number; month: number };
 }
 
+// Caps untuk hindari memory blow-up dari realtime burst
 const TRX_CAP = 5000;
 const DL_CAP  = 730;
 
+// =============================================================
+// Component
+// =============================================================
 export const DashboardClient = ({
   initialTransactions, initialDownloads, initialTargets, period,
 }: Props) => {
@@ -35,21 +41,102 @@ export const DashboardClient = ({
   const [downloads, setDownloads] = useState<Download[]>(initialDownloads);
   const [targets] = useState<Target[]>(initialTargets);
 
+  // router.refresh() debounced — YearlyKpi + target_config auto-update on realtime
+  const router = useRouter();
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefresh = () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => router.refresh(), 5000);
+  };
+
+  // Realtime subscribe — dengan stability features:
+  // - Auto-reconnect with exponential backoff on channel error/closed
+  // - Visibility change detector: refetch + verify channel saat tab balik aktif
+  // - Online event: refetch + reconnect saat network kembali
+  // - Heartbeat 3 menit: safety-net refetch
+  // Penting buat dashboard TV yang nyala 24/7 — WebSocket suka "zombie"
+  // setelah idle lama, ini paksa keep-alive.
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel('dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
-        setTransactions((prev) => mergeRow(prev, payload, 'trx_id', TRX_CAP));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'downloaders' }, (payload) => {
-        setDownloads((prev) => mergeDownload(prev, payload, DL_CAP));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'target_config' }, () => {
-        // target_config tergantung year_month — refetch lewat reload SSR
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    let cancelled = false;
+    let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempt = 0;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+    const setupChannel = () => {
+      if (cancelled) return;
+      const channel = supabase
+        .channel('dashboard')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+          setTransactions((prev) => mergeRow<Transaction>(prev, payload as unknown as RealtimePayload<Transaction>, 'trx_id', TRX_CAP));
+          scheduleRefresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'downloaders' }, (payload) => {
+          setDownloads((prev) => mergeDownload(prev, payload as unknown as RealtimePayload<Download>, DL_CAP));
+          scheduleRefresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'target_config' }, () => {
+          scheduleRefresh();
+        })
+        .subscribe((s: string) => {
+          if (cancelled) return;
+          if (s === 'SUBSCRIBED') {
+            reconnectAttempt = 0;
+            router.refresh();
+          } else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') {
+            const delay = Math.min(30_000, 1000 * Math.pow(2, reconnectAttempt));
+            reconnectAttempt += 1;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => {
+              if (cancelled) return;
+              void supabase.removeChannel(channel);
+              setupChannel();
+            }, delay);
+          }
+        });
+      currentChannel = channel;
+    };
+
+    setupChannel();
+
+    heartbeatTimer = setInterval(() => {
+      if (!document.hidden) router.refresh();
+    }, 3 * 60 * 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh();
+        const chan = currentChannel as unknown as { state?: string } | null;
+        if (chan && chan.state && chan.state !== 'joined') {
+          if (currentChannel) void supabase.removeChannel(currentChannel);
+          setupChannel();
+        }
+      }
+    };
+
+    const handleOnline = () => {
+      router.refresh();
+      const chan = currentChannel as unknown as { state?: string } | null;
+      if (chan && chan.state && chan.state !== 'joined') {
+        if (currentChannel) void supabase.removeChannel(currentChannel);
+        setupChannel();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      cancelled = true;
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      if (currentChannel) void supabase.removeChannel(currentChannel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const range = useMemo(() => monthRangeJakarta(period.year, period.month), [period.year, period.month]);
@@ -104,11 +191,7 @@ export const DashboardClient = ({
     return Array.from(acc.entries()).map(([app, v]) => {
       const target = targetByApp.get(app) ?? null;
       const conversion = v.downloaders > 0 ? (v.trxCount / v.downloaders) * 100 : 0;
-      return {
-        app, sales: v.sales, trxCount: v.trxCount,
-        downloaders: v.downloaders, premium: v.emails.size,
-        conversion, target,
-      };
+      return { app, sales: v.sales, trxCount: v.trxCount, downloaders: v.downloaders, premium: v.emails.size, conversion, target };
     });
   }, [trxInRange, downloadsInRange, targetByApp]);
 
@@ -184,15 +267,7 @@ export const DashboardClient = ({
     return buckets;
   }, [trxInRange, downloadsInRange, period.year, period.month, range.lastDay]);
 
-  const paymentSlices = useMemo(() => {
-    const acc = new Map<string, number>();
-    trxInRange.forEach((t) => {
-      const k = (t.methode_name || 'Tidak Diketahui').trim();
-      acc.set(k, (acc.get(k) ?? 0) + (Number(t.revenue) || 0));
-    });
-    return Array.from(acc.entries()).map(([name, value]) => ({ name, value }));
-  }, [trxInRange]);
-
+  // Top rank slices
   const promoEntries = useMemo(() => {
     const acc = new Map<string, number>();
     trxInRange.forEach((t) => {
@@ -221,113 +296,81 @@ export const DashboardClient = ({
     return Array.from(acc.entries()).map(([name, v]) => ({ name, ...v }));
   }, [trxInRange]);
 
+  const paymentSlices = useMemo(() => {
+    const acc = new Map<string, number>();
+    trxInRange.forEach((t) => {
+      const k = (t.methode_name || 'Tidak Diketahui').trim();
+      acc.set(k, (acc.get(k) ?? 0) + (Number(t.revenue) || 0));
+    });
+    return Array.from(acc.entries()).map(([name, value]) => ({ name, value }));
+  }, [trxInRange]);
+
   const blocks = useMemo<MetricBlock[]>(() => {
-    const sortAndTake = <T extends { value: number }>(arr: T[]) =>
-      arr.sort((a, b) => b.value - a.value).slice(0, 8);
-    const salesApps = perApp.map((a) => ({
-      app: a.app, value: a.sales,
-      target: a.target?.sales_target ?? 0,
-      pct: a.target?.sales_target ? (a.sales / a.target.sales_target) * 100 : 0,
-    }));
-    const dlApps = perApp.map((a) => ({
-      app: a.app, value: a.downloaders,
-      target: a.target?.downloader_target ?? 0,
-      pct: a.target?.downloader_target ? (a.downloaders / a.target.downloader_target) * 100 : 0,
-    }));
-    const premApps = perApp.map((a) => ({
-      app: a.app, value: a.premium,
-      target: a.target?.premium_user_target ?? 0,
-      pct: a.target?.premium_user_target ? (a.premium / a.target.premium_user_target) * 100 : 0,
-    }));
-    const convApps = perApp.map((a) => ({
-      app: a.app, value: a.conversion,
-      target: a.target?.conversion_target ?? 0,
-      pct: a.target?.conversion_target ? (a.conversion / a.target.conversion_target) * 100 : 0,
-    }));
+    const sortDesc = <T extends { value: number }>(arr: T[]) =>
+      arr.sort((a, b) => b.value - a.value);
+    const salesApps = perApp.map((a) => ({ app: a.app, value: a.sales, target: a.target?.sales_target ?? 0, pct: a.target?.sales_target ? (a.sales / a.target.sales_target) * 100 : 0 }));
+    const dlApps = perApp.map((a) => ({ app: a.app, value: a.downloaders, target: a.target?.downloader_target ?? 0, pct: a.target?.downloader_target ? (a.downloaders / a.target.downloader_target) * 100 : 0 }));
+    const premApps = perApp.map((a) => ({ app: a.app, value: a.premium, target: a.target?.premium_user_target ?? 0, pct: a.target?.premium_user_target ? (a.premium / a.target.premium_user_target) * 100 : 0 }));
+    const convApps = perApp.map((a) => ({ app: a.app, value: a.conversion, target: a.target?.conversion_target ?? 0, pct: a.target?.conversion_target ? (a.conversion / a.target.conversion_target) * 100 : 0 }));
     return [
-      { key: 'sales', label: 'Sales', unit: 'rp',
-        total: totals.sales, target: aggregateTarget.sales,
-        apps: sortAndTake(salesApps) },
-      { key: 'downloaders', label: 'Downloader', unit: 'num',
-        total: totals.downloaders, target: aggregateTarget.downloaders,
-        apps: sortAndTake(dlApps) },
-      { key: 'premium', label: 'Premium', unit: 'num',
-        total: totals.premium, target: aggregateTarget.premium,
-        apps: sortAndTake(premApps) },
-      { key: 'conversion', label: 'Konversi', unit: 'pct',
-        total: totals.conversion, target: aggregateTarget.conversion,
-        apps: sortAndTake(convApps) },
+      { key: 'sales', label: 'Sales', unit: 'rp', total: totals.sales, target: aggregateTarget.sales, apps: sortDesc(salesApps) },
+      { key: 'downloaders', label: 'Downloader', unit: 'num', total: totals.downloaders, target: aggregateTarget.downloaders, apps: sortDesc(dlApps) },
+      { key: 'premium', label: 'Premium', unit: 'num', total: totals.premium, target: aggregateTarget.premium, apps: sortDesc(premApps) },
+      { key: 'conversion', label: 'Konversi', unit: 'pct', total: totals.conversion, target: aggregateTarget.conversion, apps: sortDesc(convApps) },
     ];
   }, [perApp, totals, aggregateTarget]);
 
   const hasTarget = aggregateTarget.sales > 0 || targetByApp.size > 0;
 
   return (
-    <main className="max-w-screen mx-auto px-4 md:px-6 py-4 space-y-4">
-      <section className="space-y-3">
-        <div className="flex items-baseline justify-between gap-2 flex-wrap">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[11px] md:text-xs font-display uppercase tracking-widest text-nb-black/60">
-              Periode
+    <main className="max-w-screen mx-auto px-4 md:px-6 py-4 md:py-5 space-y-4 md:space-y-5">
+      <section className="space-y-3 md:space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Badge variant="black" className="!text-base md:!text-lg !px-4 !py-2">
+              Periode {period.year}
+            </Badge>
+            <span className="text-sm md:text-base font-display uppercase tracking-widest text-nb-black/60">
+              Performa Bulan Berjalan
             </span>
-            <h2 className="font-display text-xl md:text-2xl tracking-tight">
-              Bulan Ini
-            </h2>
           </div>
-          <Badge variant={hasTarget ? 'lime' : 'red'}>
+          <Badge variant={hasTarget ? 'lime' : 'red'} className="!text-sm md:!text-base !px-3 !py-1.5">
             {hasTarget ? `${targetByApp.size} app punya target` : 'Belum ada target'}
           </Badge>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          <KpiCard label="Sales" value={formatCompactIDR(totals.sales)}
-            target={hasTarget ? formatCompactIDR(aggregateTarget.sales) : null}
-            pct={hasTarget && aggregateTarget.sales > 0 ? (totals.sales / aggregateTarget.sales) * 100 : null}
-            variant="yellow" />
-          <KpiCard label="Downloader" value={formatNumber(totals.downloaders)}
-            target={hasTarget ? formatNumber(aggregateTarget.downloaders) : null}
-            pct={hasTarget && aggregateTarget.downloaders > 0 ? (totals.downloaders / aggregateTarget.downloaders) * 100 : null}
-            variant="cyan" />
-          <KpiCard label="Premium" value={formatNumber(totals.premium)}
-            target={hasTarget ? formatNumber(aggregateTarget.premium) : null}
-            pct={hasTarget && aggregateTarget.premium > 0 ? (totals.premium / aggregateTarget.premium) * 100 : null}
-            variant="pink" />
-          <KpiCard label="Konversi" value={formatPercent(totals.conversion, 1)}
-            target={hasTarget ? formatPercent(aggregateTarget.conversion, 1) : null}
-            pct={hasTarget && aggregateTarget.conversion > 0 ? (totals.conversion / aggregateTarget.conversion) * 100 : null}
-            variant="lime" />
-          <KpiCard label="Avg Price" value={formatCompactIDR(totals.avgPrice)}
-            target={hasTarget ? formatCompactIDR(aggregateTarget.avgPrice) : null}
-            pct={hasTarget && aggregateTarget.avgPrice > 0 ? (totals.avgPrice / aggregateTarget.avgPrice) * 100 : null}
-            variant="purple" />
+          <KpiCard label="Sales" value={formatCompactIDR(totals.sales)} target={hasTarget ? formatCompactIDR(aggregateTarget.sales) : null} pct={hasTarget && aggregateTarget.sales > 0 ? (totals.sales / aggregateTarget.sales) * 100 : null} variant="yellow" />
+          <KpiCard label="Downloader" value={formatNumber(totals.downloaders)} target={hasTarget ? formatNumber(aggregateTarget.downloaders) : null} pct={hasTarget && aggregateTarget.downloaders > 0 ? (totals.downloaders / aggregateTarget.downloaders) * 100 : null} variant="cyan" />
+          <KpiCard label="Premium" value={formatNumber(totals.premium)} target={hasTarget ? formatNumber(aggregateTarget.premium) : null} pct={hasTarget && aggregateTarget.premium > 0 ? (totals.premium / aggregateTarget.premium) * 100 : null} variant="pink" />
+          <KpiCard label="Konversi" value={formatPercent(totals.conversion, 1)} target={hasTarget ? formatPercent(aggregateTarget.conversion, 1) : null} pct={hasTarget && aggregateTarget.conversion > 0 ? (totals.conversion / aggregateTarget.conversion) * 100 : null} variant="lime" />
+          <KpiCard label="Avg Price" value={formatCompactIDR(totals.avgPrice)} target={hasTarget ? formatCompactIDR(aggregateTarget.avgPrice) : null} pct={hasTarget && aggregateTarget.avgPrice > 0 ? (totals.avgPrice / aggregateTarget.avgPrice) * 100 : null} variant="purple" />
         </div>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <PerformanceCarousel
-          data={daily}
-          totals={{
-            sales: totals.sales,
-            downloaders: totals.downloaders,
-            premium: totals.premium,
-            conversion: totals.conversion,
-          }}
-          dailyTargets={dailyTargets}
-        />
-        <TargetCarousel blocks={blocks} hasTarget={hasTarget} />
-      </section>
-
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <PaymentMethodChart slices={paymentSlices} />
-        <PromoRank entries={promoEntries} />
-        <TopProducts products={topProducts} />
+      <section className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4 items-stretch">
+        <div className="xl:col-span-6 flex">
+          <PerformanceCarousel
+            data={daily}
+            totals={{ sales: totals.sales, downloaders: totals.downloaders, premium: totals.premium, conversion: totals.conversion }}
+            dailyTargets={dailyTargets}
+          />
+        </div>
+        <div className="xl:col-span-3 flex">
+          <TargetCarousel blocks={blocks} hasTarget={hasTarget} />
+        </div>
+        <div className="xl:col-span-3 flex">
+          <TopRankCarousel products={topProducts} promoEntries={promoEntries} paymentSlices={paymentSlices} />
+        </div>
       </section>
     </main>
   );
 };
 
-function mergeRow<T extends Record<string, unknown>>(
+type RealtimePayload<T> = { eventType: string; new: T; old: T };
+
+function mergeRow<T>(
   prev: T[],
-  payload: { eventType: string; new: T; old: T },
+  payload: RealtimePayload<T>,
   pk: keyof T,
   cap: number,
 ): T[] {
@@ -338,12 +381,13 @@ function mergeRow<T extends Record<string, unknown>>(
   if (!payload.new) return prev;
   const newKey = payload.new[pk];
   const filtered = prev.filter((r) => r[pk] !== newKey);
-  return [payload.new, ...filtered].slice(0, cap);
+  const next = [payload.new, ...filtered];
+  return next.slice(0, cap);
 }
 
 function mergeDownload(
   prev: Download[],
-  payload: { eventType: string; new: Download; old: Download },
+  payload: RealtimePayload<Download>,
   cap: number,
 ): Download[] {
   const matchKey = (a: Download, b: Download) =>

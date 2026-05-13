@@ -13,23 +13,24 @@ export const revalidate = 0;
 
 const PAGE_SIZE = 1000;
 const HARD_CAP  = 50000;
+const YEAR_HARD_CAP = 200000;  // year-wide fetch may be large
 
 interface PageProps {
   searchParams: Promise<{ period?: string }>;
 }
 
-async function paginate<T>(
-  makeQuery: () => {
-    range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }>;
-  },
-): Promise<T[]> {
+// =============================================================
+// Paginate helper — bypass Supabase 1000-row default cap
+// =============================================================
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function paginate<T>(makeQuery: () => any, cap = HARD_CAP): Promise<T[]> {
   const result: T[] = [];
   let from = 0;
-  while (result.length < HARD_CAP) {
+  while (result.length < cap) {
     const { data, error } = await makeQuery().range(from, from + PAGE_SIZE - 1);
     if (error || !data) break;
-    result.push(...data);
-    if (data.length < PAGE_SIZE) break;
+    result.push(...(data as T[]));
+    if ((data as T[]).length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
   return result;
@@ -43,10 +44,14 @@ export default async function Page({ searchParams }: PageProps) {
   const supabase = await createClient();
 
   const startDate = jakartaDateOnly(range.start);
+  // End exclusive — pakai last day of month
   const endDate = `${period.year}-${String(period.month).padStart(2, '0')}-${String(range.lastDay).padStart(2, '0')}`;
   const yearMonth = `${period.year}-${String(period.month).padStart(2, '0')}`;
+  const yearStart = `${period.year}-01-01`;
+  const yearEnd = `${period.year}-12-31`;
 
-  const [transactions, downloads, targetConfigs, yearTotalsRes] = await Promise.all([
+  // Fetch data parallel — current period + year-wide raw rows
+  const [transactions, downloads, targetConfigs, yearTrxRaw, yearDlRaw] = await Promise.all([
     paginate<Transaction>(() =>
       supabase
         .from('transactions')
@@ -63,16 +68,35 @@ export default async function Page({ searchParams }: PageProps) {
         .lte('date', endDate)
         .order('date', { ascending: false }),
     ),
+    // target_config — filter by year_month
     supabase
       .from('target_config')
       .select('*')
       .eq('year_month', yearMonth)
       .then(({ data }) => data ?? []),
-    supabase
-      .rpc('dashboard_year_totals', { year_param: period.year })
-      .single<YearTotals>(),
+    // Year-wide transactions: pakai SELECT minimal kolom buat hitung total
+    paginate<{ revenue: number | null; email: string | null }>(
+      () =>
+        supabase
+          .from('transactions')
+          .select('revenue, email')
+          .gte('transaction_date', yearStart)
+          .lte('transaction_date', yearEnd),
+      YEAR_HARD_CAP,
+    ),
+    // Year-wide downloaders: cuma count
+    paginate<{ count: number | null }>(
+      () =>
+        supabase
+          .from('downloaders')
+          .select('count')
+          .gte('date', yearStart)
+          .lte('date', yearEnd),
+      YEAR_HARD_CAP,
+    ),
   ]);
 
+  // Map target_config → Target FE shape
   const targets: Target[] = (targetConfigs as Array<{
     app_name?: string;
     source_app?: string;
@@ -96,7 +120,17 @@ export default async function Page({ searchParams }: PageProps) {
     avg_price_target: Number(t.avg_price ?? t.avg_price_target ?? 0),
   }));
 
-  const yearTotals: YearTotals | null = yearTotalsRes.data ?? null;
+  // Compute year totals — no RPC dependency, jadi gak butuh migration
+  const yearEmails = new Set<string>();
+  yearTrxRaw.forEach((t) => {
+    if (t.email) yearEmails.add(t.email.trim().toLowerCase());
+  });
+  const yearTotals: YearTotals = {
+    total_sales: yearTrxRaw.reduce((s, t) => s + (Number(t.revenue) || 0), 0),
+    total_trx: yearTrxRaw.length,
+    total_premium: yearEmails.size,
+    total_downloader: yearDlRaw.reduce((s, d) => s + (Number(d.count) || 0), 0),
+  };
 
   return (
     <>
