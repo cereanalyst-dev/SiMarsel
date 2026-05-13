@@ -194,23 +194,35 @@ async function fetchAllPages<T>(
   let nextPage = 0;
   let done = false;
 
+  // Retry helper — 2 attempts per page sebelum nyerah. Mitigasi network
+  // blip yang singkat (mis. wifi switch, 4G drop sebentar).
+  const fetchPageWithRetry = async (pageIdx: number, attempt = 0): Promise<{
+    pageIdx: number;
+    res: Awaited<ReturnType<ReturnType<ReturnType<typeof supabase.from>['select']>['range']>>;
+  }> => {
+    const query = supabase
+      .from(tableName)
+      .select('*')
+      .order(orderColumn, { ascending: true });
+    if (tableName === 'downloaders') {
+      query.order('source_app', { ascending: true });
+    }
+    const from = pageIdx * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const res = await query.range(from, to);
+    if (res.error && attempt < 2) {
+      // Backoff 500ms × attempt+1 sebelum retry
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      return fetchPageWithRetry(pageIdx, attempt + 1);
+    }
+    return { pageIdx, res };
+  };
+
   while (!done) {
-    // Build N request paralel sekaligus.
-    const batch = Array.from({ length: FETCH_CONCURRENCY }, (_, i) => {
-      const pageIdx = nextPage + i;
-      const query = supabase
-        .from(tableName)
-        .select('*')
-        .order(orderColumn, { ascending: true });
-
-      if (tableName === 'downloaders') {
-        query.order('source_app', { ascending: true });
-      }
-
-      const from = pageIdx * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-      return query.range(from, to).then((res) => ({ pageIdx, res }));
-    });
+    // Build N request paralel sekaligus (dengan retry per page).
+    const batch = Array.from({ length: FETCH_CONCURRENCY }, (_, i) =>
+      fetchPageWithRetry(nextPage + i),
+    );
 
     const results = await Promise.all(batch);
 
@@ -220,13 +232,13 @@ async function fetchAllPages<T>(
     for (const { pageIdx, res } of results) {
       const { data, error } = res;
       if (error) {
+        // Throw — JANGAN return partial. Caller (pullRawData) bakal catch
+        // dan KEEP state lama, jadi UI gak flicker dari 288K ke partial.
         logger.error(
-          `❌ Gagal fetch ${label} (page ${pageIdx}):`,
+          `❌ Gagal fetch ${label} (page ${pageIdx} setelah retry):`,
           error.message,
-          error,
         );
-        done = true;
-        break;
+        throw new Error(`Fetch ${label} gagal di page ${pageIdx}: ${error.message}`);
       }
       if (!data) continue;
       rows.push(...(data as T[]));

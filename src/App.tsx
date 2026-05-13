@@ -392,11 +392,15 @@ export default function App() {
     table: 'transactions',
     onChange: () => { void pullRawData(); },
     debounceMs: 2000,
+    // Heartbeat 10 menit khusus tabel berat (288K baris) — biar gak refetch
+    // full setiap 3 menit yang bikin UI flicker + makan bandwidth.
+    heartbeatMs: 10 * 60 * 1000,
   });
   useRealtimeTable({
     table: 'downloaders',
     onChange: () => { void pullRawData(); },
     debounceMs: 2000,
+    heartbeatMs: 10 * 60 * 1000,
   });
 
 
