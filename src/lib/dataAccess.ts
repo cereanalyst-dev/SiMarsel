@@ -30,6 +30,12 @@ import {
   SELECTED_APP_STORAGE_KEY,
 } from '../config/app.config';
 import { processDownloaders, processTransactions } from './dataProcessing';
+import {
+  saveSnapshot,
+  loadSnapshot,
+  clearSnapshot,
+  type SnapshotMeta,
+} from './cache/dataCache';
 
 // ---------- Apps (operational data) ----------
 
@@ -371,6 +377,208 @@ export const fetchDataFromSupabase = async (
 
   return { transactions, downloaders };
 };
+
+// ==============================================================
+// Quick DB stats — pakai buat verifikasi cache fresh-or-stale.
+// 1 query ringan (~50ms), bukan fetch full.
+// ==============================================================
+
+interface DbStats {
+  txCount: number;
+  dlCount: number;
+  txMaxUploaded: string | null;
+  dlMaxUploaded: string | null;
+}
+
+const fetchDbStats = async (): Promise<DbStats | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  try {
+    const [txCountRes, dlCountRes, txMaxRes, dlMaxRes] = await Promise.all([
+      supabase.from('transactions').select('id', { count: 'exact', head: true }),
+      supabase.from('downloaders').select('date', { count: 'exact', head: true }),
+      supabase.from('transactions').select('uploaded_at').order('uploaded_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('downloaders').select('uploaded_at').order('uploaded_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    return {
+      txCount: txCountRes.count ?? 0,
+      dlCount: dlCountRes.count ?? 0,
+      txMaxUploaded: (txMaxRes.data as { uploaded_at?: string } | null)?.uploaded_at ?? null,
+      dlMaxUploaded: (dlMaxRes.data as { uploaded_at?: string } | null)?.uploaded_at ?? null,
+    };
+  } catch (err) {
+    logger.warn('fetchDbStats failed:', err);
+    return null;
+  }
+};
+
+// ==============================================================
+// Load with cache verify
+// ==============================================================
+//
+// Strategy:
+// 1. Cache hit (snapshot exists for current user)
+//    → render cached data INSTANT
+//    → background: 1 ringan SQL query buat cek count+maxUpload
+//    → MATCH = cache fresh, gak refetch, gak setState lagi
+//    → MISMATCH = full refetch + update cache
+//
+// 2. Cache miss (first visit)
+//    → full fetch + save snapshot
+//
+// Caller pakai 2 callback:
+//   - onCachedRender: dipanggil sekali kalau ada cache → state diisi instant
+//   - onFreshFetch:   dipanggil kalau perlu full refetch (cache stale / miss)
+//
+// Catatan: tidak ada delta merge. Cache valid → state tetap, gak goyang.
+// Cache stale → full replace (jarang, cuma kalau DB beneran berubah saat
+// user offline).
+// ==============================================================
+
+export interface RawTxRow {
+  id: string;
+  uploaded_at?: string;
+  [k: string]: unknown;
+}
+
+export interface RawDlRow {
+  date: string;
+  source_app: string;
+  count?: number;
+  uploaded_at?: string;
+  [k: string]: unknown;
+}
+
+export interface CacheLoadResult {
+  fromCache: boolean;
+  transactions: Transaction[];
+  downloaders: Downloader[];
+}
+
+/**
+ * Load raw rows dari cache + process. Return null kalau cache kosong /
+ * milik user beda.
+ */
+export const loadFromCacheForUser = async (userId: string): Promise<CacheLoadResult | null> => {
+  const snap = await loadSnapshot<RawTxRow, RawDlRow>();
+  if (!snap || snap.meta.userId !== userId) return null;
+  if (snap.transactions.length === 0 && snap.downloaders.length === 0) return null;
+
+  const transactions = processTransactions(snap.transactions);
+  // wide-format conversion for downloaders
+  const dlByDate = new Map<string, Record<string, unknown>>();
+  snap.downloaders.forEach((r) => {
+    const existing = dlByDate.get(r.date) || { Tanggal: r.date };
+    existing[r.source_app] = r.count ?? 0;
+    dlByDate.set(r.date, existing);
+  });
+  const downloaders = processDownloaders(Array.from(dlByDate.values()));
+  logger.info(`⚡ [cache] hit: ${transactions.length} tx + ${downloaders.length} dl rendered instant`);
+  return { fromCache: true, transactions, downloaders };
+};
+
+/**
+ * Verifikasi: apakah cache snapshot match DB stats sekarang?
+ * Return:
+ *   - true  = cache fresh, gak perlu refetch
+ *   - false = cache stale (DB beda count atau ada upload lebih baru) → harus refetch
+ *   - null  = error / tidak bisa verify
+ */
+export const isCacheFresh = async (userId: string): Promise<boolean | null> => {
+  const snap = await loadSnapshot<RawTxRow, RawDlRow>();
+  if (!snap || snap.meta.userId !== userId) return false;
+
+  const dbStats = await fetchDbStats();
+  if (!dbStats) return null;
+
+  const meta = snap.meta;
+  const match =
+    dbStats.txCount === meta.txCount &&
+    dbStats.dlCount === meta.dlCount &&
+    dbStats.txMaxUploaded === meta.txMaxUploaded &&
+    dbStats.dlMaxUploaded === meta.dlMaxUploaded;
+
+  logger.info(
+    `[cache] verify: ${match ? 'FRESH ✓' : 'STALE ✗'} (db: tx=${dbStats.txCount} dl=${dbStats.dlCount} txMax=${dbStats.txMaxUploaded}; cache: tx=${meta.txCount} dl=${meta.dlCount} txMax=${meta.txMaxUploaded})`,
+  );
+  return match;
+};
+
+/**
+ * Fetch full dari Supabase + simpan ke cache dengan meta lengkap.
+ * Caller pakai ini kalau cache stale atau miss.
+ */
+export const fetchAndCache = async (
+  userId: string,
+  onProgress?: FetchProgressCallback,
+): Promise<DataSet | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const [txRows, dlRows] = await Promise.all([
+    fetchAllPages<RawTxRow>(supabase, 'transactions', 'transactions', onProgress),
+    fetchAllPages<RawDlRow>(supabase, 'downloaders', 'downloaders', onProgress),
+  ]);
+
+  // Process untuk return ke caller (state)
+  const transactions = processTransactions(txRows);
+  const dlByDate = new Map<string, Record<string, unknown>>();
+  dlRows.forEach((r) => {
+    const existing = dlByDate.get(r.date) || { Tanggal: r.date };
+    existing[r.source_app] = r.count ?? 0;
+    dlByDate.set(r.date, existing);
+  });
+  const downloaders = processDownloaders(Array.from(dlByDate.values()));
+
+  // Compute meta untuk cache verify ke depan
+  const txMax = txRows.reduce<string | null>(
+    (max, r) => !r.uploaded_at ? max : !max || r.uploaded_at > max ? r.uploaded_at : max,
+    null,
+  );
+  const dlMax = dlRows.reduce<string | null>(
+    (max, r) => !r.uploaded_at ? max : !max || r.uploaded_at > max ? r.uploaded_at : max,
+    null,
+  );
+  const meta: SnapshotMeta = {
+    userId,
+    txCount: txRows.length,
+    dlCount: dlRows.length,
+    txMaxUploaded: txMax,
+    dlMaxUploaded: dlMax,
+    savedAt: new Date().toISOString(),
+  };
+  // Tulis cache background (gak block caller)
+  void saveSnapshot(txRows, dlRows, meta);
+
+  return { transactions, downloaders };
+};
+
+/**
+ * Update cache meta setelah realtime event (mis. INSERT bikin count +1).
+ * Read snapshot, update meta sesuai delta, tulis ulang.
+ * Catatan: cache rows array TIDAK di-update — biar tetap simple. Cache
+ * jadi sedikit stale row-wise tapi count selalu update, jadi verify
+ * tetap akurat. Kalau user reload, cache stale → full refetch (1x).
+ *
+ * Kalau pengen super-fresh cache, lebih simple call `clearLocalDataCache()`
+ * setelah realtime event — next reload bakal full fetch.
+ */
+export const incrementCacheCount = async (
+  delta: { tx?: number; dl?: number; uploadedAt?: string },
+): Promise<void> => {
+  const snap = await loadSnapshot<RawTxRow, RawDlRow>();
+  if (!snap) return;
+  const meta = { ...snap.meta };
+  if (delta.tx) meta.txCount += delta.tx;
+  if (delta.dl) meta.dlCount += delta.dl;
+  if (delta.uploadedAt) {
+    if (!meta.txMaxUploaded || delta.uploadedAt > meta.txMaxUploaded) meta.txMaxUploaded = delta.uploadedAt;
+    if (!meta.dlMaxUploaded || delta.uploadedAt > meta.dlMaxUploaded) meta.dlMaxUploaded = delta.uploadedAt;
+  }
+  await saveSnapshot(snap.transactions, snap.downloaders, meta);
+};
+
+export const clearLocalDataCache = (): Promise<void> => clearSnapshot();
 
 // ---------- Quick overview stats (server-side aggregated) ----------
 //
