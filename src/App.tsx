@@ -22,10 +22,6 @@ import {
   uploadDownloadersToSupabase,
   uploadTransactionsToSupabase,
   type QuickOverviewStats,
-  loadCachedData,
-  syncDeltaFromSupabase,
-  handleRealtimeCacheUpdate,
-  clearLocalCache,
 } from './lib/dataAccess';
 import { processDownloaders, processTransactions } from './lib/dataProcessing';
 import { fetchPromoCodeRules } from './lib/promoCodeRulesClient';
@@ -213,13 +209,6 @@ export default function App() {
           );
         }
 
-        // Replace mode → clear IndexedDB cache supaya gak ada row stale dari
-        // data lama yang udah di-delete di DB.
-        if (replaceMode) {
-          await clearLocalCache();
-          logger.info('🗑️ Local cache cleared (replace mode upload)');
-        }
-
         logger.info('♻️ Upload sukses, fetching ulang dari Supabase…');
         const res = await fetchDataFromSupabase();
         if (res) {
@@ -291,29 +280,11 @@ export default function App() {
         if (active) setLoadingHeadline(false);
       }
 
-      // Stage 2a: cache load (INSTANT — ~1-2 detik buat 364K rows)
-      // → dashboard langsung pakai data lama, user gak nungguin.
+      // Stage 2: full fetch SEKALI dari Supabase. Setelah ini state stabil
+      // — gak ada periodic refetch. Update selanjutnya via realtime per-event
+      // (incremental: tambah/edit/hapus 1 row dari state).
       try {
-        const cached = await loadCachedData(userId);
-        if (!active) return;
-        if (cached.fromCache) {
-          setData(cached.transactions);
-          setDownloaderData(cached.downloaders);
-          // Loading raw selesai dari user perspective — UI sudah jalan.
-          setLoadingRawData(false);
-          logger.info(
-            `⚡ Cache hit: render ${cached.transactions.length} tx + ${cached.downloaders.length} dl rows instant`,
-          );
-        }
-      } catch (err) {
-        logger.warn('Cache load failed, fallback to full fetch:', err);
-      }
-
-      // Stage 2b: delta sync (background) — fetch row baru dari Supabase.
-      // First visit: full fetch + populate cache (~30s).
-      // Subsequent: cuma uploaded_at > lastSync = biasanya 0-100 rows (instant).
-      try {
-        const res = await syncDeltaFromSupabase(userId, (loaded, label) => {
+        const res = await fetchDataFromSupabase((loaded, label) => {
           if (!active) return;
           setFetchProgress((prev) => ({
             ...prev,
@@ -321,23 +292,20 @@ export default function App() {
           }));
         });
         if (!active) return;
-        if (res === null) {
-          setError(
-            'Supabase tidak bisa diakses. Cek .env.local (VITE_SUPABASE_URL / ANON_KEY).',
-          );
-        } else if (res.changed) {
+        if (res) {
           setData(res.transactions);
           setDownloaderData(res.downloaders);
           if (res.transactions.length === 0 && res.downloaders.length === 0 && !quickStats) {
             setError('Belum ada data di Supabase. Unggah file Excel di Settings.');
           }
+        } else {
+          setError(
+            'Supabase tidak bisa diakses. Cek .env.local (VITE_SUPABASE_URL / ANON_KEY).',
+          );
         }
       } catch (err) {
-        logger.error('Delta sync failed:', err);
-        // Cuma show error kalau cache juga kosong (first visit yang gagal).
-        if (data.length === 0) {
-          setError('Gagal memuat data. Buka DevTools Console untuk detail errornya.');
-        }
+        logger.error('Raw data load failed:', err);
+        setError('Gagal memuat data. Buka DevTools Console untuk detail errornya.');
       } finally {
         if (active) setLoadingRawData(false);
       }
@@ -405,48 +373,72 @@ export default function App() {
   });
   const realtimeLive = realtimeStatus === 'live';
 
-  // Realtime: transactions & downloaders dari n8n auto-insert.
-  // Pakai DELTA sync — cuma fetch row dengan uploaded_at > lastSync (biasanya
-  // < 1000 rows = 1 request, instant). Bukan refetch full 364K rows.
-  const pullRawData = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const res = await syncDeltaFromSupabase(userId);
-      if (res && res.changed) {
-        setData(res.transactions);
-        setDownloaderData(res.downloaders);
-        logger.info(`✅ Delta sync: +${res.added.tx} tx, +${res.added.dl} dl`);
-      }
-    } catch (err) {
-      logger.warn('Delta sync failed:', err);
-    }
-  }, [userId]);
-
-  // Realtime callback yang juga update IndexedDB cache.
-  // Catatan: useRealtimeTable saat ini tidak expose payload — jadi kita pakai
-  // pullRawData (delta sync) sebagai trigger, yang akan otomatis fetch row
-  // baru dari DB lalu write ke cache. Lebih reliable daripada coba apply
-  // payload langsung (kalau realtime event hilang, delta tetap dapet).
-  useRealtimeTable({
+  // Realtime: transactions & downloaders — INCREMENTAL update per event.
+  // - INSERT  → tambah row baru ke state (processed dulu via processTransactions)
+  // - UPDATE  → ganti row dengan id sama
+  // - DELETE  → hapus row dengan id sama
+  //
+  // GAK ada full refetch. Initial state stabil — cuma berubah saat ada
+  // event realtime dari Supabase (mis. n8n insert via webhook).
+  useRealtimeTable<Record<string, unknown>>({
     table: 'transactions',
-    onChange: () => { void pullRawData(); },
-    // Debounce 3 detik — delta sync ringan (1-2 request) jadi gak perlu lama.
-    debounceMs: 3000,
-    // Heartbeat 5 menit — sekarang ringan karena cuma delta, gak full refetch.
-    heartbeatMs: 5 * 60 * 1000,
-  });
-  useRealtimeTable({
-    table: 'downloaders',
-    onChange: () => { void pullRawData(); },
-    debounceMs: 3000,
-    heartbeatMs: 5 * 60 * 1000,
+    onEvent: (payload) => {
+      const ev = payload.eventType;
+      if (ev === 'DELETE') {
+        const oldId = (payload.old as { id?: string })?.id;
+        if (!oldId) return;
+        setData((prev) => prev.filter((r) => (r as { id?: string }).id !== oldId));
+        return;
+      }
+      // INSERT or UPDATE — proses single row, merge by id.
+      const newRow = payload.new;
+      if (!newRow || !(newRow as { id?: string }).id) return;
+      const processed = processTransactions([newRow])[0];
+      if (!processed) return;
+      setData((prev) => {
+        const idx = prev.findIndex((r) => (r as { id?: string }).id === (newRow as { id?: string }).id);
+        if (idx >= 0) {
+          // UPDATE — replace in place
+          const next = [...prev];
+          next[idx] = processed;
+          return next;
+        }
+        // INSERT — prepend (paling baru di depan biar konsisten urutan)
+        return [processed, ...prev];
+      });
+    },
   });
 
-  // Hindari unused-import warning di build kalau handleRealtimeCacheUpdate
-  // belum dipakai di hot path (cache di-update via pullRawData → delta fetch
-  // → cacheWriteTransactions). Helper tetap available kalau nanti switch ke
-  // payload-based incremental.
-  void handleRealtimeCacheUpdate;
+  useRealtimeTable<Record<string, unknown>>({
+    table: 'downloaders',
+    onEvent: (payload) => {
+      const ev = payload.eventType;
+      const newRow = payload.new as { date?: string; source_app?: string; count?: number } | null;
+      const oldRow = payload.old as { date?: string; source_app?: string } | null;
+
+      const matchKey = (a: Downloader, b: { date?: string; source_app?: string }) =>
+        (a as unknown as { date?: string; source_app?: string }).date === b.date &&
+        (a as unknown as { date?: string; source_app?: string }).source_app === b.source_app;
+
+      if (ev === 'DELETE' && oldRow?.date && oldRow?.source_app) {
+        setDownloaderData((prev) => prev.filter((r) => !matchKey(r, oldRow)));
+        return;
+      }
+      if (!newRow?.date || !newRow?.source_app) return;
+      // Convert single long-format row ke wide → process → ambil hasilnya.
+      const processed = processDownloaders([{ Tanggal: newRow.date, [newRow.source_app]: newRow.count ?? 0 }])[0];
+      if (!processed) return;
+      setDownloaderData((prev) => {
+        const idx = prev.findIndex((r) => matchKey(r, newRow));
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = processed;
+          return next;
+        }
+        return [...prev, processed];
+      });
+    },
+  });
 
 
   // Pull user-defined kode promo rules. Re-callable lewat reloadPromoRules()
