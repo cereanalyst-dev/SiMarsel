@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
-  formatCompactIDR, formatNumber, formatPercent,
+  formatIDR, formatNumber, formatPercent,
   normalizeApp, appFromTrxId, parsePromoCodes,
   jakartaDay, jakartaDateOnly, monthRangeJakarta, jakartaParts,
 } from '@/lib/utils';
@@ -17,9 +17,6 @@ import { TargetCarousel } from './TargetCarousel';
 import { TopRankCarousel } from './TopRankCarousel';
 import { Badge } from '@/components/ui/Badge';
 
-// =============================================================
-// Types
-// =============================================================
 interface Props {
   initialTransactions: Transaction[];
   initialDownloads: Download[];
@@ -27,13 +24,9 @@ interface Props {
   period: { year: number; month: number };
 }
 
-// Caps untuk hindari memory blow-up dari realtime burst
 const TRX_CAP = 5000;
 const DL_CAP  = 730;
 
-// =============================================================
-// Component
-// =============================================================
 export const DashboardClient = ({
   initialTransactions, initialDownloads, initialTargets, period,
 }: Props) => {
@@ -41,7 +34,6 @@ export const DashboardClient = ({
   const [downloads, setDownloads] = useState<Download[]>(initialDownloads);
   const [targets] = useState<Target[]>(initialTargets);
 
-  // router.refresh() debounced — YearlyKpi + target_config auto-update on realtime
   const router = useRouter();
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleRefresh = () => {
@@ -49,13 +41,6 @@ export const DashboardClient = ({
     refreshTimerRef.current = setTimeout(() => router.refresh(), 5000);
   };
 
-  // Realtime subscribe — dengan stability features:
-  // - Auto-reconnect with exponential backoff on channel error/closed
-  // - Visibility change detector: refetch + verify channel saat tab balik aktif
-  // - Online event: refetch + reconnect saat network kembali
-  // - Heartbeat 3 menit: safety-net refetch
-  // Penting buat dashboard TV yang nyala 24/7 — WebSocket suka "zombie"
-  // setelah idle lama, ini paksa keep-alive.
   useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
@@ -141,10 +126,11 @@ export const DashboardClient = ({
 
   const range = useMemo(() => monthRangeJakarta(period.year, period.month), [period.year, period.month]);
 
+  // Filter pakai payment_date dulu (sama kayak SiMarsel) supaya angka match.
   const trxInRange = useMemo(() => {
     const startStr = jakartaDateOnly(range.start);
     return transactions.filter((t) => {
-      const d = t.transaction_date ?? t.payment_date ?? t.created_at;
+      const d = t.payment_date ?? t.transaction_date ?? t.created_at;
       if (!d) return false;
       const ds = jakartaDateOnly(d);
       if (ds < startStr) return false;
@@ -191,7 +177,11 @@ export const DashboardClient = ({
     return Array.from(acc.entries()).map(([app, v]) => {
       const target = targetByApp.get(app) ?? null;
       const conversion = v.downloaders > 0 ? (v.trxCount / v.downloaders) * 100 : 0;
-      return { app, sales: v.sales, trxCount: v.trxCount, downloaders: v.downloaders, premium: v.emails.size, conversion, target };
+      return {
+        app, sales: v.sales, trxCount: v.trxCount,
+        downloaders: v.downloaders, premium: v.emails.size,
+        conversion, target,
+      };
     });
   }, [trxInRange, downloadsInRange, targetByApp]);
 
@@ -241,7 +231,7 @@ export const DashboardClient = ({
     }));
     const emailsByDay: Map<number, Set<string>> = new Map();
     trxInRange.forEach((t) => {
-      const d = t.transaction_date ?? t.payment_date ?? t.created_at;
+      const d = t.payment_date ?? t.transaction_date ?? t.created_at;
       if (!d) return;
       const day = jakartaDay(d);
       if (day < 1 || day > lastDayToShow) return;
@@ -267,7 +257,6 @@ export const DashboardClient = ({
     return buckets;
   }, [trxInRange, downloadsInRange, period.year, period.month, range.lastDay]);
 
-  // Top rank slices
   const promoEntries = useMemo(() => {
     const acc = new Map<string, number>();
     trxInRange.forEach((t) => {
@@ -327,23 +316,23 @@ export const DashboardClient = ({
       <section className="space-y-3 md:space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-wrap">
-            <Badge variant="black" className="!text-base md:!text-lg !px-4 !py-2">
+            <Badge variant="black" className="!text-sm md:!text-base !px-3 !py-1.5">
               Periode {period.year}
             </Badge>
-            <span className="text-sm md:text-base font-display uppercase tracking-widest text-nb-black/60">
+            <span className="text-[11px] md:text-xs font-display uppercase tracking-widest text-nb-black/60">
               Performa Bulan Berjalan
             </span>
           </div>
-          <Badge variant={hasTarget ? 'lime' : 'red'} className="!text-sm md:!text-base !px-3 !py-1.5">
+          <Badge variant={hasTarget ? 'lime' : 'red'} className="!text-xs md:!text-sm !px-3 !py-1">
             {hasTarget ? `${targetByApp.size} app punya target` : 'Belum ada target'}
           </Badge>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          <KpiCard label="Sales" value={formatCompactIDR(totals.sales)} target={hasTarget ? formatCompactIDR(aggregateTarget.sales) : null} pct={hasTarget && aggregateTarget.sales > 0 ? (totals.sales / aggregateTarget.sales) * 100 : null} variant="yellow" />
+          <KpiCard label="Sales" value={formatIDR(totals.sales)} target={hasTarget ? formatIDR(aggregateTarget.sales) : null} pct={hasTarget && aggregateTarget.sales > 0 ? (totals.sales / aggregateTarget.sales) * 100 : null} variant="yellow" />
           <KpiCard label="Downloader" value={formatNumber(totals.downloaders)} target={hasTarget ? formatNumber(aggregateTarget.downloaders) : null} pct={hasTarget && aggregateTarget.downloaders > 0 ? (totals.downloaders / aggregateTarget.downloaders) * 100 : null} variant="cyan" />
           <KpiCard label="Premium" value={formatNumber(totals.premium)} target={hasTarget ? formatNumber(aggregateTarget.premium) : null} pct={hasTarget && aggregateTarget.premium > 0 ? (totals.premium / aggregateTarget.premium) * 100 : null} variant="pink" />
           <KpiCard label="Konversi" value={formatPercent(totals.conversion, 1)} target={hasTarget ? formatPercent(aggregateTarget.conversion, 1) : null} pct={hasTarget && aggregateTarget.conversion > 0 ? (totals.conversion / aggregateTarget.conversion) * 100 : null} variant="lime" />
-          <KpiCard label="Avg Price" value={formatCompactIDR(totals.avgPrice)} target={hasTarget ? formatCompactIDR(aggregateTarget.avgPrice) : null} pct={hasTarget && aggregateTarget.avgPrice > 0 ? (totals.avgPrice / aggregateTarget.avgPrice) * 100 : null} variant="purple" />
+          <KpiCard label="Avg Price" value={formatIDR(totals.avgPrice)} target={hasTarget ? formatIDR(aggregateTarget.avgPrice) : null} pct={hasTarget && aggregateTarget.avgPrice > 0 ? (totals.avgPrice / aggregateTarget.avgPrice) * 100 : null} variant="purple" />
         </div>
       </section>
 

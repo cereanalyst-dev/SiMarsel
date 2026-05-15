@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { formatCompactIDR, formatNumber, formatPercent } from '@/lib/utils';
+import { formatIDR, formatNumber, formatPercent } from '@/lib/utils';
 import type { YearTotals } from '@/types/database';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 
 type Variant = 'yellow' | 'pink' | 'cyan' | 'lime' | 'purple';
 
+// Inline SVG icons — no extra deps, scales crisp at any size
 const ICONS: Record<string, React.ReactNode> = {
   sales: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-9 h-9 md:w-11 md:h-11">
@@ -90,11 +91,41 @@ export const YearlyKpi = ({ year, totals }: Props) => {
         </span>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
-        <BigStat label="Total Sales" value={formatCompactIDR(sales)} subtitle={`${formatNumber(trx)} transaksi`} variant="yellow" icon={ICONS.sales} />
-        <BigStat label="Total Downloader" value={formatNumber(dl)} subtitle="seluruh app, sepanjang tahun" variant="cyan" icon={ICONS.download} />
-        <BigStat label="Total Premium" value={formatNumber(prem)} subtitle="email unik yang transaksi" variant="pink" icon={ICONS.star} />
-        <BigStat label="Konversi" value={formatPercent(konversi, 1)} subtitle="trx ÷ downloader · setahun" variant="lime" icon={ICONS.target} />
-        <BigStat label="AOV" value={formatCompactIDR(aov)} subtitle="rata-rata nilai transaksi" variant="purple" icon={ICONS.trending} />
+        <BigStat
+          label="Total Sales"
+          value={formatIDR(sales)}
+          subtitle={`${formatNumber(trx)} transaksi`}
+          variant="yellow"
+          icon={ICONS.sales}
+        />
+        <BigStat
+          label="Total Downloader"
+          value={formatNumber(dl)}
+          subtitle="seluruh app, sepanjang tahun"
+          variant="cyan"
+          icon={ICONS.download}
+        />
+        <BigStat
+          label="Total Premium"
+          value={formatNumber(prem)}
+          subtitle="email unik yang transaksi"
+          variant="pink"
+          icon={ICONS.star}
+        />
+        <BigStat
+          label="Konversi"
+          value={formatPercent(konversi, 1)}
+          subtitle="trx ÷ downloader · setahun"
+          variant="lime"
+          icon={ICONS.target}
+        />
+        <BigStat
+          label="AOV"
+          value={formatIDR(aov)}
+          subtitle="rata-rata nilai transaksi"
+          variant="purple"
+          icon={ICONS.trending}
+        />
       </div>
     </section>
   );

@@ -50,15 +50,16 @@ export default async function Page({ searchParams }: PageProps) {
   const yearStart = `${period.year}-01-01`;
   const yearEnd = `${period.year}-12-31`;
 
+  // Filter pakai payment_date (sama kayak SiMarsel) supaya angka selalu match.
   // Fetch data parallel — current period + year-wide raw rows
   const [transactions, downloads, targetConfigs, yearTrxRaw, yearDlRaw] = await Promise.all([
     paginate<Transaction>(() =>
       supabase
         .from('transactions')
         .select('*')
-        .gte('transaction_date', startDate)
-        .lte('transaction_date', endDate)
-        .order('transaction_date', { ascending: false }),
+        .gte('payment_date', startDate)
+        .lte('payment_date', endDate)
+        .order('payment_date', { ascending: false }),
     ),
     paginate<Download>(() =>
       supabase
@@ -80,8 +81,8 @@ export default async function Page({ searchParams }: PageProps) {
         supabase
           .from('transactions')
           .select('revenue, email')
-          .gte('transaction_date', yearStart)
-          .lte('transaction_date', yearEnd),
+          .gte('payment_date', yearStart)
+          .lte('payment_date', yearEnd),
       YEAR_HARD_CAP,
     ),
     // Year-wide downloaders: cuma count
