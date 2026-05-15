@@ -31,13 +31,11 @@ import {
 } from '../config/app.config';
 import { processDownloaders, processTransactions } from './dataProcessing';
 import {
-  loadCachedDataset,
-  writeTransactions as cacheWriteTransactions,
-  writeDownloaders as cacheWriteDownloaders,
-  deleteTransactionFromCache,
-  deleteDownloaderFromCache,
-  clearCache,
-} from './cache/indexedDbCache';
+  saveSnapshot,
+  loadSnapshot,
+  clearSnapshot,
+  type SnapshotMeta,
+} from './cache/dataCache';
 
 // ---------- Apps (operational data) ----------
 
@@ -381,236 +379,206 @@ export const fetchDataFromSupabase = async (
 };
 
 // ==============================================================
-// Fetch dengan IndexedDB cache + delta sync
+// Quick DB stats — pakai buat verifikasi cache fresh-or-stale.
+// 1 query ringan (~50ms), bukan fetch full.
+// ==============================================================
+
+interface DbStats {
+  txCount: number;
+  dlCount: number;
+  txMaxUploaded: string | null;
+  dlMaxUploaded: string | null;
+}
+
+const fetchDbStats = async (): Promise<DbStats | null> => {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  try {
+    const [txCountRes, dlCountRes, txMaxRes, dlMaxRes] = await Promise.all([
+      supabase.from('transactions').select('id', { count: 'exact', head: true }),
+      supabase.from('downloaders').select('date', { count: 'exact', head: true }),
+      supabase.from('transactions').select('uploaded_at').order('uploaded_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('downloaders').select('uploaded_at').order('uploaded_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    return {
+      txCount: txCountRes.count ?? 0,
+      dlCount: dlCountRes.count ?? 0,
+      txMaxUploaded: (txMaxRes.data as { uploaded_at?: string } | null)?.uploaded_at ?? null,
+      dlMaxUploaded: (dlMaxRes.data as { uploaded_at?: string } | null)?.uploaded_at ?? null,
+    };
+  } catch (err) {
+    logger.warn('fetchDbStats failed:', err);
+    return null;
+  }
+};
+
+// ==============================================================
+// Load with cache verify
 // ==============================================================
 //
 // Strategy:
-// 1. Load cached rows dari IndexedDB → return INSTANT (~1-2 detik buat 364K rows)
-// 2. Caller render dashboard pakai cached data
-// 3. Background: fetch rows yang uploaded_at > lastSync → cuma data baru
-// 4. Merge new rows + write ke cache + update lastSync
-// 5. Caller dapet notifikasi (onSyncComplete) buat refresh UI dengan data baru
+// 1. Cache hit (snapshot exists for current user)
+//    → render cached data INSTANT
+//    → background: 1 ringan SQL query buat cek count+maxUpload
+//    → MATCH = cache fresh, gak refetch, gak setState lagi
+//    → MISMATCH = full refetch + update cache
 //
-// First visit (cache kosong): jalanin full fetch + populate cache.
-// Subsequent visits: 5-10x lebih cepet karena cuma delta yang dari network.
+// 2. Cache miss (first visit)
+//    → full fetch + save snapshot
+//
+// Caller pakai 2 callback:
+//   - onCachedRender: dipanggil sekali kalau ada cache → state diisi instant
+//   - onFreshFetch:   dipanggil kalau perlu full refetch (cache stale / miss)
+//
+// Catatan: tidak ada delta merge. Cache valid → state tetap, gak goyang.
+// Cache stale → full replace (jarang, cuma kalau DB beneran berubah saat
+// user offline).
 // ==============================================================
 
-interface RawTransactionRow {
-  id?: string;
+export interface RawTxRow {
+  id: string;
   uploaded_at?: string;
   [k: string]: unknown;
 }
 
-interface RawDownloaderRow {
+export interface RawDlRow {
   date: string;
   source_app: string;
-  count: number;
+  count?: number;
   uploaded_at?: string;
   [k: string]: unknown;
 }
 
 export interface CacheLoadResult {
-  fromCache: boolean;            // true kalau initial render pakai cache
+  fromCache: boolean;
   transactions: Transaction[];
   downloaders: Downloader[];
 }
 
-export interface DeltaSyncResult {
-  changed: boolean;              // true kalau ada data baru / berubah
-  transactions: Transaction[];   // full set after merge
-  downloaders: Downloader[];     // full set after merge
-  added: { tx: number; dl: number };
-}
-
 /**
- * Load cached data dari IndexedDB. Instant render.
- * Return empty arrays kalau cache kosong.
+ * Load raw rows dari cache + process. Return null kalau cache kosong /
+ * milik user beda.
  */
-export const loadCachedData = async (userId: string): Promise<CacheLoadResult> => {
-  const cached = await loadCachedDataset<RawTransactionRow, RawDownloaderRow>(userId);
-  if (cached.transactions.length === 0 && cached.downloaders.length === 0) {
-    return { fromCache: false, transactions: [], downloaders: [] };
-  }
-  const transactions = processTransactions(cached.transactions);
-  // wide format conversion for downloaders
+export const loadFromCacheForUser = async (userId: string): Promise<CacheLoadResult | null> => {
+  const snap = await loadSnapshot<RawTxRow, RawDlRow>();
+  if (!snap || snap.meta.userId !== userId) return null;
+  if (snap.transactions.length === 0 && snap.downloaders.length === 0) return null;
+
+  const transactions = processTransactions(snap.transactions);
+  // wide-format conversion for downloaders
   const dlByDate = new Map<string, Record<string, unknown>>();
-  cached.downloaders.forEach((r) => {
+  snap.downloaders.forEach((r) => {
     const existing = dlByDate.get(r.date) || { Tanggal: r.date };
-    existing[r.source_app] = r.count;
+    existing[r.source_app] = r.count ?? 0;
     dlByDate.set(r.date, existing);
   });
   const downloaders = processDownloaders(Array.from(dlByDate.values()));
-  logger.info(
-    `[cache] loaded ${transactions.length} tx + ${downloaders.length} dl rows from IndexedDB`,
-  );
+  logger.info(`⚡ [cache] hit: ${transactions.length} tx + ${downloaders.length} dl rendered instant`);
   return { fromCache: true, transactions, downloaders };
 };
 
 /**
- * Sync delta: fetch rows dengan uploaded_at > lastSync. Kalau lastSync null
- * (first visit) → fetch full dataset.
- *
- * Return merged full dataset (cache + new rows) untuk replace state.
+ * Verifikasi: apakah cache snapshot match DB stats sekarang?
+ * Return:
+ *   - true  = cache fresh, gak perlu refetch
+ *   - false = cache stale (DB beda count atau ada upload lebih baru) → harus refetch
+ *   - null  = error / tidak bisa verify
  */
-export const syncDeltaFromSupabase = async (
+export const isCacheFresh = async (userId: string): Promise<boolean | null> => {
+  const snap = await loadSnapshot<RawTxRow, RawDlRow>();
+  if (!snap || snap.meta.userId !== userId) return false;
+
+  const dbStats = await fetchDbStats();
+  if (!dbStats) return null;
+
+  const meta = snap.meta;
+  const match =
+    dbStats.txCount === meta.txCount &&
+    dbStats.dlCount === meta.dlCount &&
+    dbStats.txMaxUploaded === meta.txMaxUploaded &&
+    dbStats.dlMaxUploaded === meta.dlMaxUploaded;
+
+  logger.info(
+    `[cache] verify: ${match ? 'FRESH ✓' : 'STALE ✗'} (db: tx=${dbStats.txCount} dl=${dbStats.dlCount} txMax=${dbStats.txMaxUploaded}; cache: tx=${meta.txCount} dl=${meta.dlCount} txMax=${meta.txMaxUploaded})`,
+  );
+  return match;
+};
+
+/**
+ * Fetch full dari Supabase + simpan ke cache dengan meta lengkap.
+ * Caller pakai ini kalau cache stale atau miss.
+ */
+export const fetchAndCache = async (
   userId: string,
   onProgress?: FetchProgressCallback,
-): Promise<DeltaSyncResult | null> => {
+): Promise<DataSet | null> => {
   const supabase = getSupabase();
-  if (!supabase) {
-    logger.warn('Supabase belum terkonfigurasi');
-    return null;
-  }
+  if (!supabase) return null;
 
-  const cached = await loadCachedDataset<RawTransactionRow, RawDownloaderRow>(userId);
-  const isFirstVisit = cached.lastSyncTx === null;
-
-  if (isFirstVisit) {
-    // Full fetch — sama kayak fetchDataFromSupabase, tapi tulis ke cache juga
-    logger.info('[cache] first visit detected — full fetch');
-    const [txRows, dlRows] = await Promise.all([
-      fetchAllPages<RawTransactionRow>(supabase, 'transactions', 'transactions', onProgress),
-      fetchAllPages<RawDownloaderRow>(supabase, 'downloaders', 'downloaders', onProgress),
-    ]);
-    // Tulis ke cache (background)
-    void cacheWriteTransactions(userId, txRows);
-    void cacheWriteDownloaders(userId, dlRows);
-
-    const transactions = processTransactions(txRows);
-    const dlByDate = new Map<string, Record<string, unknown>>();
-    dlRows.forEach((r) => {
-      const existing = dlByDate.get(r.date) || { Tanggal: r.date };
-      existing[r.source_app] = r.count;
-      dlByDate.set(r.date, existing);
-    });
-    const downloaders = processDownloaders(Array.from(dlByDate.values()));
-
-    return {
-      changed: true,
-      transactions,
-      downloaders,
-      added: { tx: txRows.length, dl: dlRows.length },
-    };
-  }
-
-  // Delta fetch — cuma row dengan uploaded_at > lastSync
-  logger.info(
-    `[cache] delta sync — tx sejak ${cached.lastSyncTx}, dl sejak ${cached.lastSyncDl}`,
-  );
-
-  const [newTx, newDl] = await Promise.all([
-    fetchSinceUploadedAt<RawTransactionRow>(supabase, 'transactions', cached.lastSyncTx),
-    fetchSinceUploadedAt<RawDownloaderRow>(supabase, 'downloaders', cached.lastSyncDl),
+  const [txRows, dlRows] = await Promise.all([
+    fetchAllPages<RawTxRow>(supabase, 'transactions', 'transactions', onProgress),
+    fetchAllPages<RawDlRow>(supabase, 'downloaders', 'downloaders', onProgress),
   ]);
 
-  if (newTx.length === 0 && newDl.length === 0) {
-    // Tidak ada perubahan — return cached as-is (caller sudah render dari cache)
-    return { changed: false, transactions: [], downloaders: [], added: { tx: 0, dl: 0 } };
-  }
-
-  // Tulis delta ke cache (merge by primary key)
-  void cacheWriteTransactions(userId, newTx);
-  void cacheWriteDownloaders(userId, newDl);
-
-  // Merge cached + new untuk return full dataset
-  const txByKey = new Map<string, RawTransactionRow>();
-  cached.transactions.forEach((r) => { if (r.id) txByKey.set(r.id, r); });
-  newTx.forEach((r) => { if (r.id) txByKey.set(r.id, r); });
-  const mergedTx = Array.from(txByKey.values());
-
-  const dlByKey = new Map<string, RawDownloaderRow>();
-  cached.downloaders.forEach((r) => {
-    dlByKey.set(`${r.date}::${r.source_app}`, r);
-  });
-  newDl.forEach((r) => {
-    dlByKey.set(`${r.date}::${r.source_app}`, r);
-  });
-  const mergedDl = Array.from(dlByKey.values());
-
-  const transactions = processTransactions(mergedTx);
+  // Process untuk return ke caller (state)
+  const transactions = processTransactions(txRows);
   const dlByDate = new Map<string, Record<string, unknown>>();
-  mergedDl.forEach((r) => {
+  dlRows.forEach((r) => {
     const existing = dlByDate.get(r.date) || { Tanggal: r.date };
-    existing[r.source_app] = r.count;
+    existing[r.source_app] = r.count ?? 0;
     dlByDate.set(r.date, existing);
   });
   const downloaders = processDownloaders(Array.from(dlByDate.values()));
 
-  logger.info(
-    `[cache] delta merged: +${newTx.length} tx, +${newDl.length} dl. Total: ${transactions.length} tx, ${downloaders.length} dl`,
+  // Compute meta untuk cache verify ke depan
+  const txMax = txRows.reduce<string | null>(
+    (max, r) => !r.uploaded_at ? max : !max || r.uploaded_at > max ? r.uploaded_at : max,
+    null,
   );
-
-  return {
-    changed: true,
-    transactions,
-    downloaders,
-    added: { tx: newTx.length, dl: newDl.length },
+  const dlMax = dlRows.reduce<string | null>(
+    (max, r) => !r.uploaded_at ? max : !max || r.uploaded_at > max ? r.uploaded_at : max,
+    null,
+  );
+  const meta: SnapshotMeta = {
+    userId,
+    txCount: txRows.length,
+    dlCount: dlRows.length,
+    txMaxUploaded: txMax,
+    dlMaxUploaded: dlMax,
+    savedAt: new Date().toISOString(),
   };
+  // Tulis cache background (gak block caller)
+  void saveSnapshot(txRows, dlRows, meta);
+
+  return { transactions, downloaders };
 };
 
 /**
- * Fetch rows dari Supabase WHERE uploaded_at > since.
- * Pagination ringan — biasanya delta < 1000 rows = 1 request.
+ * Update cache meta setelah realtime event (mis. INSERT bikin count +1).
+ * Read snapshot, update meta sesuai delta, tulis ulang.
+ * Catatan: cache rows array TIDAK di-update — biar tetap simple. Cache
+ * jadi sedikit stale row-wise tapi count selalu update, jadi verify
+ * tetap akurat. Kalau user reload, cache stale → full refetch (1x).
+ *
+ * Kalau pengen super-fresh cache, lebih simple call `clearLocalDataCache()`
+ * setelah realtime event — next reload bakal full fetch.
  */
-async function fetchSinceUploadedAt<T>(
-  supabase: ReturnType<typeof getSupabase>,
-  tableName: 'transactions' | 'downloaders',
-  since: string | null,
-): Promise<T[]> {
-  if (!supabase || !since) return [];
-  const rows: T[] = [];
-  let nextPage = 0;
-  while (rows.length < MAX_ROWS_PER_QUERY) {
-    const query = supabase
-      .from(tableName)
-      .select('*')
-      .gt('uploaded_at', since)
-      .order('uploaded_at', { ascending: true });
-    const from = nextPage * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-    const { data, error } = await query.range(from, to);
-    if (error) {
-      logger.warn(`[cache] delta fetch ${tableName} error:`, error.message);
-      break;
-    }
-    if (!data || data.length === 0) break;
-    rows.push(...(data as T[]));
-    if (data.length < PAGE_SIZE) break;
-    nextPage += 1;
-  }
-  return rows;
-}
-
-/**
- * Helper untuk realtime: update cache saat ada INSERT/UPDATE/DELETE event.
- */
-export const handleRealtimeCacheUpdate = async (
-  userId: string,
-  table: 'transactions' | 'downloaders',
-  eventType: 'INSERT' | 'UPDATE' | 'DELETE',
-  newRow: Record<string, unknown> | null,
-  oldRow: Record<string, unknown> | null,
+export const incrementCacheCount = async (
+  delta: { tx?: number; dl?: number; uploadedAt?: string },
 ): Promise<void> => {
-  if (table === 'transactions') {
-    if (eventType === 'DELETE' && oldRow?.id) {
-      await deleteTransactionFromCache(String(oldRow.id));
-    } else if (newRow?.id) {
-      await cacheWriteTransactions(userId, [newRow as RawTransactionRow]);
-    }
-  } else if (table === 'downloaders') {
-    if (eventType === 'DELETE' && oldRow?.date && oldRow?.source_app) {
-      await deleteDownloaderFromCache(String(oldRow.date), String(oldRow.source_app));
-    } else if (newRow?.date && newRow?.source_app) {
-      await cacheWriteDownloaders(userId, [newRow as RawDownloaderRow]);
-    }
+  const snap = await loadSnapshot<RawTxRow, RawDlRow>();
+  if (!snap) return;
+  const meta = { ...snap.meta };
+  if (delta.tx) meta.txCount += delta.tx;
+  if (delta.dl) meta.dlCount += delta.dl;
+  if (delta.uploadedAt) {
+    if (!meta.txMaxUploaded || delta.uploadedAt > meta.txMaxUploaded) meta.txMaxUploaded = delta.uploadedAt;
+    if (!meta.dlMaxUploaded || delta.uploadedAt > meta.dlMaxUploaded) meta.dlMaxUploaded = delta.uploadedAt;
   }
+  await saveSnapshot(snap.transactions, snap.downloaders, meta);
 };
 
-/**
- * Clear cache — dipanggil saat user upload Excel baru (replace mode)
- * untuk menghindari race kondisi cache vs DB.
- */
-export const clearLocalCache = (): Promise<void> => clearCache();
+export const clearLocalDataCache = (): Promise<void> => clearSnapshot();
 
 // ---------- Quick overview stats (server-side aggregated) ----------
 //

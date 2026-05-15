@@ -1,34 +1,27 @@
 // ==============================================================
 // Hook subscribe ke perubahan tabel via Supabase Realtime.
-// Auto-call `onChange` setiap ada INSERT / UPDATE / DELETE di table
-// yang dipilih. Tidak mengirim data — caller refetch sendiri.
+//
+// Dua mode trigger:
+//   1. onChange()        → DEBOUNCED, no payload — caller refetch sendiri.
+//                          Cocok untuk tabel kecil / aggregate refetch.
+//   2. onEvent(payload)  → PER-EVENT, payload included — caller apply
+//                          incremental update sendiri (INSERT/UPDATE/DELETE).
+//                          Cocok untuk tabel besar — gak full refetch.
 //
 // Filter optional: 'user_id=eq.<uuid>' untuk subscribe ke baris user
 // tertentu saja (hemat bandwidth).
 //
 // Returned:
 //   - status: 'connecting' | 'live' | 'error' | 'closed'
-//     UI bisa pakai ini untuk tampilkan badge Live.
 //
 // ==============================================================
-// Stability features (penting buat dashboard yang nyala lama):
-//
-// 1. Auto-reconnect dengan exponential backoff — kalau channel CLOSED
-//    / TIMED_OUT / CHANNEL_ERROR, recreate channel otomatis (1s → 2s
-//    → 4s → ... max 30s). User gak perlu reload manual.
-//
-// 2. Visibility change handler — pas tab balik ke foreground (user dari
-//    tab lain / device sleep), langsung refetch + verify connection.
-//    WebSocket sering "zombie" (state masih connected tapi event mati)
-//    setelah tab idle lama — handler ini paksa fresh state.
-//
-// 3. Online event — pas network balik dari offline, refetch + reconnect.
-//
-// 4. Heartbeat refetch — tiap N menit panggil onChange() sebagai safety
-//    net (kalau realtime miss event karena suatu hal). Default 3 menit.
-//
-// 5. On (re)connect, langsung trigger 1 kali onChange — biar data fresh
-//    setelah down time.
+// Stability:
+// - Auto-reconnect connection dengan exponential backoff kalau channel
+//   CLOSED/TIMED_OUT/CHANNEL_ERROR. CONNECTION saja yang di-restore —
+//   TIDAK trigger refetch buat hindari "ngaccak" state.
+// - NO heartbeat (default off). User minta dashboard "diam" setelah load.
+// - NO visibility-change refetch. Tab balik aktif → realtime tetap jalan
+//   karena auto-reconnect, tapi state gak di-refetch.
 // ==============================================================
 
 import { useEffect, useState, useRef } from 'react';
@@ -37,31 +30,43 @@ import { logger } from './logger';
 
 export type RealtimeStatus = 'connecting' | 'live' | 'error' | 'closed';
 
-interface UseRealtimeTableOptions {
+// Payload shape dari Supabase Realtime (event INSERT/UPDATE/DELETE)
+export interface RealtimePayload<T = Record<string, unknown>> {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: T;
+  old: T;
+  schema: string;
   table: string;
-  filter?: string;          // mis. 'user_id=eq.abc-123'
-  onChange: () => void;     // dipanggil setiap event — caller refetch
-  // schema default 'public'
-  schema?: string;
-  // Debounce trigger (ms). Hindari spam refetch kalau banyak event burst.
-  debounceMs?: number;
-  // Heartbeat — periodic safety-net refetch. Set 0 untuk disable.
-  heartbeatMs?: number;
 }
 
-export const useRealtimeTable = ({
-  table,
-  filter,
-  onChange,
-  schema = 'public',
-  debounceMs = 200,
-  heartbeatMs = 3 * 60 * 1000,   // default 3 menit
-}: UseRealtimeTableOptions): { status: RealtimeStatus } => {
+interface UseRealtimeTableOptions<T = Record<string, unknown>> {
+  table: string;
+  filter?: string;          // mis. 'user_id=eq.abc-123'
+  // Mode 1: full refetch trigger (debounced, no payload)
+  onChange?: () => void;
+  // Mode 2: per-event handler (instant, payload included)
+  onEvent?: (payload: RealtimePayload<T>) => void;
+  schema?: string;
+  // Debounce buat onChange. onEvent gak di-debounce.
+  debounceMs?: number;
+}
+
+export const useRealtimeTable = <T extends Record<string, unknown> = Record<string, unknown>>(
+  options: UseRealtimeTableOptions<T>,
+): { status: RealtimeStatus } => {
+  const {
+    table, filter, onChange, onEvent,
+    schema = 'public',
+    debounceMs = 200,
+  } = options;
+
   const [status, setStatus] = useState<RealtimeStatus>('connecting');
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Simpan onChange di ref supaya channel tidak di-recreate setiap render
+  // Simpan callback di ref supaya channel tidak di-recreate setiap render
   const onChangeRef = useRef(onChange);
+  const onEventRef = useRef(onEvent);
   onChangeRef.current = onChange;
+  onEventRef.current = onEvent;
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -72,15 +77,15 @@ export const useRealtimeTable = ({
 
     const channelName = `realtime:${schema}:${table}${filter ? ':' + filter : ''}`;
 
-    const debouncedTrigger = () => {
+    const debouncedChange = () => {
+      if (!onChangeRef.current) return;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => onChangeRef.current(), debounceMs);
+      timeoutRef.current = setTimeout(() => onChangeRef.current?.(), debounceMs);
     };
 
     let cancelled = false;
     let currentChannel: ReturnType<typeof supabase.channel> | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     let reconnectAttempt = 0;
 
     const setupChannel = () => {
@@ -92,7 +97,22 @@ export const useRealtimeTable = ({
         .on(
           'postgres_changes',
           { event: '*', schema, table, ...(filter ? { filter } : {}) },
-          () => debouncedTrigger(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (payload: any) => {
+            if (cancelled) return;
+            // Mode 2: per-event handler (instant, no debounce)
+            if (onEventRef.current) {
+              try {
+                onEventRef.current(payload as RealtimePayload<T>);
+              } catch (err) {
+                logger.warn(`[Realtime] ${channelName} onEvent threw:`, err);
+              }
+            }
+            // Mode 1: debounced full refetch
+            if (onChangeRef.current) {
+              debouncedChange();
+            }
+          },
         )
         .subscribe((s: string) => {
           if (cancelled) return;
@@ -101,11 +121,14 @@ export const useRealtimeTable = ({
           if (s === 'SUBSCRIBED') {
             setStatus('live');
             reconnectAttempt = 0;
-            // Catch missed events selama down time
-            onChangeRef.current();
+            // CATATAN PENTING: TIDAK trigger refetch di sini.
+            // User minta dashboard "diam" setelah initial load — kalau
+            // reconnect trigger refetch otomatis, state bakal ngaccak.
+            // Trade-off: event yang miss selama disconnect tidak ke-catch,
+            // tapi koneksi tetap idup buat event berikutnya.
           } else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') {
             setStatus(s === 'CLOSED' ? 'closed' : 'error');
-            // Schedule reconnect dengan exponential backoff
+            // Schedule reconnect dengan exponential backoff (1s → 30s)
             const delay = Math.min(30_000, 1000 * Math.pow(2, reconnectAttempt));
             reconnectAttempt += 1;
             if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -122,62 +145,13 @@ export const useRealtimeTable = ({
 
     setupChannel();
 
-    // Heartbeat — safety net refetch (cuma kalau tab visible)
-    if (heartbeatMs > 0) {
-      heartbeatTimer = setInterval(() => {
-        if (typeof document !== 'undefined' && !document.hidden) {
-          onChangeRef.current();
-        }
-      }, heartbeatMs);
-    }
-
-    // Visibility change — tab balik ke foreground
-    const handleVisibilityChange = () => {
-      if (typeof document === 'undefined') return;
-      if (document.visibilityState === 'visible') {
-        onChangeRef.current();
-        // Verify channel masih hidup; kalau zombie, paksa reconnect
-        const chan = currentChannel as unknown as { state?: string } | null;
-        if (chan && chan.state && chan.state !== 'joined') {
-          logger.info(`[Realtime] ${channelName} → forcing reconnect on visibility change (state=${chan.state})`);
-          if (currentChannel) void supabase.removeChannel(currentChannel);
-          setupChannel();
-        }
-      }
-    };
-
-    // Online — network kembali
-    const handleOnline = () => {
-      logger.info(`[Realtime] ${channelName} → network online, refetching`);
-      onChangeRef.current();
-      const chan = currentChannel as unknown as { state?: string } | null;
-      if (chan && chan.state && chan.state !== 'joined') {
-        if (currentChannel) void supabase.removeChannel(currentChannel);
-        setupChannel();
-      }
-    };
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-    if (typeof window !== 'undefined') {
-      window.addEventListener('online', handleOnline);
-    }
-
     return () => {
       cancelled = true;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('online', handleOnline);
-      }
       if (currentChannel) void supabase.removeChannel(currentChannel);
     };
-  }, [table, filter, schema, debounceMs, heartbeatMs]);
+  }, [table, filter, schema, debounceMs]);
 
   return { status };
 };

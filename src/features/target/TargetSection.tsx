@@ -120,6 +120,11 @@ export const TargetSection = ({
     });
   }, [targetMonth, daysInMonthCount]);
 
+  // Tanggal hari ini dalam format 'yyyy-MM-dd' — dipakai buat tentuin tanggal
+  // mana yang sudah lewat. Tanggal yang sudah lewat + masih "Menunggu" /
+  // tidak ada transaksi → keterangan dihitung sebagai 0 - target (deficit).
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
   // ==============================================================
   // Auto-fill actuals dari database, keyed by APP_NAME_UPPER → DATE_KEY.
   //   • downloader = SUM(count) dari tabel downloaders
@@ -277,8 +282,9 @@ export const TargetSection = ({
     let totalRealSales = 0;
     let totalRealRepeatOrder = 0;
     // sumKeterangan = total kolom "Keterangan" di operational sheet, yaitu
-    // sum(actualSales - displayTargetSales) hanya untuk hari yang punya
-    // actualSales > 0. Cells dengan actualSales 0 tampil "-" → tidak ikut.
+    // sum(actualSales - displayTargetSales). Hari yang lewat + tidak ada
+    // transaksi dihitung sebagai 0 (selisih = -target, defisit). Tanggal
+    // hari ini / masa depan dengan status menunggu di-skip dari summary.
     let sumKeterangan = 0;
 
     const targetConfig = selectedApp.targetConfig?.[targetMonth] || {
@@ -303,11 +309,16 @@ export const TargetSection = ({
       totalRealSales += actualSales;
       totalRealRepeatOrder += actualRepeatOrder;
 
+      const dailyTarget = dayData.manualTargetSales || baseDailySales;
       if (actualSales > 0) {
-        // displayTarget = manualTargetSales kalau di-set, else target harian proporsional
-        const dailyTarget = dayData.manualTargetSales || baseDailySales;
+        // Hari yang ada transaksi — selisih = actual - target.
         sumKeterangan += actualSales - dailyTarget;
+      } else if (date < todayStr) {
+        // Hari yang sudah LEWAT tapi masih "Menunggu" / tidak ada transaksi:
+        // hitung real-nya sebagai 0 → selisih = 0 - target = -target.
+        sumKeterangan += -dailyTarget;
       }
+      // Tanggal hari ini / masa depan dengan status menunggu: SKIP (belum waktunya).
     });
 
     const progressDownloader = targetConfig.targetDownloader > 0
@@ -344,8 +355,9 @@ export const TargetSection = ({
     let totalRealSales = 0;
     let totalTargetRepeatOrder = 0;
     let totalRealRepeatOrder = 0;
-    // sumKeterangan = total kolom "Keterangan" semua app (sum daily salesDiff
-    // hanya untuk hari yang punya actualSales > 0).
+    // sumKeterangan = total kolom "Keterangan" semua app. Hari lewat tanpa
+    // transaksi dihitung sebagai 0 (selisih = -target). Hari ini / masa depan
+    // dengan status menunggu di-skip.
     let sumKeterangan = 0;
 
     filteredAppsForSummary.forEach(app => {
@@ -370,9 +382,12 @@ export const TargetSection = ({
           ? Number(dayData.actualRepeatOrder)
           : a.premium;
 
+        const dailyTarget = dayData.manualTargetSales || baseDailySalesApp;
         if (actualSales > 0) {
-          const dailyTarget = dayData.manualTargetSales || baseDailySalesApp;
           sumKeterangan += actualSales - dailyTarget;
+        } else if (date < todayStr) {
+          // Hari sudah lewat tapi tidak ada transaksi → real = 0, selisih = -target
+          sumKeterangan += -dailyTarget;
         }
       });
     });
@@ -1057,6 +1072,9 @@ export const TargetSection = ({
                     const displayTargetRepeatOrder = dayData.manualTargetRepeatOrder || flexibleTargetRepeatOrder;
 
                     const achievement = displayTargetSales > 0 ? (actualSales / displayTargetSales) * 100 : 0;
+                    // Tanggal lewat + tidak ada transaksi → hitung real = 0 (= achievement 0% = Kurang).
+                    // Tanggal hari ini / masa depan + tidak ada transaksi → masih "Menunggu".
+                    const isPastWithoutSales = actualSales === 0 && date < todayStr;
                     let statusColor = 'text-slate-400';
                     let statusText = 'Menunggu';
                     let statusBg = 'bg-slate-50';
@@ -1075,10 +1093,17 @@ export const TargetSection = ({
                         statusText = 'Kurang';
                         statusBg = 'bg-rose-50';
                       }
+                    } else if (isPastWithoutSales) {
+                      statusColor = 'text-rose-600';
+                      statusText = 'Kurang';
+                      statusBg = 'bg-rose-50';
                     }
 
-                    const salesDiff = actualSales - displayTargetSales;
-                    const keteranganText = actualSales > 0
+                    // Tanggal lewat + status menunggu → hitung real sebagai 0 (selisih = -target).
+                    // Tanggal hari ini / masa depan dengan status menunggu → tampil '-'.
+                    const effectiveSales = actualSales > 0 ? actualSales : (isPastWithoutSales ? 0 : null);
+                    const salesDiff = (effectiveSales ?? actualSales) - displayTargetSales;
+                    const keteranganText = effectiveSales !== null
                       ? `${salesDiff >= 0 ? '+' : ''}${formatCurrency(salesDiff)}`
                       : '-';
 
