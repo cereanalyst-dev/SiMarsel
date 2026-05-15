@@ -1074,7 +1074,9 @@ export const TargetSection = ({
                     const achievement = displayTargetSales > 0 ? (actualSales / displayTargetSales) * 100 : 0;
                     // Tanggal lewat + tidak ada transaksi → hitung real = 0 (= achievement 0% = Kurang).
                     // Tanggal hari ini / masa depan + tidak ada transaksi → masih "Menunggu".
-                    const isPastWithoutSales = actualSales === 0 && date < todayStr;
+                    // Tanggal lewat + tidak ada transaksi → hitung real = 0.
+                    // Pakai !(actualSales > 0) supaya catch juga NaN/null/undefined.
+                    const isPastWithoutSales = !(actualSales > 0) && date < todayStr;
                     let statusColor = 'text-slate-400';
                     let statusText = 'Menunggu';
                     let statusBg = 'bg-slate-50';
