@@ -22,11 +22,6 @@ import {
   uploadDownloadersToSupabase,
   uploadTransactionsToSupabase,
   type QuickOverviewStats,
-  loadFromCacheForUser,
-  isCacheFresh,
-  fetchAndCache,
-  clearLocalDataCache,
-  incrementCacheCount,
 } from './lib/dataAccess';
 import { processDownloaders, processTransactions } from './lib/dataProcessing';
 import { fetchPromoCodeRules } from './lib/promoCodeRulesClient';
@@ -214,12 +209,6 @@ export default function App() {
           );
         }
 
-        // Replace mode → clear cache supaya next reload full refetch
-        if (replaceMode) {
-          await clearLocalDataCache();
-          logger.info('🗑️ Local cache cleared (replace mode upload)');
-        }
-
         logger.info('♻️ Upload sukses, fetching ulang dari Supabase…');
         const res = await fetchDataFromSupabase();
         if (res) {
@@ -291,44 +280,12 @@ export default function App() {
         if (active) setLoadingHeadline(false);
       }
 
-      // Stage 2: cache-first load
-      //
-      // a. Load cache (instant) → render dashboard
-      // b. Background: verify count + maxUploaded match DB
-      //    - MATCH = cache fresh, state stabil, gak ada setState lagi
-      //    - MISMATCH = full refetch + replace state + update cache
-      // c. Kalau cache kosong (first visit) = langsung full fetch
-      //
-      // Realtime tetap jalan terlepas dari cache.
+      // Stage 2: full fetch dari Supabase (sekali per session).
+      // Tidak pakai IndexedDB cache — bikin memory ngembung kalau tab idle
+      // lama → "Aw snap" crash. Reload = 30s full fetch, tapi stabil.
+      // Update selanjutnya via realtime per-event (incremental).
       try {
-        // a. Try cache first
-        const cached = await loadFromCacheForUser(userId);
-        if (!active) return;
-        if (cached) {
-          setData(cached.transactions);
-          setDownloaderData(cached.downloaders);
-          setLoadingRawData(false); // UI ready
-
-          // b. Verify in background (1 quick query)
-          const fresh = await isCacheFresh(userId);
-          if (!active) return;
-          if (fresh === true) {
-            // Cache fresh — state stabil, nothing to do.
-            return;
-          }
-          if (fresh === null) {
-            // Verify gagal (network issue). Don't change state. Cache stays.
-            logger.warn('Cache verify failed, keeping cached state');
-            return;
-          }
-          // fresh === false: cache stale, perlu refetch
-          logger.info('🔄 [cache] stale, full refetch…');
-        } else {
-          logger.info('[cache] miss — first visit / new user. Full fetch starting…');
-        }
-
-        // c. Full fetch (first visit atau cache stale)
-        const res = await fetchAndCache(userId, (loaded, label) => {
+        const res = await fetchDataFromSupabase((loaded, label) => {
           if (!active) return;
           setFetchProgress((prev) => ({
             ...prev,
@@ -349,10 +306,7 @@ export default function App() {
         }
       } catch (err) {
         logger.error('Raw data load failed:', err);
-        // Cuma show error kalau cache juga gak ada
-        if (data.length === 0) {
-          setError('Gagal memuat data. Buka DevTools Console untuk detail errornya.');
-        }
+        setError('Gagal memuat data. Buka DevTools Console untuk detail errornya.');
       } finally {
         if (active) setLoadingRawData(false);
       }
@@ -462,10 +416,6 @@ export default function App() {
           if (u && (!maxUploadedAt || u > maxUploadedAt)) maxUploadedAt = u;
         }
       });
-      // Update cache meta sekaligus (batch)
-      if (txDelta !== 0 || maxUploadedAt) {
-        void incrementCacheCount({ tx: txDelta, uploadedAt: maxUploadedAt || undefined });
-      }
       return Array.from(byId.values());
     });
   }, []);
@@ -501,9 +451,6 @@ export default function App() {
           if (u && (!maxUploadedAt || u > maxUploadedAt)) maxUploadedAt = u;
         }
       });
-      if (dlDelta !== 0 || maxUploadedAt) {
-        void incrementCacheCount({ dl: dlDelta, uploadedAt: maxUploadedAt || undefined });
-      }
       return Array.from(byKey.values());
     });
   }, []);
