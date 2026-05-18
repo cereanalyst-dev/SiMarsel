@@ -129,7 +129,9 @@ export const TargetSection = ({
   // Auto-fill actuals dari database, keyed by APP_NAME_UPPER → DATE_KEY.
   //   • downloader = SUM(count) dari tabel downloaders
   //   • sales      = SUM(revenue) dari transactions
-  //   • premium    = COUNT(DISTINCT trx_id) per (app, date)
+  //   • premium    = COUNT(DISTINCT email) per (app, date)
+  //                   = jumlah USER unik yang transaksi (bukan jumlah transaksi).
+  //                   Kalau 1 email beli 5x → premium = 1, bukan 5.
   //
   // Dipakai oleh: operational sheet, summary, globalSummary, recap.
   // User tidak perlu isi Real manual — semua auto dari DB.
@@ -137,7 +139,7 @@ export const TargetSection = ({
   type ActualRow = {
     downloader: number;
     sales: number;
-    trxIds: Set<string>;
+    emails: Set<string>;
     promo: Record<PromoCategory, number>;
   };
   const actualsByAppByDate = useMemo(() => {
@@ -154,7 +156,7 @@ export const TargetSection = ({
       }
       let row = inner.get(dateKey);
       if (!row) {
-        row = { downloader: 0, sales: 0, trxIds: new Set(), promo: emptyPromo() };
+        row = { downloader: 0, sales: 0, emails: new Set(), promo: emptyPromo() };
         inner.set(dateKey, row);
       }
       return row;
@@ -185,8 +187,10 @@ export const TargetSection = ({
       if (!dateKey) return;
       const row = ensure(appKey, dateKey);
       row.sales += Number(t.revenue) || 0;
-      const trxId = (t.trx_id ?? '').trim();
-      if (trxId) row.trxIds.add(trxId);
+      // Premium dihitung dari distinct email — 1 user (1 email) = 1 premium,
+      // gak peduli beli berapa kali. Konsisten dengan Live Dashboard.
+      const email = (t.email ?? '').trim().toLowerCase();
+      if (email) row.emails.add(email);
       // Klasifikasi promo per transaksi → tally ke kategori-nya
       const category = classifyPromo(t.promo_code, appName, promoRulesIndex);
       row.promo[category] += 1;
@@ -207,7 +211,7 @@ export const TargetSection = ({
     return {
       downloader: row.downloader,
       sales: row.sales,
-      premium: row.trxIds.size,
+      premium: row.emails.size,
       promo: row.promo,
     };
   };
