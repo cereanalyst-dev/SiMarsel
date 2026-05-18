@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { logger } from './lib/logger';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Session } from '@supabase/supabase-js';
@@ -420,13 +420,105 @@ export default function App() {
   });
   const realtimeLive = realtimeStatus === 'live';
 
-  // Realtime: transactions & downloaders — INCREMENTAL update per event.
-  // - INSERT  → tambah row baru ke state (processed dulu via processTransactions)
-  // - UPDATE  → ganti row dengan id sama
-  // - DELETE  → hapus row dengan id sama
+  // Realtime: transactions & downloaders — INCREMENTAL + BATCHED update.
+  //
+  // Strategy:
+  // - Tiap event masuk → dimasukin ke buffer (ref, no re-render)
+  // - Setiap 300ms (debounced), buffer di-flush → 1x setState saja
+  // - Kalau n8n bulk insert 50 row barengan → 50 events → 1 re-render
+  //   (sebelumnya 50 re-render = lag)
   //
   // GAK ada full refetch. Initial state stabil — cuma berubah saat ada
   // event realtime dari Supabase (mis. n8n insert via webhook).
+  type PendingTxEvent = { type: 'upsert' | 'delete'; id: string; row?: Transaction };
+  type PendingDlEvent = { type: 'upsert' | 'delete'; date: string; source_app: string; row?: Downloader };
+  const pendingTxRef = useRef<PendingTxEvent[]>([]);
+  const pendingDlRef = useRef<PendingDlEvent[]>([]);
+  const flushTxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushDlTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushTxBuffer = useCallback(() => {
+    const events = pendingTxRef.current;
+    pendingTxRef.current = [];
+    flushTxTimerRef.current = null;
+    if (events.length === 0) return;
+    setData((prev) => {
+      // Build map dari prev untuk O(1) lookup by id
+      const byId = new Map<string, Transaction>();
+      prev.forEach((r) => {
+        const id = (r as { id?: string }).id;
+        if (id) byId.set(id, r);
+      });
+      let txDelta = 0;
+      let maxUploadedAt: string | null = null;
+      events.forEach((e) => {
+        if (e.type === 'delete') {
+          if (byId.delete(e.id)) txDelta -= 1;
+        } else if (e.row) {
+          const existed = byId.has(e.id);
+          byId.set(e.id, e.row);
+          if (!existed) txDelta += 1;
+          const u = (e.row as { uploaded_at?: string }).uploaded_at;
+          if (u && (!maxUploadedAt || u > maxUploadedAt)) maxUploadedAt = u;
+        }
+      });
+      // Update cache meta sekaligus (batch)
+      if (txDelta !== 0 || maxUploadedAt) {
+        void incrementCacheCount({ tx: txDelta, uploadedAt: maxUploadedAt || undefined });
+      }
+      return Array.from(byId.values());
+    });
+  }, []);
+
+  const scheduleTxFlush = () => {
+    if (flushTxTimerRef.current) clearTimeout(flushTxTimerRef.current);
+    flushTxTimerRef.current = setTimeout(flushTxBuffer, 300);
+  };
+
+  const flushDlBuffer = useCallback(() => {
+    const events = pendingDlRef.current;
+    pendingDlRef.current = [];
+    flushDlTimerRef.current = null;
+    if (events.length === 0) return;
+    setDownloaderData((prev) => {
+      const keyOf = (date: string, source_app: string) => `${date}::${source_app}`;
+      const byKey = new Map<string, Downloader>();
+      prev.forEach((r) => {
+        const dr = r as unknown as { date?: string; source_app?: string };
+        if (dr.date && dr.source_app) byKey.set(keyOf(dr.date, dr.source_app), r);
+      });
+      let dlDelta = 0;
+      let maxUploadedAt: string | null = null;
+      events.forEach((e) => {
+        const k = keyOf(e.date, e.source_app);
+        if (e.type === 'delete') {
+          if (byKey.delete(k)) dlDelta -= 1;
+        } else if (e.row) {
+          const existed = byKey.has(k);
+          byKey.set(k, e.row);
+          if (!existed) dlDelta += 1;
+          const u = (e.row as unknown as { uploaded_at?: string }).uploaded_at;
+          if (u && (!maxUploadedAt || u > maxUploadedAt)) maxUploadedAt = u;
+        }
+      });
+      if (dlDelta !== 0 || maxUploadedAt) {
+        void incrementCacheCount({ dl: dlDelta, uploadedAt: maxUploadedAt || undefined });
+      }
+      return Array.from(byKey.values());
+    });
+  }, []);
+
+  const scheduleDlFlush = () => {
+    if (flushDlTimerRef.current) clearTimeout(flushDlTimerRef.current);
+    flushDlTimerRef.current = setTimeout(flushDlBuffer, 300);
+  };
+
+  // Cleanup pending flushes on unmount
+  useEffect(() => () => {
+    if (flushTxTimerRef.current) clearTimeout(flushTxTimerRef.current);
+    if (flushDlTimerRef.current) clearTimeout(flushDlTimerRef.current);
+  }, []);
+
   useRealtimeTable<Record<string, unknown>>({
     table: 'transactions',
     onEvent: (payload) => {
@@ -434,30 +526,17 @@ export default function App() {
       if (ev === 'DELETE') {
         const oldId = (payload.old as { id?: string })?.id;
         if (!oldId) return;
-        setData((prev) => prev.filter((r) => (r as { id?: string }).id !== oldId));
-        // Update cache meta supaya verify next reload tetap match
-        void incrementCacheCount({ tx: -1 });
+        pendingTxRef.current.push({ type: 'delete', id: oldId });
+        scheduleTxFlush();
         return;
       }
-      // INSERT or UPDATE — proses single row, merge by id.
       const newRow = payload.new;
       if (!newRow || !(newRow as { id?: string }).id) return;
       const processed = processTransactions([newRow])[0];
       if (!processed) return;
-      const uploadedAt = (newRow as { uploaded_at?: string }).uploaded_at;
-      setData((prev) => {
-        const idx = prev.findIndex((r) => (r as { id?: string }).id === (newRow as { id?: string }).id);
-        if (idx >= 0) {
-          // UPDATE — replace in place. Count tidak berubah.
-          const next = [...prev];
-          next[idx] = processed;
-          if (uploadedAt) void incrementCacheCount({ uploadedAt });
-          return next;
-        }
-        // INSERT — prepend. Count +1.
-        void incrementCacheCount({ tx: 1, uploadedAt });
-        return [processed, ...prev];
-      });
+      const id = (newRow as { id?: string }).id as string;
+      pendingTxRef.current.push({ type: 'upsert', id, row: processed });
+      scheduleTxFlush();
     },
   });
 
@@ -468,29 +547,16 @@ export default function App() {
       const newRow = payload.new as { date?: string; source_app?: string; count?: number; uploaded_at?: string } | null;
       const oldRow = payload.old as { date?: string; source_app?: string } | null;
 
-      const matchKey = (a: Downloader, b: { date?: string; source_app?: string }) =>
-        (a as unknown as { date?: string; source_app?: string }).date === b.date &&
-        (a as unknown as { date?: string; source_app?: string }).source_app === b.source_app;
-
       if (ev === 'DELETE' && oldRow?.date && oldRow?.source_app) {
-        setDownloaderData((prev) => prev.filter((r) => !matchKey(r, oldRow)));
-        void incrementCacheCount({ dl: -1 });
+        pendingDlRef.current.push({ type: 'delete', date: oldRow.date, source_app: oldRow.source_app });
+        scheduleDlFlush();
         return;
       }
       if (!newRow?.date || !newRow?.source_app) return;
       const processed = processDownloaders([{ Tanggal: newRow.date, [newRow.source_app]: newRow.count ?? 0 }])[0];
       if (!processed) return;
-      setDownloaderData((prev) => {
-        const idx = prev.findIndex((r) => matchKey(r, newRow));
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = processed;
-          if (newRow.uploaded_at) void incrementCacheCount({ uploadedAt: newRow.uploaded_at });
-          return next;
-        }
-        void incrementCacheCount({ dl: 1, uploadedAt: newRow.uploaded_at });
-        return [...prev, processed];
-      });
+      pendingDlRef.current.push({ type: 'upsert', date: newRow.date, source_app: newRow.source_app, row: processed });
+      scheduleDlFlush();
     },
   });
 
