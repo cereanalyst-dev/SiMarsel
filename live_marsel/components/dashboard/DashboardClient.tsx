@@ -126,7 +126,6 @@ export const DashboardClient = ({
 
   const range = useMemo(() => monthRangeJakarta(period.year, period.month), [period.year, period.month]);
 
-  // Filter pakai payment_date dulu (sama kayak SiMarsel) supaya angka match.
   const trxInRange = useMemo(() => {
     const startStr = jakartaDateOnly(range.start);
     return transactions.filter((t) => {
@@ -153,35 +152,31 @@ export const DashboardClient = ({
     return map;
   }, [targets]);
 
+  // Premium = count baris transaksi (sama dengan SiMarsel).
+  // 1 user beli 5x → premium = 5. Match dengan SUM sebaran kode.
   const perApp = useMemo<AppAggregate[]>(() => {
     const acc = new Map<string, {
       sales: number; trxCount: number; downloaders: number;
-      emails: Set<string>;
     }>();
     trxInRange.forEach((t) => {
       const app = normalizeApp(t.source_app || appFromTrxId(t.trx_id));
       if (!app) return;
-      const cur = acc.get(app) ?? { sales: 0, trxCount: 0, downloaders: 0, emails: new Set() };
+      const cur = acc.get(app) ?? { sales: 0, trxCount: 0, downloaders: 0 };
       cur.sales += Number(t.revenue) || 0;
       cur.trxCount += 1;
-      if (t.email) cur.emails.add(t.email.trim().toLowerCase());
       acc.set(app, cur);
     });
     downloadsInRange.forEach((d) => {
       const app = normalizeApp(d.source_app);
       if (!app) return;
-      const cur = acc.get(app) ?? { sales: 0, trxCount: 0, downloaders: 0, emails: new Set() };
+      const cur = acc.get(app) ?? { sales: 0, trxCount: 0, downloaders: 0 };
       cur.downloaders += Number(d.count) || 0;
       acc.set(app, cur);
     });
     return Array.from(acc.entries()).map(([app, v]) => {
       const target = targetByApp.get(app) ?? null;
       const conversion = v.downloaders > 0 ? (v.trxCount / v.downloaders) * 100 : 0;
-      return {
-        app, sales: v.sales, trxCount: v.trxCount,
-        downloaders: v.downloaders, premium: v.emails.size,
-        conversion, target,
-      };
+      return { app, sales: v.sales, trxCount: v.trxCount, downloaders: v.downloaders, premium: v.trxCount, conversion, target };
     });
   }, [trxInRange, downloadsInRange, targetByApp]);
 
@@ -189,17 +184,16 @@ export const DashboardClient = ({
     const totalSales = perApp.reduce((s, a) => s + a.sales, 0);
     const totalTrx = perApp.reduce((s, a) => s + a.trxCount, 0);
     const totalDl = perApp.reduce((s, a) => s + a.downloaders, 0);
-    const allEmails = new Set<string>();
-    trxInRange.forEach((t) => { if (t.email) allEmails.add(t.email.trim().toLowerCase()); });
+    // Premium = count baris transaksi (= totalTrx).
     return {
       sales: totalSales,
       trx: totalTrx,
       downloaders: totalDl,
-      premium: allEmails.size,
+      premium: totalTrx,
       avgPrice: totalTrx > 0 ? totalSales / totalTrx : 0,
       conversion: totalDl > 0 ? (totalTrx / totalDl) * 100 : 0,
     };
-  }, [perApp, trxInRange]);
+  }, [perApp]);
 
   const aggregateTarget = useMemo(() => {
     const ts = Array.from(targetByApp.values());
@@ -229,7 +223,6 @@ export const DashboardClient = ({
       date: `${period.year}-${String(period.month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
       sales: 0, trxCount: 0, downloaders: 0, premium: 0, conversion: 0,
     }));
-    const emailsByDay: Map<number, Set<string>> = new Map();
     trxInRange.forEach((t) => {
       const d = t.payment_date ?? t.transaction_date ?? t.created_at;
       if (!d) return;
@@ -238,11 +231,6 @@ export const DashboardClient = ({
       const idx = day - 1;
       buckets[idx].sales += Number(t.revenue) || 0;
       buckets[idx].trxCount += 1;
-      if (t.email) {
-        const set = emailsByDay.get(day) ?? new Set();
-        set.add(t.email.trim().toLowerCase());
-        emailsByDay.set(day, set);
-      }
     });
     downloadsInRange.forEach((d) => {
       if (!d.date) return;
@@ -251,7 +239,8 @@ export const DashboardClient = ({
       buckets[day - 1].downloaders += Number(d.count) || 0;
     });
     buckets.forEach((b) => {
-      b.premium = emailsByDay.get(b.day)?.size ?? 0;
+      // Premium = count baris transaksi per hari (= trxCount).
+      b.premium = b.trxCount;
       b.conversion = b.downloaders > 0 ? (b.trxCount / b.downloaders) * 100 : 0;
     });
     return buckets;
@@ -338,11 +327,7 @@ export const DashboardClient = ({
 
       <section className="grid grid-cols-1 xl:grid-cols-12 gap-3 md:gap-4 items-stretch">
         <div className="xl:col-span-6 flex">
-          <PerformanceCarousel
-            data={daily}
-            totals={{ sales: totals.sales, downloaders: totals.downloaders, premium: totals.premium, conversion: totals.conversion }}
-            dailyTargets={dailyTargets}
-          />
+          <PerformanceCarousel data={daily} totals={{ sales: totals.sales, downloaders: totals.downloaders, premium: totals.premium, conversion: totals.conversion }} dailyTargets={dailyTargets} />
         </div>
         <div className="xl:col-span-3 flex">
           <TargetCarousel blocks={blocks} hasTarget={hasTarget} />

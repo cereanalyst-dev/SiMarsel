@@ -50,7 +50,6 @@ export default async function Page({ searchParams }: PageProps) {
   const yearStart = `${period.year}-01-01`;
   const yearEnd = `${period.year}-12-31`;
 
-  // Filter pakai payment_date (sama kayak SiMarsel) supaya angka selalu match.
   // Fetch data parallel — current period + year-wide raw rows
   const [transactions, downloads, targetConfigs, yearTrxRaw, yearDlRaw] = await Promise.all([
     paginate<Transaction>(() =>
@@ -75,12 +74,13 @@ export default async function Page({ searchParams }: PageProps) {
       .select('*')
       .eq('year_month', yearMonth)
       .then(({ data }) => data ?? []),
-    // Year-wide transactions: pakai SELECT minimal kolom buat hitung total
-    paginate<{ revenue: number | null; email: string | null }>(
+    // Year-wide transactions: SELECT minimal (revenue saja) buat hitung total.
+    // Premium = count rows, jadi tidak perlu email.
+    paginate<{ revenue: number | null }>(
       () =>
         supabase
           .from('transactions')
-          .select('revenue, email')
+          .select('revenue')
           .gte('payment_date', yearStart)
           .lte('payment_date', yearEnd),
       YEAR_HARD_CAP,
@@ -121,15 +121,13 @@ export default async function Page({ searchParams }: PageProps) {
     avg_price_target: Number(t.avg_price ?? t.avg_price_target ?? 0),
   }));
 
-  // Compute year totals — no RPC dependency, jadi gak butuh migration
-  const yearEmails = new Set<string>();
-  yearTrxRaw.forEach((t) => {
-    if (t.email) yearEmails.add(t.email.trim().toLowerCase());
-  });
+  // Compute year totals.
+  // Premium = count baris transaksi (= total_trx). Match dengan SiMarsel
+  // operational sheet — 1 user beli 5x dihitung 5 premium.
   const yearTotals: YearTotals = {
     total_sales: yearTrxRaw.reduce((s, t) => s + (Number(t.revenue) || 0), 0),
     total_trx: yearTrxRaw.length,
-    total_premium: yearEmails.size,
+    total_premium: yearTrxRaw.length,
     total_downloader: yearDlRaw.reduce((s, d) => s + (Number(d.count) || 0), 0),
   };
 
