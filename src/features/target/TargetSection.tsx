@@ -17,6 +17,80 @@ const parseFormattedNumber = (s: string): number => {
   return cleaned ? Number(cleaned) : 0;
 };
 
+// ==============================================================
+// Uncontrolled input untuk cell di operational sheet.
+//
+// Kenapa uncontrolled?
+// - State `apps` di-update tiap karakter → trigger re-render seluruh
+//   tab → kursor mental + input ke-replace tengah-jalan = lag/bouncing.
+// - Realtime juga update state saat user ngetik → mengganggu input.
+//
+// Pattern: defaultValue + onBlur commit. Saat user ngetik, input internal
+// (DOM) tidak tergantung state React. Saat user pindah cell / klik luar,
+// nilai baru di-commit ke state.
+//
+// `committedValue` (number) di-stringify ke defaultValue. Key di-include
+// committedValue jadi kalau external (mis. switch period / realtime)
+// mengubah value, input re-mount dengan default baru.
+// ==============================================================
+interface DailyCellInputProps {
+  // Nilai yang sudah ke-commit di state (number atau string).
+  // Untuk numeric input: ditampilkan dengan formatter (mis. formatNumber).
+  // Untuk text input: ditampilkan apa adanya.
+  committedValue: number | string | null | undefined;
+  // Untuk numeric: format yg ditampilkan saat tidak focus (mis. "1.000").
+  // Untuk text: undefined (pakai committedValue langsung).
+  format?: (n: number) => string;
+  // Untuk numeric: parser dari string user input ke number.
+  parse?: (s: string) => number | null;
+  // Dipanggil saat user blur — commit value ke state.
+  onCommit: (value: number | string | null) => void;
+  // Placeholder text.
+  placeholder?: string;
+  // Tailwind classes.
+  className?: string;
+  // Aria label.
+  ariaLabel?: string;
+  // Title (tooltip).
+  title?: string;
+}
+const DailyCellInput = ({
+  committedValue, format, parse, onCommit,
+  placeholder, className, ariaLabel, title,
+}: DailyCellInputProps) => {
+  // Display value saat NOT focus: pakai formatter kalau numeric.
+  const display = (() => {
+    if (committedValue == null || committedValue === '') return '';
+    if (typeof committedValue === 'number') {
+      return format ? format(committedValue) : String(committedValue);
+    }
+    return String(committedValue);
+  })();
+
+  return (
+    <input
+      // Key includes committed value → input re-mount kalau external change
+      key={`cell-${display}`}
+      type="text"
+      inputMode={parse ? 'numeric' : 'text'}
+      defaultValue={display}
+      onBlur={(e) => {
+        const raw = e.target.value;
+        if (parse) {
+          const n = parse(raw);
+          onCommit(n);
+        } else {
+          onCommit(raw);
+        }
+      }}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      title={title}
+      className={className}
+    />
+  );
+};
+
 interface TargetSectionProps {
   apps: AppData[];
   setApps: (a: AppData[]) => void;
@@ -1137,52 +1211,52 @@ export const TargetSection = ({
                           {format(new Date(date), 'EEE')}
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatNumber(dayData.manualTargetDownloader || Math.round(displayTargetDownloader))}
-                            onChange={(e) => updateDailyValue(date, 'manualTargetDownloader', parseFormattedNumber(e.target.value))}
-                            aria-label={`Target downloader ${date}`}
+                          <DailyCellInput
+                            committedValue={dayData.manualTargetDownloader ?? Math.round(displayTargetDownloader)}
+                            format={formatNumber}
+                            parse={(s) => parseFormattedNumber(s)}
+                            onCommit={(v) => updateDailyValue(date, 'manualTargetDownloader', v)}
+                            ariaLabel={`Target downloader ${date}`}
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors tabular-nums"
                           />
                         </td>
                         {/* Actual Downloader — editable, default dari DB */}
                         <td className="py-3 px-4 border-r border-slate-100" title="Default auto dari DB · klik untuk override manual">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={actualDownloader > 0 ? formatNumber(actualDownloader) : ''}
-                            onChange={(e) => {
-                              const val = parseFormattedNumber(e.target.value);
-                              updateDailyValue(date, 'actualDownloader', val || null);
+                          <DailyCellInput
+                            committedValue={actualDownloader > 0 ? actualDownloader : null}
+                            format={formatNumber}
+                            parse={(s) => {
+                              const n = parseFormattedNumber(s);
+                              return n || null;
                             }}
+                            onCommit={(v) => updateDailyValue(date, 'actualDownloader', v)}
                             placeholder="–"
-                            aria-label={`Real downloader ${date}`}
+                            ariaLabel={`Real downloader ${date}`}
                             className="w-full bg-transparent text-[11px] font-black text-indigo-600 tabular-nums outline-none focus:bg-indigo-50/50 focus:ring-2 focus:ring-indigo-200 rounded transition-all placeholder:text-slate-300 placeholder:font-medium"
                           />
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatNumber(dayData.manualTargetRepeatOrder || Math.round(displayTargetRepeatOrder))}
-                            onChange={(e) => updateDailyValue(date, 'manualTargetRepeatOrder', parseFormattedNumber(e.target.value))}
-                            aria-label={`Target user premium ${date}`}
+                          <DailyCellInput
+                            committedValue={dayData.manualTargetRepeatOrder ?? Math.round(displayTargetRepeatOrder)}
+                            format={formatNumber}
+                            parse={(s) => parseFormattedNumber(s)}
+                            onCommit={(v) => updateDailyValue(date, 'manualTargetRepeatOrder', v)}
+                            ariaLabel={`Target user premium ${date}`}
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-indigo-600 transition-colors tabular-nums"
                           />
                         </td>
                         {/* Actual User Premium — editable, default dari DB */}
                         <td className="py-3 px-4 border-r border-slate-100 bg-indigo-50/20" title="Default auto dari DB · klik untuk override manual">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={actualRepeatOrder > 0 ? formatNumber(actualRepeatOrder) : ''}
-                            onChange={(e) => {
-                              const val = parseFormattedNumber(e.target.value);
-                              updateDailyValue(date, 'actualRepeatOrder', val || null);
+                          <DailyCellInput
+                            committedValue={actualRepeatOrder > 0 ? actualRepeatOrder : null}
+                            format={formatNumber}
+                            parse={(s) => {
+                              const n = parseFormattedNumber(s);
+                              return n || null;
                             }}
+                            onCommit={(v) => updateDailyValue(date, 'actualRepeatOrder', v)}
                             placeholder="–"
-                            aria-label={`Real user premium ${date}`}
+                            ariaLabel={`Real user premium ${date}`}
                             className="w-full bg-transparent text-[11px] font-black text-indigo-600 tabular-nums outline-none focus:bg-indigo-50/50 focus:ring-2 focus:ring-indigo-200 rounded transition-all placeholder:text-slate-300 placeholder:font-medium"
                           />
                         </td>
@@ -1190,12 +1264,12 @@ export const TargetSection = ({
                           {conv.toFixed(1)}%
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100 bg-emerald-50/20">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatNumber(dayData.manualTargetSales || Math.round(displayTargetSales))}
-                            onChange={(e) => updateDailyValue(date, 'manualTargetSales', parseFormattedNumber(e.target.value))}
-                            aria-label={`Target sales ${date}`}
+                          <DailyCellInput
+                            committedValue={dayData.manualTargetSales ?? Math.round(displayTargetSales)}
+                            format={formatNumber}
+                            parse={(s) => parseFormattedNumber(s)}
+                            onCommit={(v) => updateDailyValue(date, 'manualTargetSales', v)}
+                            ariaLabel={`Target sales ${date}`}
                             className="w-full bg-transparent text-[11px] font-bold text-slate-400 outline-none focus:text-emerald-600 transition-colors tabular-nums"
                           />
                         </td>
@@ -1203,16 +1277,16 @@ export const TargetSection = ({
                             Display pakai formatCurrency, parsing pakai
                             parseFormattedNumber yg strip semua non-digit. */}
                         <td className="py-3 px-4 border-r border-slate-100 bg-emerald-50/20" title="Default auto dari DB · klik untuk override manual">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={actualSales > 0 ? formatCurrency(actualSales) : ''}
-                            onChange={(e) => {
-                              const val = parseFormattedNumber(e.target.value);
-                              updateDailyValue(date, 'actualSales', val || null);
+                          <DailyCellInput
+                            committedValue={actualSales > 0 ? actualSales : null}
+                            format={formatCurrency}
+                            parse={(s) => {
+                              const n = parseFormattedNumber(s);
+                              return n || null;
                             }}
+                            onCommit={(v) => updateDailyValue(date, 'actualSales', v)}
                             placeholder="–"
-                            aria-label={`Real sales ${date}`}
+                            ariaLabel={`Real sales ${date}`}
                             className="w-full bg-transparent text-[11px] font-black text-emerald-600 tabular-nums outline-none focus:bg-emerald-50/50 focus:ring-2 focus:ring-emerald-200 rounded transition-all placeholder:text-slate-300 placeholder:font-medium"
                           />
                         </td>
@@ -1240,78 +1314,16 @@ export const TargetSection = ({
                             </td>
                           );
                         })}
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="text" 
-                            value={dayData.premium || ''} 
-                            onChange={(e) => updateDailyValue(date, 'premium', e.target.value)}
-                            className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
-                            placeholder="..."
-                          />
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="text" 
-                            value={dayData.benefit || ''} 
-                            onChange={(e) => updateDailyValue(date, 'benefit', e.target.value)}
-                            className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
-                            placeholder="..."
-                          />
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="text" 
-                            value={dayData.event || ''} 
-                            onChange={(e) => updateDailyValue(date, 'event', e.target.value)}
-                            className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
-                            placeholder="..."
-                          />
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="text" 
-                            value={dayData.benefit2 || ''} 
-                            onChange={(e) => updateDailyValue(date, 'benefit2', e.target.value)}
-                            className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
-                            placeholder="..."
-                          />
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="text" 
-                            value={dayData.bcan || ''} 
-                            onChange={(e) => updateDailyValue(date, 'bcan', e.target.value)}
-                            className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
-                            placeholder="..."
-                          />
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="text" 
-                            value={dayData.story || ''} 
-                            onChange={(e) => updateDailyValue(date, 'story', e.target.value)}
-                            className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
-                            placeholder="..."
-                          />
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="text" 
-                            value={dayData.chat || ''} 
-                            onChange={(e) => updateDailyValue(date, 'chat', e.target.value)}
-                            className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
-                            placeholder="..."
-                          />
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <input 
-                            type="text" 
-                            value={dayData.activity || ''} 
-                            onChange={(e) => updateDailyValue(date, 'activity', e.target.value)}
-                            className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
-                            placeholder="..."
-                          />
-                        </td>
+                        {(['premium', 'benefit', 'event', 'benefit2', 'bcan', 'story', 'chat', 'activity'] as const).map((field) => (
+                          <td key={field} className="py-3 px-4 border-r border-slate-100">
+                            <DailyCellInput
+                              committedValue={(dayData as Record<string, unknown>)[field] as string | undefined ?? ''}
+                              onCommit={(v) => updateDailyValue(date, field, v)}
+                              placeholder="..."
+                              className="w-full bg-transparent text-[10px] font-bold text-slate-600 outline-none placeholder:text-slate-200"
+                            />
+                          </td>
+                        ))}
                         <td className="py-3 px-4 bg-indigo-50/30">
                           <button
                             onClick={() => {
