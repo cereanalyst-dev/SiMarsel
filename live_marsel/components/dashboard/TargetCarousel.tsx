@@ -10,7 +10,7 @@ import {
 import type { MetricBlock } from '@/types/database';
 
 interface Props {
-  blocks: MetricBlock[];
+  blocks: MetricBlock[];     // 4 metric blocks (sales/dl/premium/conversion)
   hasTarget: boolean;
 }
 
@@ -61,8 +61,20 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
           <h3 className="font-display text-3xl md:text-4xl tracking-tight">{block.label}</h3>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i - 1 + blocks.length) % blocks.length)} aria-label="Sebelumnya">←</Button>
-          <Button variant="white" size="sm" onClick={() => setIdx((i) => (i + 1) % blocks.length)} aria-label="Berikutnya">→</Button>
+          <Button
+            variant="white" size="sm"
+            onClick={() => setIdx((i) => (i - 1 + blocks.length) % blocks.length)}
+            aria-label="Sebelumnya"
+          >
+            ←
+          </Button>
+          <Button
+            variant="white" size="sm"
+            onClick={() => setIdx((i) => (i + 1) % blocks.length)}
+            aria-label="Berikutnya"
+          >
+            →
+          </Button>
         </div>
       </div>
 
@@ -82,7 +94,7 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
       </div>
 
       {/* App list */}
-      <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar min-h-0">
+      <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar">
         {block.apps.length === 0 ? (
           <div className="h-32 flex items-center justify-center border-2 border-dashed border-nb-black/30">
             <p className="text-sm font-bold text-nb-black/50">Belum ada data</p>
@@ -92,13 +104,20 @@ export const TargetCarousel = ({ blocks, hasTarget }: Props) => {
             const pct = clamp(app.pct, 0, 999);
             return (
               <div key={app.app} className="flex items-center gap-3 py-2">
+                {/* Rank */}
                 <span className="w-10 h-10 flex items-center justify-center bg-nb-black text-white text-lg font-display flex-shrink-0">
                   {i + 1}
                 </span>
+                {/* Name + values */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-2 mb-1.5">
                     <span className="font-display text-xl md:text-2xl truncate">
                       {titleCase(app.app)}
+                      {app.target > 0 && (
+                        <span className="ml-1.5 text-sm md:text-base font-bold text-nb-black/55 tabular-nums">
+                          ({fmt(app.target, block.unit)})
+                        </span>
+                      )}
                     </span>
                     <span className="text-lg md:text-xl font-display tabular-nums flex-shrink-0">
                       {fmt(app.value, block.unit)}
