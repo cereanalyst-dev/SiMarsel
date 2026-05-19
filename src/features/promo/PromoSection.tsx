@@ -89,6 +89,21 @@ export const PromoSection = ({
   }, [data, appFilter, yearFilter, monthFilter, dateFrom, dateTo]);
 
   // ============================================================
+  // Apply search di atas filteredTx — shared by Table 1 + Table 2,
+  // jadi search jadi salah satu layer filter (berlapis dengan app /
+  // year / month / range tanggal).
+  // ============================================================
+  const searchFilteredTx = useMemo(() => {
+    const q = search.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!q) return filteredTx;
+    return filteredTx.filter((t) => {
+      const parsed = parsePromoCode(t.promo_code);
+      const key = buildPromoDisplayKey(parsed).toUpperCase();
+      return key.includes(q);
+    });
+  }, [filteredTx, search]);
+
+  // ============================================================
   // Aggregate per kategori (Tabel 1: Kode Promo per Channel)
   // + Hitung total reseller (informational row)
   // ============================================================
@@ -109,7 +124,7 @@ export const PromoSection = ({
     let resCount = 0;
     let resRevenue = 0;
 
-    filteredTx.forEach((t) => {
+    searchFilteredTx.forEach((t) => {
       const parsed = parsePromoCode(t.promo_code);
       const cat = classifyPromo(t.promo_code, t.source_app || '', promoRulesIndex);
       const rev = Number(t.revenue) || 0;
@@ -141,10 +156,12 @@ export const PromoSection = ({
         pct: grandTotalRevenue > 0 ? (resRevenue / grandTotalRevenue) * 100 : 0,
       },
     };
-  }, [filteredTx, promoRulesIndex]);
+  }, [searchFilteredTx, promoRulesIndex]);
 
   // ============================================================
   // Aggregate per kode unik (Tabel 2: Rekap Per Kode Promo)
+  // Search sudah di-apply di searchFilteredTx — di sini cuma filter
+  // category yang spesifik buat Tabel 2.
   // ============================================================
   const byCode = useMemo(() => {
     const acc: Record<string, {
@@ -154,7 +171,7 @@ export const PromoSection = ({
       revenue: number;
     }> = {};
 
-    filteredTx.forEach((t) => {
+    searchFilteredTx.forEach((t) => {
       const parsed = parsePromoCode(t.promo_code);
       const key = buildPromoDisplayKey(parsed);
       const cat = classifyPromo(t.promo_code, t.source_app || '', promoRulesIndex);
@@ -167,13 +184,8 @@ export const PromoSection = ({
     if (categoryFilter !== 'All') {
       rows = rows.filter((r) => r.category === categoryFilter);
     }
-    if (search.trim()) {
-      const q = search.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-      // Match terhadap normalized key (sudah uppercase + no spec chars)
-      rows = rows.filter((r) => r.key.includes(q));
-    }
     return rows.sort((a, b) => b.revenue - a.revenue);
-  }, [filteredTx, categoryFilter, search, promoRulesIndex]);
+  }, [searchFilteredTx, categoryFilter, promoRulesIndex]);
 
   // ============================================================
   // Detail search — saat user search, tampil breakdown per app
@@ -334,7 +346,40 @@ export const PromoSection = ({
               </button>
             )}
           </div>
+
+          {/* Search kode promo — berlaku ke Tabel 1 & Tabel 2 */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 min-w-[220px] flex-1 md:flex-initial">
+            <Search className="w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari kode promo…"
+              aria-label="Cari kode promo"
+              className="flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-400 min-w-0"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                title="Clear search"
+                className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
+
+        {search.trim() && (
+          <p className="text-[10px] font-bold text-slate-400 mt-3 ml-1">
+            Search aktif — Tabel 1 &amp; Tabel 2 menampilkan hasil yang cocok dengan
+            <span className="ml-1 px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded font-black uppercase tracking-widest">
+              {search.trim()}
+            </span>
+          </p>
+        )}
       </div>
 
       {/* Hero stats */}
@@ -361,9 +406,9 @@ export const PromoSection = ({
 
       {/* Table 1: Kode Promo Per Channel + row Reseller */}
       <div className="card-tile overflow-hidden">
-        <div className="px-7 py-5 border-b border-slate-100 flex items-center gap-3">
+        <div className="px-7 py-5 border-b border-slate-100 flex items-center gap-3 flex-wrap">
           <div className="w-1 h-8 rounded-full bg-gradient-to-b from-rose-500 to-pink-500" />
-          <div>
+          <div className="flex-1">
             <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-0.5">
               Tabel 1
             </p>
@@ -371,6 +416,12 @@ export const PromoSection = ({
               Kode Promo per Channel
             </h3>
           </div>
+          {search.trim() && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-[0.2em] border border-rose-200">
+              <Search className="w-3 h-3" />
+              Filter: {search.trim()}
+            </span>
+          )}
         </div>
 
         <div className="overflow-x-auto custom-scrollbar">
@@ -500,26 +551,6 @@ export const PromoSection = ({
               <option value="All">SEMUA KATEGORI</option>
               {PROMO_CATEGORIES.map((c) => <option key={c} value={c}>{c.toUpperCase()}</option>)}
             </select>
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 min-w-[200px]">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari kode..."
-                className="flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-400 min-w-0"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch('')}
-                  aria-label="Clear"
-                  className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
           </div>
         </div>
 
