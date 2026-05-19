@@ -36,9 +36,19 @@ export const PromoSection = ({
   const [appFilter, setAppFilter] = useState<string>('All');
   const [yearFilter, setYearFilter] = useState<string>('All');
   const [monthFilter, setMonthFilter] = useState<string>('All');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<PromoCategory | 'All'>('All');
   const [search, setSearch] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Local YYYY-MM-DD dari Date — Jakarta time (gak toISOString biar gak shift UTC).
+  const toDateKey = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
 
   // Daftar app + year yang ada di data
   const allApps = useMemo(() => {
@@ -58,16 +68,25 @@ export const PromoSection = ({
     return ['All', ...Array.from(set).sort((a, b) => b - a).map(String)];
   }, [data]);
 
-  // Filter transaksi: app + year + month
+  // Filter transaksi: app + year + month + range tanggal.
+  // Range tanggal pakai parsed_payment_date (local Jakarta) — AND dengan
+  // filter year/month, jadi user bisa narrow lebih sempit lagi.
   const filteredTx = useMemo(() => {
     return data.filter((t) => {
       const app = (t.source_app || '').trim().toLowerCase();
       if (appFilter !== 'All' && app !== appFilter) return false;
       if (yearFilter !== 'All' && String(t.year) !== yearFilter) return false;
       if (monthFilter !== 'All' && String(t.month) !== monthFilter) return false;
+      if (dateFrom || dateTo) {
+        const d = t.parsed_payment_date;
+        if (!(d instanceof Date) || isNaN(d.getTime())) return false;
+        const key = toDateKey(d);
+        if (dateFrom && key < dateFrom) return false;
+        if (dateTo && key > dateTo) return false;
+      }
       return true;
     });
-  }, [data, appFilter, yearFilter, monthFilter]);
+  }, [data, appFilter, yearFilter, monthFilter, dateFrom, dateTo]);
 
   // ============================================================
   // Aggregate per kategori (Tabel 1: Kode Promo per Channel)
@@ -280,6 +299,41 @@ export const PromoSection = ({
               <option key={m} value={String(i + 1)}>{m.toUpperCase()}</option>
             ))}
           </select>
+
+          {/* Range Tanggal — Dari / Sampai */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Dari</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="Tanggal mulai"
+              max={dateTo || undefined}
+              className="bg-transparent text-[11px] font-black text-slate-700 outline-none cursor-pointer tabular-nums"
+            />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">→</span>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sampai</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              aria-label="Tanggal akhir"
+              min={dateFrom || undefined}
+              className="bg-transparent text-[11px] font-black text-slate-700 outline-none cursor-pointer tabular-nums"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                aria-label="Reset range tanggal"
+                title="Reset range tanggal"
+                className="ml-1 px-2 py-0.5 text-[10px] font-black text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-md uppercase tracking-widest transition-colors"
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
