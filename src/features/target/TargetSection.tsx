@@ -335,6 +335,7 @@ export const TargetSection = ({
       isTargetSet: newIsTargetSet,
     } : a);
     setApps(updatedApps);
+    setIsEditingTarget(false);
     // Force save langsung — bypass debounce 800ms supaya target bulanan
     // dijamin tersimpan walau user langsung close tab / pindah menu.
     onForceSave?.(updatedApps);
@@ -352,6 +353,16 @@ export const TargetSection = ({
   };
 
   const isTargetSetForMonth = selectedApp.isTargetSet?.[targetMonth];
+
+  // Local-only "user is editing target" flag. Tidak ikut ke-persist ke
+  // Supabase — supaya realtime sync dari apps_snapshot tidak nutup form
+  // pas user lagi edit. Reset otomatis saat ganti app / bulan / setelah
+  // Generate Sheet sukses.
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  useEffect(() => {
+    setIsEditingTarget(false);
+  }, [selectedAppId, targetMonth]);
+  const showTargetForm = !isTargetSetForMonth || isEditingTarget;
 
   const summary = useMemo(() => {
     // Real — prioritas manual override (dailyData.actualX) > auto DB.
@@ -857,7 +868,7 @@ export const TargetSection = ({
         </div>
       </div>
 
-      {!isTargetSetForMonth ? (
+      {showTargetForm ? (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -1035,12 +1046,9 @@ export const TargetSection = ({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => {
-                    const newIsTargetSet = { ...(selectedApp.isTargetSet || {}) };
-                    newIsTargetSet[targetMonth] = false;
-                    setApps(apps.map(a => a.id === selectedAppId ? { ...a, isTargetSet: newIsTargetSet } : a));
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTarget(true)}
                   className="px-4 py-2 bg-white border border-slate-200 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-slate-50 transition-all"
                 >
                   Edit Target
