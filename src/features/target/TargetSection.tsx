@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import {
@@ -177,10 +177,20 @@ export const TargetSection = ({
 
   const [form, setForm] = useState(selectedApp.targetConfig?.[targetMonth] || emptyTargetForm);
 
+  // Track kalau user lagi ngetik di form target — supaya realtime sync /
+  // external apps update tidak nge-overwrite ketikannya. Reset saat user
+  // ganti app / bulan, atau setelah Generate Sheet sukses.
+  const userTypingTargetRef = useRef(false);
+
   useEffect(() => {
+    if (userTypingTargetRef.current) return;
     setForm(selectedApp.targetConfig?.[targetMonth] || emptyTargetForm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAppId, targetMonth, selectedApp.targetConfig]);
+
+  useEffect(() => {
+    userTypingTargetRef.current = false;
+  }, [selectedAppId, targetMonth]);
 
   const daysInMonthCount = useMemo(() => {
     const [year, month] = targetMonth.split('-').map(Number);
@@ -336,6 +346,7 @@ export const TargetSection = ({
     } : a);
     setApps(updatedApps);
     setIsEditingTarget(false);
+    userTypingTargetRef.current = false;
     // Force save langsung — bypass debounce 800ms supaya target bulanan
     // dijamin tersimpan walau user langsung close tab / pindah menu.
     onForceSave?.(updatedApps);
@@ -887,10 +898,13 @@ export const TargetSection = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Target Downloader</label>
-              <input 
+              <input
                 type="number"
                 value={form.targetDownloader || ''}
-                onChange={(e) => setForm({...form, targetDownloader: Number(e.target.value)})}
+                onChange={(e) => {
+                  userTypingTargetRef.current = true;
+                  setForm({ ...form, targetDownloader: Number(e.target.value) });
+                }}
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold"
                 placeholder="0"
               />
@@ -900,37 +914,49 @@ export const TargetSection = ({
               <input
                 type="number"
                 value={form.targetRepeatOrder || ''}
-                onChange={(e) => setForm({...form, targetRepeatOrder: Number(e.target.value)})}
+                onChange={(e) => {
+                  userTypingTargetRef.current = true;
+                  setForm({ ...form, targetRepeatOrder: Number(e.target.value) });
+                }}
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold"
                 placeholder="0"
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Target Sales (Revenue)</label>
-              <input 
+              <input
                 type="number"
                 value={form.targetSales || ''}
-                onChange={(e) => setForm({...form, targetSales: Number(e.target.value)})}
+                onChange={(e) => {
+                  userTypingTargetRef.current = true;
+                  setForm({ ...form, targetSales: Number(e.target.value) });
+                }}
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold"
                 placeholder="0"
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Target Konversi (%)</label>
-              <input 
+              <input
                 type="number"
                 value={form.targetConversion || ''}
-                onChange={(e) => setForm({...form, targetConversion: Number(e.target.value)})}
+                onChange={(e) => {
+                  userTypingTargetRef.current = true;
+                  setForm({ ...form, targetConversion: Number(e.target.value) });
+                }}
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold"
                 placeholder="0"
               />
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Rata-rata Harga Paket</label>
-              <input 
+              <input
                 type="number"
                 value={form.avgPrice || ''}
-                onChange={(e) => setForm({...form, avgPrice: Number(e.target.value)})}
+                onChange={(e) => {
+                  userTypingTargetRef.current = true;
+                  setForm({ ...form, avgPrice: Number(e.target.value) });
+                }}
                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold"
                 placeholder="0"
               />
